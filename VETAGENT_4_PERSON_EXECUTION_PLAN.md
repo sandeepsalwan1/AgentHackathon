@@ -169,7 +169,62 @@ Must support:
 - competitor pricing -> report task,
 - daily ops -> ranked work list.
 
+## Person 1 vs Person 3 - Clean Split
+
+This is the ownership line so work does not overlap.
+
+Person 1 owns the agent-ready product system.
+
+- database,
+- mock clinic data,
+- route contracts,
+- API routes,
+- task/approval/workflow persistence,
+- check-in backend path,
+- Render/Supabase/Opsera deploy path,
+- deterministic mock responses so frontend and demos never block.
+
+Person 3 owns the agent intelligence.
+
+- OpenAI Agents SDK usage,
+- agent prompts/instructions,
+- tool definitions,
+- tool calling behavior,
+- guardrails,
+- scenario behavior,
+- E2B evals,
+- Apify pricing-agent logic.
+
+Fast rule:
+
+- If it needs to exist as a route, table, deploy, stored workflow, task, approval, or reusable backend contract: Person 1.
+- If it decides what the agent asks, says, classifies, recommends, escalates, or tests in scenarios: Person 3.
+- If both touch it, Person 1 defines the contract first and Person 3 plugs agent behavior into that contract.
+
+Examples:
+
+- Check-in route: Person 1.
+- Check-in conversation behavior: Person 3.
+- Mock appointments and wait status data: Person 1.
+- Agent deciding whether arrival is matched, ambiguous, or urgent: Person 3.
+- Creating a task from a workflow: Person 1 provides the task/approval persistence path; Person 3 decides when to call it.
+- Records-transfer approval route: Person 1.
+- Records-transfer agent flow and wording: Person 3.
+- Pricing report storage/task: Person 1.
+- Competitor price comparison logic: Person 3.
+- E2B scenario runner behavior: Person 3, with Person 1 providing route stubs and mock data.
+
 ## Person 1 - Platform + Backend + Agent Foundation
+
+Person 1 outcome:
+
+- backend-ready foundation deployed or locally runnable,
+- mock clinic data available,
+- stable agent API contracts,
+- check-in route path usable by frontend,
+- task/approval/workflow persistence usable by agents,
+- agent run history and workflow timeline available,
+- clear deploy/run notes for everyone else.
 
 Person 1 owns:
 
@@ -192,6 +247,19 @@ Person 1 owns:
 - agent API contracts for Person 3 and Person 4.
 - smoke tests.
 - docs for deployment and handoff.
+
+Person 1 build sequence:
+
+1. Confirm current app/build/db state.
+2. Freeze route contracts in `docs/agent-api-contracts.md`.
+3. Get Supabase migrations and seed data working.
+4. Add mock clinic DB helpers.
+5. Add agent run, workflow event, and approval persistence.
+6. Add route stubs with stable JSON for Person 3 and Person 4.
+7. Add check-in backend path first.
+8. Add call, follow-up, records, pricing, and internal-agent route paths.
+9. Verify existing task board, public request form, and passcodes still work.
+10. Keep Render/Opsera deploy path moving.
 
 Person 1 does not own:
 
@@ -436,7 +504,17 @@ Done when:
 
 ## Person 3 - Agents + Tools + Behavior
 
-Person 3 owns agent behavior depth. Person 1 co-owns the agent foundation and route wiring. If Person 3 already has pieces started, preserve that work and connect it through the shared contracts.
+Person 3 owns agent behavior depth. Person 1 owns the backend foundation and route wiring. If Person 3 already has pieces started, preserve that work and connect it through the shared contracts.
+
+Person 3 outcome:
+
+- external agent behaves well on mock data,
+- internal agent behaves well on mock data,
+- check-in agent handles the most important client path,
+- tool registry is typed and safe,
+- E2B scenario proof exists,
+- Apify pricing-agent path exists,
+- risky actions create tasks/approvals instead of silently acting.
 
 Person 3 owns:
 
@@ -451,6 +529,28 @@ Person 3 owns:
 - E2B scenario runner,
 - Apify pricing wrapper,
 - scenario tests/evals.
+
+Person 3 build sequence:
+
+1. Read `docs/agent-api-contracts.md` once Person 1 creates it.
+2. Define shared agent/tool types in `packages/agents/src/contracts.ts`.
+3. Build deterministic mock agent responses first.
+4. Implement check-in/arrival behavior first.
+5. Implement external agent behavior for booking, pickup, follow-up, records, sick-pet, and call intake.
+6. Implement internal agent behavior for daily ops, triage, records, invoice/admin, follow-up, and pricing review.
+7. Add guardrails for medical, billing, records, and pricing risk.
+8. Add E2B scenario runner with local fallback.
+9. Add Apify pricing wrapper with sample-data fallback.
+10. Plug package functions into Person 1 route contracts.
+
+Person 3 does not own:
+
+- Supabase project setup,
+- Render deploy setup,
+- Opsera pipeline setup,
+- DB migrations,
+- final frontend layout,
+- changing passcode auth.
 
 ### Person 3 Workstream A - Agent Package
 
