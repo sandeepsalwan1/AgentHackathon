@@ -12,7 +12,8 @@
     "build": "npm run build --workspace @central-vet/internal && npm run build --workspace @central-vet/client-request",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "db:migrate": "node packages/db/scripts/migrate.mjs"
+    "db:migrate": "node packages/db/scripts/migrate.mjs",
+    "test:scenarios": "tsx packages/agents/src/scenarioRunner.ts"
   },
   "engines": {
     "node": ">=22"
@@ -25,7 +26,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^4.1.2",
-    "zod": "^3.24.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -33,6 +34,7 @@
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
     "eslint-config-next": "^16.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   },
   "overrides": {
