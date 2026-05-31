@@ -3,7 +3,6 @@
 This document is a revised, fuller implementation brief for VetAgent. It is meant to be handed to another AI or engineer so they can understand the complete intent, missing context, exact priorities, constraints, architecture, and execution plan.
 
 This version explicitly adds the details that were previously underemphasized:
-
 - The current top priority is **internal and external agents**.
 - A **task manager already exists** in a Tri-City Veterinary Hospital implementation and should be reused.
 - There is **not yet reliable access to all integrations**, so the early system must be designed to work with **mock data, simulated adapters, and local mirrors** until real integrations are available.
