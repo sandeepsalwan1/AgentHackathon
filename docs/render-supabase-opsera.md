@@ -27,9 +27,9 @@ Render setup:
 - Project: `Main1` (`prj-d8e98bmk1jcs739ogq20`).
 - Environment: `evm-d8e98bmk1jcs739ogq2g`.
 - Services:
-  - `vetagent-internal`: `https://vetagent-internal.onrender.com`
-  - `vetagent-client`: `https://vetagent-client.onrender.com`
-  - `vetagent-overdue-summary`
+  - `vetagent-internal` (`srv-d8e9c019rddc73el6i5g`): `https://vetagent-internal.onrender.com`
+  - `vetagent-client` (`srv-d8e9c3l7vvec73ef0p30`): `https://vetagent-client.onrender.com`
+  - `vetagent-overdue-summary`: defined in `render.yaml`, not created through the API yet.
 - Internal build: `npm ci && npm run build --workspace @central-vet/internal`
 - Internal start: `npm run start --workspace @central-vet/internal -- -p $PORT`
 - Client build: `npm ci && npm run build --workspace @central-vet/client-request`
