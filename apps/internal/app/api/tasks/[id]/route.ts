@@ -298,13 +298,58 @@ export async function PATCH(
     }
 
     if (nextStatus === "completed" && currentTask.requestType === "records_request") {
-      if (!currentTask.opseraAuditStatus) {
-        return NextResponse.json(
-          { error: "Records transfers require an Opsera audit before completion." },
-          { status: 403 }
+      let auditStatus = currentTask.opseraAuditStatus;
+      if (!auditStatus) {
+        const opseraAudit = await auditRecordsTransfer(
+          buildRecordsTransferPacket({
+            clientName: currentTask.clientName,
+            clientPhone: currentTask.clientPhone,
+            clientDateOfBirth: currentTask.clientDateOfBirth,
+            clientId: currentTask.clarityId,
+            petName: currentTask.petName,
+            petWeight: currentTask.petWeight,
+            lastVisit: currentTask.lastVisit,
+            request: currentTask.request,
+            requestedBy: actor.name,
+            metadata: {
+              source: "completion_gate",
+              actorRole: actor.role,
+              taskId: id
+            }
+          })
         );
+        auditStatus = opseraAudit.status;
+        await editTask(
+          id,
+          {
+            opseraAuditStatus: opseraAudit.status,
+            opseraAuditReason: opseraAudit.reason,
+            opseraAuditId: opseraAudit.auditId,
+            opseraAuditCheckedAt: opseraAudit.checkedAt
+          },
+          actor
+        );
+        await recordTaskEvent({
+          taskId: id,
+          actor,
+          eventType: "opsera_records_audit",
+          previousStatus: currentTask.status,
+          nextStatus: currentTask.status,
+          metadata: {
+            opseraStatus: opseraAudit.status,
+            opseraReason: opseraAudit.reason,
+            opseraAuditId: opseraAudit.auditId,
+            opseraSource: opseraAudit.source,
+            reason: "completion_gate"
+          }
+        });
+        logInfo("opsera_records_audit", {
+          taskId: id,
+          actorRole: actor.role,
+          status: opseraAudit.status
+        });
       }
-      if (currentTask.opseraAuditStatus === "blocked") {
+      if (auditStatus === "blocked") {
         return NextResponse.json(
           { error: "Opsera blocked this records transfer. It cannot be completed." },
           { status: 403 }
