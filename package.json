@@ -12,7 +12,8 @@
     "build": "npm run build --workspace @central-vet/internal && npm run build --workspace @central-vet/client-request",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "db:migrate": "node packages/db/scripts/migrate.mjs"
+    "db:migrate": "node packages/db/scripts/migrate.mjs",
+    "test:scenarios": "npx tsx packages/agents/src/scenarioRunner.ts"
   },
   "engines": {
     "node": ">=22"
