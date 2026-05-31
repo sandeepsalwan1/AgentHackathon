@@ -13,7 +13,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:migrate": "node packages/db/scripts/migrate.mjs",
-    "test:scenarios": "npx tsx packages/agents/src/scenarioRunner.ts"
+    "test:scenarios": "tsx packages/agents/src/scenarioRunner.ts"
   },
   "engines": {
     "node": ">=22"
@@ -34,6 +34,7 @@
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
     "eslint-config-next": "^16.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   },
   "overrides": {

@@ -1,79 +1,82 @@
-import { Actor, createTask } from "@central-vet/db";
+import type { AgentInput, TaskPriority } from "./contracts";
+import { getInputText } from "./tools";
 
-export interface GuardrailResult {
+export type GuardrailDecision = {
   allowed: boolean;
-  escalated: boolean;
-  message?: string;
-  taskId?: string;
-}
+  risk: "none" | "medical" | "records" | "billing" | "pricing";
+  priority: TaskPriority;
+  message: string | null;
+  reasons: string[];
+};
 
-/**
- * Checks for medical keywords and diagnoses in client messages.
- * If flagged, automatically escalates to a high-priority staff task and prevents auto-diagnosis.
- */
-export async function enforceMedicalGuardrails(
-  messageBody: string,
-  clientName?: string | null,
-  petName?: string | null
-): Promise<GuardrailResult> {
-  const medicalKeywords = [
-    "vomit", "throw up", "blood", "diarrhea", "lethargic", "cough", 
-    "bleeding", "broken", "limping", "swelling", "seizure", "collapse", 
-    "choking", "poison", "toxin", "pain", "fever", "breathing"
-  ];
-  
-  const hasMedicalKeyword = medicalKeywords.some(keyword => 
-    messageBody.toLowerCase().includes(keyword)
-  );
+const medicalTerms = [
+  "blood",
+  "breathing",
+  "choking",
+  "collapse",
+  "diarrhea",
+  "emergency",
+  "lethargic",
+  "pain",
+  "poison",
+  "seizure",
+  "toxin",
+  "vomit"
+];
 
-  if (hasMedicalKeyword) {
-    const actor: Actor = { name: "Medical Guardrail", role: "task_adder" };
-    // Create a high priority triage task for the clinic staff
-    const task = await createTask({
-      status: "due", // staff needs to act immediately
-      source: "client_form",
-      clientName: clientName || "Unknown Client",
-      petName: petName || "Unknown Pet",
-      request: `SICK PET TRIAGE: Client reported potential illness/emergency: "${messageBody}"`,
-      requestType: "patient_update",
-      priority: "high"
-    }, actor);
-
+export function checkMedicalGuardrail(input: AgentInput): GuardrailDecision {
+  const text = getInputText(input).toLowerCase();
+  const matched = medicalTerms.filter((term) => text.includes(term));
+  if (!matched.length) {
     return {
-      allowed: false,
-      escalated: true,
-      taskId: task.id,
-      message: "I cannot diagnose illnesses or recommend medical treatments. I have immediately alerted our veterinary team of your concern, and a clinic staff member will contact you shortly. If this is a life-threatening emergency, please bring your pet to the nearest emergency clinic."
+      allowed: true,
+      risk: "none",
+      priority: "low",
+      message: null,
+      reasons: []
     };
   }
 
-  return { allowed: true, escalated: false };
+  return {
+    allowed: false,
+    risk: "medical",
+    priority: matched.some((term) => ["blood", "breathing", "choking", "collapse", "seizure", "poison", "toxin"].includes(term))
+      ? "high"
+      : "medium",
+    message: "I cannot diagnose or recommend treatment. I flagged this for the clinical team. If this is an emergency, call the hospital or go to the nearest emergency clinic now.",
+    reasons: matched
+  };
 }
 
-/**
- * Ensures any records release action is intercepted and marked as pending human approval.
- */
-export function enforceRecordsGuardrails(requestedAction: string): GuardrailResult {
-  if (requestedAction.includes("send_records") || requestedAction.includes("release_records")) {
-    return {
-      allowed: false,
-      escalated: true,
-      message: "Records cannot be sent automatically. A transfer request has been placed in the approvals queue for staff verification."
-    };
-  }
-  return { allowed: true, escalated: false };
+export function checkRecordsGuardrail(action: string): GuardrailDecision {
+  const risky = /(send|release|transfer|email).*record/i.test(action);
+  return {
+    allowed: !risky,
+    risk: risky ? "records" : "none",
+    priority: risky ? "medium" : "low",
+    message: risky ? "Records transfer requires staff approval before anything is sent." : null,
+    reasons: risky ? ["records_transfer_requires_approval"] : []
+  };
 }
 
-/**
- * Blocks any attempt to write prices or updates directly to the clinic services database.
- */
-export function enforcePricingGuardrails(requestedAction: string): GuardrailResult {
-  if (requestedAction.includes("update_price") || requestedAction.includes("set_price") || requestedAction.includes("change_catalog")) {
-    return {
-      allowed: false,
-      escalated: true,
-      message: "AI agent is not authorized to modify clinic service pricing. Pricing recommendations must be submitted in a review report."
-    };
-  }
-  return { allowed: true, escalated: false };
+export function checkBillingGuardrail(action: string): GuardrailDecision {
+  const risky = /(refund|charge|discount|void|write.?off|change.*invoice)/i.test(action);
+  return {
+    allowed: !risky,
+    risk: risky ? "billing" : "none",
+    priority: risky ? "medium" : "low",
+    message: risky ? "Billing changes require staff review. I can create a review task instead." : null,
+    reasons: risky ? ["billing_mutation_requires_review"] : []
+  };
+}
+
+export function checkPricingGuardrail(action: string): GuardrailDecision {
+  const risky = /(update|change|set|raise|lower).*price/i.test(action);
+  return {
+    allowed: !risky,
+    risk: risky ? "pricing" : "none",
+    priority: risky ? "medium" : "low",
+    message: risky ? "Prices are not changed automatically. I can create a pricing report and review task." : null,
+    reasons: risky ? ["pricing_mutation_blocked"] : []
+  };
 }

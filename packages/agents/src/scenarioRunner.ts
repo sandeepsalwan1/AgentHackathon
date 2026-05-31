@@ -1,107 +1,158 @@
-import nextEnv from "@next/env";
-import path from "node:path";
-
-// Initialize environment variables from root .env.local
-const root = path.resolve(import.meta.dirname, "../../..");
-const { loadEnvConfig } = nextEnv;
-loadEnvConfig(root);
-
+import { runInSandbox } from "./e2bRunner";
 import { runExternalAgent } from "./externalAgent";
 import { runInternalAgent } from "./internalAgent";
+import type { AgentWorkflowResult } from "./contracts";
 
-async function runScenario(name: string, fn: () => Promise<any>) {
-  console.log(`\n========================================`);
-  console.log(`RUNNING SCENARIO: ${name}`);
-  console.log(`========================================`);
-  try {
-    const result = await fn();
-    console.log(`STATUS: ${result.status.toUpperCase()}`);
-    console.log(`MESSAGE:`);
-    console.log(result.message);
-    console.log(`CREATED TASKS:`, result.taskIds);
-    console.log(`CREATED APPROVALS:`, result.approvalIds);
-    console.log(`EVENTS LOGGED:`, result.events.filter((e: any) => e.eventType === "tool_call").map((e: any) => e.toolName));
-    return true;
-  } catch (err: any) {
-    console.error(`SCENARIO FAILED with error:`, err);
-    return false;
-  }
+type Scenario = {
+  name: string;
+  run: () => Promise<AgentWorkflowResult>;
+  expect: (result: AgentWorkflowResult) => string | null;
+};
+
+function expectIntent(intent: AgentWorkflowResult["intent"]) {
+  return (result: AgentWorkflowResult) =>
+    result.intent === intent ? null : `Expected intent ${intent}, got ${result.intent}`;
 }
+
+function expectTask(result: AgentWorkflowResult) {
+  return result.task ? null : "Expected a staff task draft";
+}
+
+function expectApproval(result: AgentWorkflowResult) {
+  return result.approval ? null : "Expected an approval draft";
+}
+
+function all(...checks: Array<(result: AgentWorkflowResult) => string | null>) {
+  return (result: AgentWorkflowResult) => {
+    for (const check of checks) {
+      const message = check(result);
+      if (message) return message;
+    }
+    return null;
+  };
+}
+
+export const scenarios: Scenario[] = [
+  {
+    name: "arrival happy path",
+    run: () => runExternalAgent({
+      clientName: "Maya Parker",
+      clientPhone: "(415) 555-0134",
+      petName: "Biscuit",
+      message: "I'm outside for my appointment. Can you check me in?"
+    }),
+    expect: all(expectIntent("checkin"), expectTask)
+  },
+  {
+    name: "arrival no appointment",
+    run: () => runExternalAgent({
+      clientName: "Unknown Client",
+      petName: "Ghost",
+      message: "I'm here for my appointment."
+    }),
+    expect: all(expectIntent("checkin"), expectTask)
+  },
+  {
+    name: "booking happy path",
+    run: () => runExternalAgent({
+      clientName: "Alice Johnson",
+      petName: "Bella",
+      appointmentType: "Vaccines",
+      message: "Can I book Bella for vaccines next Tuesday?"
+    }),
+    expect: all(expectIntent("booking"), expectTask)
+  },
+  {
+    name: "booking ambiguous",
+    run: () => runExternalAgent({
+      message: "Can I get the first appointment after 3?"
+    }),
+    expect: all(expectIntent("booking"), expectTask)
+  },
+  {
+    name: "sick-pet emergency",
+    run: () => runExternalAgent({
+      clientName: "Jane Doe",
+      petName: "Buddy",
+      message: "Buddy is vomiting blood and very lethargic."
+    }),
+    expect: all(expectIntent("sick_pet"), expectTask)
+  },
+  {
+    name: "records transfer",
+    run: () => runExternalAgent({
+      clientName: "Alice Johnson",
+      petName: "Bella",
+      destination: "Eastside Vet Clinic",
+      message: "Please transfer Bella's records to Eastside Vet Clinic."
+    }),
+    expect: all(expectIntent("records"), expectTask, expectApproval)
+  },
+  {
+    name: "pickup status",
+    run: () => runExternalAgent({
+      clientName: "Jane Doe",
+      petName: "Buddy",
+      message: "Is Buddy ready for pickup?"
+    }),
+    expect: all(expectIntent("pickup"), expectTask)
+  },
+  {
+    name: "follow-up vaccine due",
+    run: () => runInternalAgent({
+      message: "Scan follow-up vaccine candidates."
+    }),
+    expect: all(expectIntent("followup"), expectTask)
+  },
+  {
+    name: "invoice issue",
+    run: () => runInternalAgent({
+      message: "Run invoice audit for unusual charges."
+    }),
+    expect: all(expectIntent("invoice"), expectTask)
+  },
+  {
+    name: "pricing review",
+    run: () => runInternalAgent({
+      message: "Check competitor prices and flag differences."
+    }),
+    expect: all(expectIntent("pricing"), expectTask)
+  },
+  {
+    name: "call transcript to task",
+    run: () => runExternalAgent({
+      callerName: "Maya Parker",
+      callerPhone: "(415) 555-0134",
+      transcript: "Hi, I parked outside with Biscuit. Can you check us in?"
+    }),
+    expect: all(expectIntent("checkin"), expectTask)
+  }
+];
 
 async function main() {
-  console.log("Starting VetAgent Scenario Tests...");
-  
-  // Set required mock variables in case running direct
-  process.env.MOCK_MODE = "true";
-  process.env.AGENT_RUNTIME = "mock";
+  const sandbox = await runInSandbox("VetAgent scenarios", async () => {
+    const failures: string[] = [];
+    for (const scenario of scenarios) {
+      const result = await scenario.run();
+      const failure = scenario.expect(result);
+      const tools = result.toolCalls.map((tool) => tool.toolName).join(", ") || "none";
+      console.log(`${failure ? "FAIL" : "PASS"} ${scenario.name}: ${result.message}`);
+      console.log(`  intent: ${result.intent}; tools: ${tools}`);
+      if (failure) failures.push(`${scenario.name}: ${failure}`);
+    }
+    return { failures };
+  });
 
-  let success = true;
-
-  // 1. External Checkin Happy Path
-  const s1 = await runScenario("Client Check-In (Happy Path)", () => 
-    runExternalAgent(
-      "Hi, I'm here for Buddy's appointment. Jane Doe.",
-      { tenantId: "central-vet", scenario: "checkin" }
-    )
-  );
-  if (!s1) success = false;
-
-  // 2. External Booking Request
-  const s2 = await runScenario("Client Reschedule / Booking", () => 
-    runExternalAgent(
-      "Hi, this is Alice Johnson. Can I reschedule Bella's appointment for next Tuesday at 10 AM?",
-      { tenantId: "central-vet", scenario: "booking" }
-    )
-  );
-  if (!s2) success = false;
-
-  // 3. Sick Pet Medical Triage (Guardrail triggering high-priority task)
-  const s3 = await runScenario("Sick Pet Emergency (Guardrails)", () => 
-    runExternalAgent(
-      "Buddy is throwing up, vomiting blood and seems extremely lethargic today.",
-      { tenantId: "central-vet", scenario: "sick_pet" }
-    )
-  );
-  if (!s3) success = false;
-
-  // 4. Records Transfer Request (Creating human approval)
-  const s4 = await runScenario("Client Records Transfer Request", () => 
-    runExternalAgent(
-      "Can you request Bella's immunization records from Eastside Vet Clinic?",
-      { tenantId: "central-vet", scenario: "records" }
-    )
-  );
-  if (!s4) success = false;
-
-  // 5. Internal Daily Ops Summary
-  const s5 = await runScenario("Staff Daily Ops Summary", () => 
-    runInternalAgent(
-      "Summarize the daily task board queue and status.",
-      { tenantId: "central-vet", scenario: "daily_ops" }
-    )
-  );
-  if (!s5) success = false;
-
-  // 6. Internal Competitor Pricing Scan (Apify research comparison)
-  const s6 = await runScenario("Competitor Price Scan (Apify Research)", () => 
-    runInternalAgent(
-      "Run a pricing check on competitor clinics.",
-      { tenantId: "central-vet", scenario: "pricing_scan" }
-    )
-  );
-  if (!s6) success = false;
-
-  console.log(`\n========================================`);
-  if (success) {
-    console.log("ALL SCENARIOS COMPLETED SUCCESSFULLY!");
-    process.exit(0);
-  } else {
-    console.error("SOME SCENARIOS FAILED.");
+  if (sandbox.stdout) console.log(sandbox.stdout);
+  if (sandbox.stderr) console.error(sandbox.stderr);
+  const failures = sandbox.result?.failures ?? ["scenario runner failed"];
+  if (failures.length > 0) {
+    for (const failure of failures) console.error(failure);
     process.exit(1);
   }
+  process.exit(0);
 }
 
-// Check if run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }

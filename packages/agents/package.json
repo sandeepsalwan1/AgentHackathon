@@ -7,10 +7,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:scenarios": "tsx src/scenarioRunner.ts"
   },
   "dependencies": {
-    "@central-vet/db": "*",
     "@openai/agents": "^0.11.6",
     "zod": "^3.24.1"
   },

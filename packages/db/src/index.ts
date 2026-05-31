@@ -33,8 +33,6 @@ export {
   setRecipientProfile,
   setPriorityAlertsEnabled
 } from "./settings";
-export * from "./agents";
-export * from "./mockClinic";
 export type { RecipientProfile } from "./settings";
 export type {
   Actor,

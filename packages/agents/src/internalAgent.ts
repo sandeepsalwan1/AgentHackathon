@@ -1,71 +1,122 @@
-import { AgentResponse, AgentContext } from "./contracts";
-import { runMockAgent } from "./mockProvider";
-import { tools } from "./tools";
+import type {
+  AgentInput,
+  AgentReportDraft,
+  AgentTaskDraft,
+  AgentWorkflowResult,
+  MockInvoice,
+  RunAgentOptions
+} from "./contracts";
+import { checkBillingGuardrail, checkMedicalGuardrail } from "./guardrails";
+import {
+  buildResult,
+  classifyIntent,
+  createRuntime,
+  normalizeAgentInput,
+  resolveMode
+} from "./mockProvider";
+import { runFollowupAgent } from "./followupAgent";
+import { runPricingAgent } from "./pricingAgent";
+import { runRecordsAgent } from "./recordsAgent";
+import { executeTool, getInputText, summarizeInvoice } from "./tools";
 
-// Instructions for the Staff-Facing Agent
-const instructions = `
-You are the Staff-Facing AI Agent for Central Veterinary Hospital. 
-You assist clinic staff (Veterinary Assistants, Veterinarians, Admins) in optimizing workflows and handling administrative backlog.
-Your key duties:
-1. DAILY OPS SUMMARY: Summarize active queue items, pending tasks, follow-ups, and billing issues.
-2. PRICE REVIEW SCAN: Trigger competitor pricing research. Compare catalog pricing and output reports. Do NOT change database prices directly.
-3. INVOICE AUDIT: Help detect billing discrepancies (surcharges) and flag them for staff reviews.
-4. OUTREACH CAMPAIGNS: Identify follow-up candidates (vaccines, wellness rechecks due) and create staff contact tasks.
+export async function runInternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
+  const normalized = normalizeAgentInput(input);
+  const intent = classifyIntent(normalized, "daily_ops");
+  if (intent === "pricing") return runPricingAgent(normalized, options);
+  if (intent === "records") return runRecordsAgent(normalized, options);
+  if (intent === "followup") return runFollowupAgent(normalized, options);
 
-Use the provided tools to fetch reports, scan competitors, compare prices, create review tasks, or approve records transfers. Be efficient, operational, and detailed.
-`;
+  const mode = resolveMode(options);
+  const runtime = createRuntime(normalized, intent === "unknown" ? "daily_ops" : intent, options);
 
-export async function runInternalAgent(
-  message: string,
-  context: AgentContext
-): Promise<AgentResponse> {
-  const isMock = process.env.MOCK_MODE === "true" || process.env.AGENT_RUNTIME === "mock";
-  
-  if (isMock) {
-    let scenario = context.scenario || "daily_ops";
-    const lowercaseMsg = message.toLowerCase();
-    
-    if (lowercaseMsg.includes("price") || lowercaseMsg.includes("pricing") || lowercaseMsg.includes("competitor") || lowercaseMsg.includes("scan")) {
-      scenario = "pricing_scan";
-    } else if (lowercaseMsg.includes("followup") || lowercaseMsg.includes("outreach") || lowercaseMsg.includes("vaccine")) {
-      scenario = "followup";
-    } else if (lowercaseMsg.includes("invoice") || lowercaseMsg.includes("billing") || lowercaseMsg.includes("audit")) {
-      scenario = "invoice";
-    }
-    
-    return runMockAgent("internal", scenario, message, context);
+  if (intent === "sick_pet") {
+    const guardrail = checkMedicalGuardrail(normalized);
+    const taskResult = await executeTool("create_task", {
+      status: "due",
+      priority: guardrail.priority,
+      requestType: "patient_update",
+      clientName: normalized.clientName ?? null,
+      clientPhone: normalized.clientPhone ?? null,
+      petName: normalized.petName ?? null,
+      request: `Staff triage needed for sick-pet message: ${getInputText(normalized)}`,
+      notes: "No diagnosis or treatment recommendation was produced."
+    }, runtime) as { task: AgentTaskDraft };
+    return buildResult({
+      intent,
+      mode,
+      message: guardrail.message ?? "Sick-pet message routed for staff triage.",
+      result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons },
+      runtime,
+      options,
+      task: taskResult.task
+    });
   }
 
-  // Real OpenAI Agent Path (dynamically imported to bypass peer dependency warnings in mock runtime)
-  // @ts-ignore
-  const { Agent, run: runAgent, tool } = await import("@openai/agents");
-
-  const agentTools = Object.entries(tools).map(([name, toolObj]) => {
-    return tool({
-      name,
-      description: toolObj.description,
-      parameters: toolObj.parameters,
-      execute: async (args: any) => {
-        return toolObj.execute(args, context.runId);
-      }
+  if (intent === "invoice") {
+    const guardrail = checkBillingGuardrail(getInputText(normalized));
+    const invoice = runtime.data.invoices.find((candidate) => candidate.flags.length > 0) ?? runtime.data.invoices[0] ?? null;
+    const reportResult = invoice
+      ? await executeTool("flag_invoice_issue", {
+          invoiceId: invoice.id,
+          issueDetails: invoice.flags[0]?.reason ?? "Invoice needs staff review."
+        }, runtime) as { task: AgentTaskDraft; report: AgentReportDraft; invoice: MockInvoice | null }
+      : null;
+    return buildResult({
+      intent,
+      mode,
+      message: guardrail.allowed
+        ? invoice
+          ? `Invoice review created for ${summarizeInvoice(invoice)}.`
+          : "No mock invoice issues found."
+        : guardrail.message ?? "Billing review task created.",
+      result: {
+        changedInvoices: false,
+        invoice: reportResult?.invoice ?? null
+      },
+      runtime,
+      options,
+      task: reportResult?.task,
+      report: reportResult?.report
     });
-  });
+  }
 
-  const agent = new Agent({
-    name: "InternalVetAgent",
-    instructions,
-    model: "gpt-4o",
-    tools: agentTools
-  });
-
-  const result = await runAgent(agent, message);
-
-  return {
-    runId: context.runId || "openai-run-" + Math.random().toString(36).substring(7),
-    status: "completed",
-    message: result.finalOutput || "Staff agent execution complete.",
-    taskIds: [],
-    approvalIds: [],
-    events: []
+  const openTasks = 3;
+  const highPriority = runtime.data.messages.filter((message) => message.urgency === "high").length;
+  const pendingFollowups = runtime.data.followups.filter((followup) => followup.status === "open").length;
+  const invoiceReviews = runtime.data.invoices.filter((invoice) => invoice.flags.length > 0).length;
+  const summary = {
+    openTasks,
+    highPriority,
+    pendingApprovals: 1,
+    openFollowups: pendingFollowups,
+    invoiceReviews,
+    pricingItems: runtime.data.pricingObservations.length
   };
+  const report: AgentReportDraft = {
+    id: "report-daily-ops",
+    kind: "report",
+    reportType: "daily_ops",
+    title: "Daily ops digest",
+    summary: `${openTasks} open task(s), ${highPriority} urgent message(s), ${pendingFollowups} follow-up candidate(s).`,
+    data: {
+      summary,
+      rankedWork: [
+        "Review urgent sick-pet messages first.",
+        "Confirm pending records-transfer approval.",
+        "Work invoice review before end of day.",
+        "Schedule open follow-up candidates."
+      ]
+    }
+  };
+  runtime.effects.push(report);
+
+  return buildResult({
+    intent: "daily_ops",
+    mode,
+    message: report.summary,
+    result: report.data,
+    runtime,
+    options,
+    report
+  });
 }

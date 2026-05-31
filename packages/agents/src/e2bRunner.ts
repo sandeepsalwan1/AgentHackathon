@@ -1,64 +1,37 @@
-export interface SandboxExecutionResult {
+export type SandboxExecutionResult<T = unknown> = {
+  provider: "local" | "e2b";
+  status: "completed" | "failed";
   stdout: string;
   stderr: string;
   exitCode: number;
-}
+  result: T | null;
+};
 
-/**
- * Runs a sandboxed execution task.
- * Uses E2B Code Interpreter if E2B_API_KEY is present,
- * otherwise falls back to local execution.
- */
-export async function runInSandbox(code: string): Promise<SandboxExecutionResult> {
-  const apiKey = process.env.E2B_API_KEY;
-
-  if (!apiKey) {
-    console.log("No E2B_API_KEY found. Executing task locally as a fallback.");
-    // Simulate sandboxed execution by running a local function eval safely
-    try {
-      let loggedStdout = "";
-      const originalLog = console.log;
-      console.log = (...args) => { loggedStdout += args.join(" ") + "\n"; };
-      
-      // Run the code dynamically inside a VM-like context (simple eval for hackathon fallback)
-      eval(code);
-      
-      console.log = originalLog;
-      return {
-        stdout: loggedStdout || "Execution completed (Local Fallback)",
-        stderr: "",
-        exitCode: 0
-      };
-    } catch (err: any) {
-      return {
-        stdout: "",
-        stderr: err.message,
-        exitCode: 1
-      };
-    }
-  }
-
-  console.log("E2B_API_KEY detected. Starting E2B Sandbox...");
+export async function runInSandbox<T>(
+  name: string,
+  execute: () => Promise<T> | T
+): Promise<SandboxExecutionResult<T>> {
   try {
-    // @ts-ignore
-    const { CodeInterpreter } = await import("@e2b/code-interpreter");
-    const sandbox = await CodeInterpreter.create({ apiKey });
-    
-    console.log("E2B Sandbox started. Running code...");
-    const execution = await sandbox.runCode(code);
-    await sandbox.close();
-
+    const result = await execute();
     return {
-      stdout: execution.logs.stdout.map((l: any) => l.line).join("\n"),
-      stderr: execution.logs.stderr.map((l: any) => l.line).join("\n"),
-      exitCode: execution.error ? 1 : 0
+      provider: "local",
+      status: "completed",
+      stdout: process.env.E2B_API_KEY
+        ? `E2B token detected; ${name} scenario completed with local fallback because the live adapter is not invoked by default.`
+        : `No E2B token; ${name} scenario completed with local fallback.`,
+      stderr: "",
+      exitCode: 0,
+      result
     };
-  } catch (err: any) {
-    console.error("E2B Sandbox execution failed:", err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown sandbox error";
     return {
+      provider: "local",
+      status: "failed",
       stdout: "",
-      stderr: `E2B Error: ${err.message}`,
-      exitCode: 1
+      stderr: message,
+      exitCode: 1,
+      result: null
     };
   }
 }
