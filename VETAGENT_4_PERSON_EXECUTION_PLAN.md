@@ -609,11 +609,8 @@ Do:
 
 Person 4 owns the actual experience people see. Person 4 should not wait for Person 1 or Person 3; build with fixtures first, then swap to routes.
 
-Login here means the current passcode gate and role-entry experience. Do not rewrite auth.
-
 Person 4 owns:
 
-- staff login / role-entry UI,
 - public client flows,
 - internal agent surfaces,
 - approval queue UI,
@@ -623,44 +620,7 @@ Person 4 owns:
 - demo script,
 - screenshot proof.
 
-### Person 4 Workstream A - Login / Role Entry UI
-
-Own the staff entry experience in `apps/internal`.
-
-Build or polish:
-
-- current passcode screen,
-- role-entry labels,
-- error state for wrong passcode,
-- loading state while auth request runs,
-- return-to-dashboard behavior after success,
-- mobile and desktop layout.
-
-Keep:
-
-- current passcode auth,
-- current passcode env names,
-- existing `/api/auth` route contract,
-- existing session/local storage behavior if present,
-- no Supabase Auth,
-- no new password system.
-
-Must support:
-
-- admin entry,
-- veterinarian entry,
-- staff/assistant entry if already supported,
-- direct path into the internal workspace/task board.
-
-Done when:
-
-- current passcodes still work,
-- wrong passcode is clear,
-- successful login lands in the staff app,
-- internal task board and internal agent panels are reachable after login,
-- no passcode values or passcode names are changed.
-
-### Person 4 Workstream B - Public Flow Shell
+### Person 4 Workstream A - Public Flow Shell
 
 Create:
 
@@ -676,7 +636,7 @@ Use for:
 - follow-up,
 - call/transcript.
 
-### Person 4 Workstream C - Check-In / Arrival UI
+### Person 4 Workstream B - Check-In / Arrival UI
 
 Build:
 
@@ -694,7 +654,7 @@ Must show:
 
 This is the top-priority screen.
 
-### Person 4 Workstream D - Agent-Driven Public Pages
+### Person 4 Workstream C - Agent-Driven Public Pages
 
 Build:
 
@@ -712,7 +672,7 @@ Rules:
 - show agent status,
 - show staff-review/approval states clearly.
 
-### Person 4 Workstream E - Internal Agent UI
+### Person 4 Workstream D - Internal Agent UI
 
 Create:
 
@@ -735,7 +695,7 @@ Quick buttons:
 - pricing review,
 - call/message triage.
 
-### Person 4 Workstream F - Demo Script
+### Person 4 Workstream E - Demo Script
 
 Write:
 
@@ -766,14 +726,14 @@ Immediate parallel start:
 - Person 1: Supabase/Render/Opsera, route stubs, mock data route.
 - Person 2: tool accounts, sample content, Apify/E2B/Opsera status.
 - Person 3: contracts, tool registry, check-in agent skeleton.
-- Person 4: login/role-entry UI, arrival screen, flow shell, internal panel skeleton.
+- Person 4: arrival screen, flow shell, internal panel skeleton.
 
 Track A - check-in and agent foundation:
 
 - Person 1: DB helpers, mock data, route stubs, check-in agent endpoint.
 - Person 2: realistic arrival phrases, transcripts, and client examples.
 - Person 3: external agent arrival behavior and tool calls.
-- Person 4: login works, arrival flow clickable with fixtures and then route stubs.
+- Person 4: arrival flow clickable with fixtures and then route stubs.
 
 Track B - internal agents and task execution:
 
@@ -793,7 +753,7 @@ Track D - proof and final polish:
 
 - Person 1: final deploy proof and reliability.
 - Person 3: scenario fixes and agent behavior polish.
-- Person 4: login polish, demo polish, screenshots, final click-through.
+- Person 4: demo polish, screenshots, final click-through.
 - Person 2: final account/tool/readiness notes.
 
 ## Final Acceptance
@@ -804,7 +764,6 @@ Must have:
 - external agent works on mock data,
 - internal agent works on mock data,
 - existing task board still works,
-- staff login works with current passcodes,
 - existing passcodes still work,
 - public request form still works,
 - Render deploy works,
