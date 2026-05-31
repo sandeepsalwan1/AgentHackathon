@@ -2,7 +2,7 @@ import postgres from "postgres";
 
 export class MissingDatabaseUrlError extends Error {
   constructor() {
-    super("DATABASE_URL or POSTGRES_URL is required.");
+    super("Supabase DATABASE_URL is required.");
     this.name = "MissingDatabaseUrlError";
   }
 }
@@ -10,7 +10,7 @@ export class MissingDatabaseUrlError extends Error {
 let cachedSql: postgres.Sql | null = null;
 
 function databaseUrl() {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+  return process.env.DATABASE_URL || "";
 }
 
 function shouldUseSsl(url: string) {
@@ -25,6 +25,7 @@ export function getSql() {
     cachedSql = postgres(url, {
       max: 1,
       ssl: shouldUseSsl(url) ? "require" : false,
+      prepare: false,
       idle_timeout: 5,
       connect_timeout: 10
     });

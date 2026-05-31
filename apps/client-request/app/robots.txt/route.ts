@@ -1,10 +1,10 @@
 import type { NextRequest } from "next/server";
+import { clientRequestHost } from "../siteConfig";
 
 export const dynamic = "force-dynamic";
 
-const seoHost = "central-vet-request.vercel.app";
-
 export function GET(request: NextRequest) {
+  const seoHost = clientRequestHost();
   const host = (
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||

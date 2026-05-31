@@ -2,13 +2,13 @@
 
 Date: 2026-05-16
 
-This document is a cleaned, scoped version of the full product idea. It is meant to be pasted into another AI/agent as the working spec. It is self-contained; no extra prompt context is needed. Follow it closely, but feel free to replan implementation details if the repo, free-tier provider limits, or Vercel setup make a different path better. Keep the product intent unchanged.
+This document is a cleaned, scoped version of the full product idea. It is meant to be pasted into another AI/agent as the working spec. It is self-contained; no extra prompt context is needed. Follow it closely, but feel free to replan implementation details if the repo, free-tier provider limits, or Render/Supabase setup make a different path better. Keep the product intent unchanged.
 
 ## Pasteable Clean Prompt
 
-Build a free-tier MVP for Central Veterinary Hospital. Use Vercel for deployment and Vercel-generated domains for now. The goal is a quick internal app plus a separate public website/form, not a big enterprise system. This should be ready to go live quickly, including working doctor email notifications.
+Build a free-tier MVP for Central Veterinary Hospital. Use Render for deployment, Render-generated domains for now, and Supabase Postgres for persistence. The goal is a quick internal app plus a separate public website/form, not a big enterprise system. This should be ready to go live quickly, including working doctor email notifications.
 
-First, do a smoke check and make sure deployment/tooling is ready: Vercel login, Node/npm, package manager, database option, email/notification option, and anything needed to work autonomously. Do as much as possible directly. Only stop for a blocker that truly requires an account, secret, billing approval, or manual dashboard step.
+First, do a smoke check and make sure deployment/tooling is ready: Render workspace, Supabase org/project, Node/npm, package manager, email/notification option, and anything needed to work autonomously. Do as much as possible directly. Only stop for a blocker that truly requires an account, secret, billing approval, or manual dashboard step.
 
 The current clinic workflow needs to change. Right now, assistant messages go to the two business owners/doctors, who are also veterinarians. The doctors then have to redirect tasks to employees. Employees then need to remember, complete, and follow up. This makes the doctors the routing bottleneck.
 
@@ -74,7 +74,7 @@ Make it hard to permanently mess up:
 - Undo recent actions if feasible
 - Vet/admin restore
 
-Use free-tier-friendly infrastructure. Default recommendation: Neon Postgres through Vercel Marketplace if it can be created/connected without paid setup. Supabase is only an alternate if realtime matters more than pause risk, because Supabase Free projects pause after 1 week of inactivity. If Neon is used, simple polling every 10-30 seconds is fine for near-realtime MVP updates.
+Use free-tier-friendly infrastructure. Default recommendation: Supabase Postgres plus Render web services. Simple polling every 10-30 seconds is fine for near-realtime MVP updates; Supabase Realtime can be added later if useful.
 
 Use Resend for email notifications. This is required for go-live, not optional. Resend docs:
 
@@ -95,7 +95,7 @@ Email launch rule:
 
 Domain:
 
-- Use Vercel-generated domains for MVP.
+- Use Render-generated domains for MVP.
 - `eepish.com` exists on Cloudflare and can be used later.
 - Optional future URLs:
   - `tasks.eepish.com`
@@ -103,16 +103,16 @@ Domain:
 
 Free-tier first:
 
-- Vercel free/Hobby where possible.
-- Neon free through Vercel Marketplace if possible.
+- Render free tier where possible.
+- Supabase free tier where possible.
 - Resend free tier if possible, but production email sending must work for go-live.
 - No paid domain work needed.
 - No paid messaging integrations for MVP.
 
 Deliverables:
 
-- Internal Vercel app for staff/task adders/vets.
-- Separate public Vercel app/form for clients.
+- Internal Render app for staff/task adders/vets.
+- Separate public Render app/form for clients.
 - Shared database.
 - Email notification path for overdue tasks.
 - Clear role-based UI.
@@ -124,17 +124,11 @@ Deliverables:
 
 Verified:
 
-- Vercel CLI is installed and logged in.
-- `vercel whoami` returns `sandeepsalwan1`.
-- Vercel CLI version checked: `54.1.0`.
-- Vercel teams visible:
-  - `S's projects`
-  - `team1`
-- The implementing agent should inspect/use Vercel directly before asking for manual Vercel details. Start with:
-  - `vercel whoami`
-  - `vercel teams ls`
-  - `vercel project ls` or equivalent
-  - `vercel env ls` after projects are linked
+- Supabase MCP is connected.
+- Supabase org visible: `sandeepsalwan1's Org` (`dflgitlurgfmnexbdpqg`).
+- Existing Supabase projects are inactive; new `vetagent` project needs explicit org/cost confirmation.
+- Render MCP is connected but no workspace is selected. User must select the workspace before service creation.
+- `render.yaml` is the deployment blueprint.
 - Fresh shells use the default nvm Node setup:
   - Node: `/Users/sandeep/.nvm/versions/node/v24.15.0/bin/node`
   - npm global prefix: `/Users/sandeep/.nvm/versions/node/v24.15.0`
@@ -158,14 +152,14 @@ Verified:
 
 Missing from local shell right now:
 
-- `DATABASE_URL` / `POSTGRES_URL`
-- `NEON_API_KEY`
-- `SUPABASE_ACCESS_TOKEN`
+- Supabase `DATABASE_URL`
+- confirmed Supabase project for this repo
+- selected Render workspace
 
 These are not reasons to stop scaffolding the app. Build with env placeholders and free-tier defaults. But a complete live launch needs:
 
-- a working database connection, preferably Neon/Vercel `DATABASE_URL`
-- deployed app env vars copied from local `~/.secrets` / Vercel configuration
+- a working Supabase `DATABASE_URL`
+- deployed app env vars copied from local secret store / Render configuration
 - final deployed email smoke test after the app exists
 
 Stop only when final database provisioning, deployed database writes, real email sending, or custom DNS requires a missing secret or dashboard authorization.
@@ -174,17 +168,10 @@ Stop only when final database provisioning, deployed database writes, real email
 
 Default database path:
 
-- Neon Postgres through Vercel Marketplace.
-- Reason: free-tier friendly, Postgres, good Vercel fit, no Supabase project pause concern.
-- Use `DATABASE_URL` / provider-injected Vercel env vars.
-- Use polling every 10-30 seconds for near-realtime updates.
-
-Supabase alternate:
-
-- Use only if built-in realtime becomes more important than pause risk or if a Supabase project is already connected.
-- Official Supabase pricing/docs say Free projects pause after 1 week of inactivity.
-- Supabase docs say projects paused more than 90 days cannot be restored through Studio; backups/migration are needed.
-- If the clinic uses the app daily, Supabase pause likely does not happen. If it sits idle for a week, pause risk is real.
+- Supabase Postgres.
+- Reason: project direction now standardizes on Supabase, with optional realtime/storage/auth later.
+- Use Supabase Postgres connection string as `DATABASE_URL`.
+- Use polling every 10-30 seconds for near-realtime updates until Realtime is intentionally added.
 
 Email path:
 
@@ -204,8 +191,8 @@ Useful references:
 - Resend docs: https://resend.com/docs/llms-full.txt
 - Supabase pricing/free pause: https://supabase.com/pricing
 - Supabase 90-day paused restore docs: https://supabase.com/docs/guides/troubleshooting/restore-project-after-90-days-pause
-- Vercel Marketplace storage: https://vercel.com/docs/marketplace-storage
-- Neon on Vercel Marketplace: https://vercel.com/marketplace/neon/
+- Render monorepo support: https://render.com/docs/monorepo-support
+- Supabase database migrations: https://supabase.com/docs/guides/deployment/database-migrations
 
 ## Product Intent
 
@@ -238,11 +225,11 @@ Core feeling:
 
 Q: Deploy target?
 
-A: Vercel.
+A: Render.
 
 Q: Custom domain now?
 
-A: No. Use Vercel-generated domains for MVP.
+A: No. Use Render-generated domains for MVP.
 
 Q: Hospital name?
 
@@ -258,7 +245,7 @@ A: Yes, but only a tiny separate public form.
 
 Q: Should client form be separate from internal dashboard?
 
-A: Yes. Two separate Vercel deployments/projects is preferred so customers do not access the internal tool.
+A: Yes. Two separate Render services is preferred so customers do not access the internal tool.
 
 Q: What should the client form collect?
 
@@ -355,13 +342,13 @@ Use one monorepo with two apps and shared packages.
 
 Recommended stack:
 
-- Next.js on Vercel
+- Next.js on Render
 - TypeScript
-- Neon Postgres via Vercel Marketplace as the default database path
+- Supabase Postgres as the default database path
 - Simple polling/refresh for near-realtime MVP updates
-- Optional Supabase alternate if built-in realtime matters more than pause concerns
+- Optional Supabase Realtime if built-in live updates become useful
 - Resend for email notifications
-- Vercel Cron for end-of-day overdue summaries
+- Render Cron for end-of-day overdue summaries
 - CSS modules, Tailwind, or existing repo styling if the implementing agent scaffolds with a template
 
 Suggested structure:
@@ -387,7 +374,7 @@ Suggested structure:
   CENTRAL_VET_MVP_PLAN.md
 ```
 
-Deploy two separate Vercel projects/surfaces: one internal task board and one public client request form. A monorepo is fine, but do not ship customers and staff through the same deployed app unless there is a very strong reason and the internal routes are protected from public visitors.
+Deploy two separate Render services: one internal task board and one public client request form. A monorepo is fine, but do not ship customers and staff through the same deployed app unless there is a very strong reason and the internal routes are protected from public visitors.
 
 ## App 1: Internal Task Board
 
@@ -521,7 +508,7 @@ Suggested copy:
 
 ## Database Model
 
-Use Postgres. Default provider recommendation is Neon through Vercel Marketplace. Supabase Postgres is still acceptable if the implementing agent chooses it deliberately for built-in realtime.
+Use Supabase Postgres through the shared `DATABASE_URL`.
 
 Suggested SQL schema:
 
@@ -612,7 +599,7 @@ Sender:
 
 - Production sender: `Central Veterinary Hospital <notifications@example.com>`.
 - `eepish.com` is verified in Resend.
-- Vercel app domains do not automatically give a usable email sender domain.
+- Render app domains do not automatically give a usable email sender domain.
 
 Launch blocker:
 
@@ -725,8 +712,8 @@ Phase 0: Setup
 - Add TypeScript.
 - Add linting/formatting.
 - Add env examples.
-- Confirm Vercel projects can be linked/deployed.
-- Confirm database connection. Default: Neon/Vercel Marketplace `DATABASE_URL`. Alternate: Supabase credentials.
+- Confirm Render services can be created/deployed.
+- Confirm Supabase database connection through `DATABASE_URL`.
 - Confirm Resend API key and sender behavior.
 
 Phase 1: Data foundation
@@ -765,7 +752,7 @@ Phase 4: Internal dashboard
 - Add invalid/error flow.
 - Add task create/edit flow for task adders/vets.
 - Add task review flow for client requests.
-- Add near-realtime updates through polling/refresh first. If Supabase is chosen, Supabase Realtime is acceptable.
+- Add near-realtime updates through polling/refresh first. Supabase Realtime is acceptable if intentionally added.
 
 Phase 5: Permissions and safety
 
@@ -781,7 +768,7 @@ Phase 6: Email notifications
 
 - Add Resend helper.
 - Add test and production notification modes.
-- Add end-of-day Vercel cron route.
+- Add end-of-day Render cron route.
 - Add notification_events logging.
 - Add overdue summary email.
 - Add manual smoke test route or script guarded by env.
@@ -791,9 +778,9 @@ Phase 6: Email notifications
 
 Phase 7: Deploy
 
-- Deploy internal app to Vercel-generated domain.
-- Deploy public client request form to separate Vercel-generated domain.
-- Set env vars in each Vercel project.
+- Deploy internal app to Render-generated domain.
+- Deploy public client request form to separate Render-generated domain.
+- Set env vars in each Render service.
 - Run migration.
 - Smoke test both deployed URLs.
 - Submit public form.
@@ -835,9 +822,9 @@ Notifications:
 
 Deployment:
 
-- Two separate Vercel deployments/projects.
-- Vercel-generated URLs are acceptable.
-- Env vars configured in Vercel.
+- Two separate Render services.
+- Render-generated URLs are acceptable.
+- Env vars configured in Render.
 - Database is connected.
 - Smoke test passes on deployed apps.
 
@@ -853,11 +840,11 @@ HOSPITAL_NAME=Central Veterinary Hospital
 TZ=America/Los_Angeles
 ```
 
-If Supabase is chosen instead of Neon, also use:
+Supabase optional/future:
 
 ```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
@@ -879,14 +866,6 @@ DATABASE_URL=
 HOSPITAL_NAME=Central Veterinary Hospital
 ```
 
-If Supabase is chosen instead of Neon for the client request app:
-
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
-
 ## Smoke Tests
 
 Local:
@@ -905,14 +884,14 @@ Local:
 
 Deployed:
 
-1. Open public Vercel URL.
+1. Open public Render URL.
 2. Submit test request:
    - Client: Test Client
    - Phone: a fake/test number
    - DOB: test date
    - Pet: Test Pet
    - Request: Test request from deployed form
-3. Open internal Vercel URL.
+3. Open internal Render URL.
 4. Confirm request appears in Pending Review.
 5. Convert it to Due.
 6. Mark complete.
@@ -922,9 +901,8 @@ Deployed:
 
 ## Risks / Things To Watch
 
-- Resend may require a verified sending domain before emailing production recipients. Vercel app domain does not automatically provide an email sender domain.
-- Supabase free-tier pause is real after 1 week of inactivity. If avoiding that is important, prefer Neon/Postgres through Vercel Marketplace and use polling for MVP updates.
-- Neon serverless Postgres may autosuspend compute when idle, but it is designed to wake on request rather than leaving the project manually paused. Expect possible cold-start latency after idle periods.
+- Resend may require a verified sending domain before emailing production recipients. Render app domain does not automatically provide an email sender domain.
+- Supabase free-tier projects can pause after inactivity. Daily clinic usage should avoid that, but idle demo projects may need unpausing before demos.
 - Lightweight name/role login is intentionally not strong security. Acceptable for MVP only if internal URL is not broadly shared.
 - Passcodes must be configured per deployment and rotated as needed.
 - Public client form must be insert-only. Do not expose internal data.
@@ -953,7 +931,7 @@ Not MVP unless explicitly requested:
 4. Make completion satisfying.
 5. Make overdue obvious.
 6. Add production-ready email notifications.
-7. Deploy both apps on Vercel.
+7. Deploy both apps on Render.
 8. Verify end to end, including email.
 
 ## Final Verification Requirement
@@ -964,8 +942,8 @@ Before final handoff, heavily verify everything:
 
 - Run install/build/lint/typecheck/tests using the repo's package manager.
 - Run database migrations against the chosen production database.
-- Confirm both Vercel projects deploy successfully.
-- Open both deployed Vercel URLs.
+- Confirm both Render services deploy successfully.
+- Open both deployed Render URLs.
 - Submit a real test request through the public client form.
 - Confirm the request appears in the internal app as `Pending Review`.
 - Log in locally in the internal app as each role:
@@ -979,7 +957,7 @@ Before final handoff, heavily verify everything:
 - Verify overdue logic works and is understandable.
 - Verify no public visitor can read the internal task board.
 - Verify privileged database credentials are not exposed to browser code.
-- Verify Resend env vars are present in Vercel.
+- Verify Resend env vars are present in Render.
 - Send one test email to `test.com`.
 - Confirm production email config points to `doctor.com`.
 - If doing a final production smoke is approved, send exactly one production test email to `doctor.com`.
@@ -991,8 +969,8 @@ Before final handoff, heavily verify everything:
 
 The final report must include:
 
-- Internal app Vercel URL.
-- Public client form Vercel URL.
+- Internal app Render URL.
+- Public client form Render URL.
 - Database provider used.
 - Email sender and recipient configuration.
 - What was tested.

@@ -24,13 +24,13 @@
 - Role system: `staff`, `task_adder`, `veterinarian`
 - DB migration scripts (`npm run db:migrate`)
 - Zod validation, TypeScript throughout
-- Vercel deployment config (`vercel.internal.json`, `vercel.request.json`)
+- Render deployment blueprint (`render.yaml`)
 
 ### ❌ Missing — Build This
 - Claude API agent integration (zero AI currently)
 - External agent: booking, check-in, pickup, escalation flows
 - Internal agent: triage, records, invoice scan, pricing
-- Supabase migration (currently uses raw Postgres/Neon)
+- Supabase migration from current raw Postgres helper path
 - Supabase Realtime subscription for live task feed
 - E2B sandbox integration for invoice/pricing scripts
 - Opsera MCP call in records-transfer flow
@@ -214,8 +214,8 @@ Inbound request: "Send my records to another hospital"
 
 ### Hour 0–0:45 — Supabase migration
 - [ ] Create Supabase project
-- [ ] Replace `DATABASE_URL`/`POSTGRES_URL` in `.env.example` with Supabase connection string
-- [ ] Add env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Set `DATABASE_URL` in `.env.example` from the Supabase Postgres connection string
+- [ ] Add env vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] Run existing migration against Supabase: `npm run db:migrate`
 - [ ] Write new migration for VetAgent-specific tables:
   - `clients` (id, name, phone, email, created_at)
@@ -397,8 +397,8 @@ OPSERA_API_KEY=
 APIFY_API_KEY=
 
 # Supabase (replaces raw DATABASE_URL)
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 

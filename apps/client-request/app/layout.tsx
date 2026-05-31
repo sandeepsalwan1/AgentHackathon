@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { clientRequestBaseUrl, clientRequestHost } from "./siteConfig";
 import "./globals.css";
-
-const seoHost = "central-vet-request.vercel.app";
 
 const icons: Metadata["icons"] = {
   icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
@@ -16,6 +15,7 @@ export const viewport: Viewport = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seoHost = clientRequestHost();
   const headerStore = await headers();
   const host = (
     headerStore.get("x-forwarded-host") ||
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
     "Submit a client request to Central Veterinary Hospital for clinic follow-up.";
 
   return {
-    metadataBase: new URL(`https://${seoHost}`),
+    metadataBase: new URL(clientRequestBaseUrl()),
     title: "Central Veterinary Hospital Client Request",
     description,
     alternates: { canonical: "/" },

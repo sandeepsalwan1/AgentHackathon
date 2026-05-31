@@ -227,7 +227,7 @@ export function dbError(error: unknown, fields?: LogFields) {
     return NextResponse.json(
       {
         error: "Database not configured.",
-        detail: "Set DATABASE_URL or POSTGRES_URL, then run npm run db:migrate."
+        detail: "Set Supabase DATABASE_URL, then run npm run db:migrate."
       },
       { status: 503 }
     );

@@ -5,29 +5,28 @@ Date: 2026-05-16
 Stack:
 
 - Next.js app router, TypeScript, npm workspaces.
-- Shared Postgres helpers via `postgres`.
+- Supabase Postgres helpers via `postgres`.
 - Resend for email and carrier-gateway SMS notifications.
-- Vercel cron runs the internal daily priority endpoint.
+- Render cron runs the internal daily priority endpoint.
 
 Deployment:
 
-- Internal: `https://central-vet-internal.vercel.app`
-- Public request form: `https://central-vet-request.vercel.app`
-- Neon resource: `central-vet-db-internal`
+- Internal: `https://vetagent-internal.onrender.com`
+- Public request form: `https://vetagent-client.onrender.com`
+- Database: Supabase Postgres, exposed to the apps through `DATABASE_URL`.
 - Database migration `001_initial.sql` applied.
-- Internal Vercel cron: `/api/notifications/overdue`, `0 2 * * *` UTC.
+- Internal Render cron: `/api/notifications/overdue`, `0 2 * * *` UTC.
 
 Deployment notes:
 
-- Vercel Hobby allows daily cron only. `0 2 * * *` maps to 6 PM Pacific Standard Time and 7 PM Pacific Daylight Time; app code still checks local hour before sending.
-- Root-level `vercel.internal.json` and `vercel.request.json` are used for CLI deployment so shared workspace packages are uploaded.
-- App-directory `vercel.json` files remain for project/app defaults.
+- `render.yaml` defines `vetagent-internal`, `vetagent-client`, and the overdue-summary cron job.
+- `0 2 * * *` maps to 6 PM Pacific Standard Time and 7 PM Pacific Daylight Time; app code still checks local hour before sending.
 - Production internal cron requires `CRON_SECRET`; without it the overdue endpoint fails closed.
 - Internal passcodes are deployment defaults: VA and Admin env passcodes plus doctor profile passcodes from Admin settings.
 
 Deploy shape:
 
-- Internal app and public request form should be separate Vercel projects.
+- Internal app and public request form should be separate Render services.
 - Both projects use the same database.
 - Public form only has insert route; no task read routes.
 

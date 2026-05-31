@@ -22,7 +22,7 @@ When unsure or the task touches both → start both in separate background proce
 
 ## Prerequisites (check once per session)
 
-1. **`.env.local` exists** with `DATABASE_URL` or `POSTGRES_URL` set. Without it the API returns 503. If missing, tell the user and stop.
+1. **`.env.local` exists** with Supabase `DATABASE_URL` set. Without it the API returns 503. If missing, tell the user and stop.
 2. **`node_modules/` present** at the root. If not, run `npm install` first.
 3. **Migrations applied** — only needed on a fresh database. Run `npm run db:migrate` if the user says the DB is new or if API calls return schema errors.
 

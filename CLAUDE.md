@@ -16,7 +16,7 @@ Central Veterinary Hospital MVP — a task management system for a veterinary cl
 
 ```sh
 npm install
-cp .env.example .env.local          # fill DATABASE_URL or POSTGRES_URL
+cp .env.example .env.local          # fill Supabase DATABASE_URL
 npm run db:migrate                   # run all pending SQL migrations
 
 npm run dev:internal                 # internal app on :3000
@@ -35,14 +35,17 @@ Copy `.env.example` to `.env.local`. Key variables:
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` / `POSTGRES_URL` | Neon/Postgres connection string |
+| `DATABASE_URL` | Supabase Postgres connection string |
+| `SUPABASE_URL` | Supabase project API URL, for realtime/storage work |
+| `SUPABASE_ANON_KEY` | Supabase anon key, browser-safe only when needed |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service key, server-only |
 | `VET_ADMIN_PASSCODE` | VA role passcode |
 | `VET_APP_ADMIN_PASSCODE` | Admin role passcode |
 | `HOSPITAL_NAME` | Display name |
 | `APP_TIME_ZONE` | IANA timezone (default `America/Los_Angeles`) |
 | `NOTIFICATION_MODE` | `disabled` (default) / `test` / `production` |
 | `NOTIFICATION_CHANNEL` | `email` (default) / `sms` / `both` |
-| `CRON_SECRET` | Required for Vercel cron to call `/api/notifications/overdue` |
+| `CRON_SECRET` | Required for Render cron to call `/api/notifications/overdue` |
 
 Veterinarian profile passcodes are managed through Admin settings UI after deployment — they are not env vars.
 
@@ -79,7 +82,7 @@ Connection is obtained via `getSql()` from `packages/db/src/connection.ts`, whic
 
 `sendEscalationAlert` and `sendOverdueSummary` query per-veterinarian opt-in preferences from `recipient_profiles`. The env-based `NOTIFICATION_MODE`/`NOTIFICATION_CHANNEL` only applies to legacy non-profile notifications. SMS is sent via Resend to carrier email-to-SMS gateway addresses (e.g., `5551234567@vtext.com`) — no Twilio needed. All sends are idempotent via `idempotency_key` in `notification_events`.
 
-Vercel cron hits `/api/notifications/overdue` daily at `0 2 * * *` UTC (≈6 PM Pacific). The endpoint checks local hour against `OVERDUE_CHECK_HOUR` (default 18) before sending.
+Render cron hits `/api/notifications/overdue` daily at `0 2 * * *` UTC (≈6 PM Pacific). The endpoint checks local hour against `OVERDUE_CHECK_HOUR` (default 18) before sending.
 
 ### API surface (internal app)
 
@@ -100,4 +103,4 @@ The public app (`apps/client-request`) only has `POST /api/requests` — no read
 
 ### Deployment
 
-Two separate Vercel projects. Use root-level `vercel.internal.json` and `vercel.request.json` for CLI deploys (so shared workspace packages are uploaded). The per-app `vercel.json` files set project-level defaults. Both projects connect to the same Postgres database.
+Two separate Render services, defined in `render.yaml`: `vetagent-internal` and `vetagent-client`. A Render cron service calls the internal overdue-summary endpoint. Both web services connect to the same Supabase Postgres database through `DATABASE_URL`.

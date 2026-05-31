@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { clientRequestBaseUrl } from "./siteConfig";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: "https://central-vet-request.vercel.app/",
+      url: `${clientRequestBaseUrl()}/`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.7
