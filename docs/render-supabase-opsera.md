@@ -38,7 +38,8 @@ Render setup:
 Required Render env:
 
 - Web service: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`.
-- Agent/tool env: `OPENAI_API_KEY`, `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
+- Agent runtime env: `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Google ADK TypeScript. For Vertex-backed ADK, also set `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
+- Tool/proof env: `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
 - Internal auth/env: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
 - Cron only: `INTERNAL_BASE_URL`, `CRON_SECRET`.
 
