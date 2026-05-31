@@ -9,7 +9,7 @@ All routes live in the unified `apps/internal` app.
 Agent workflow routes return:
 
 - `ok`: boolean
-- `mode`: `mock`, `apify`, or future runtime
+- `mode`: `mock`, `google-adk`, `apify`, or future runtime
 - `intent`: workflow intent
 - `message`: user-facing or staff-facing summary
 - `result`: structured workflow data
@@ -74,7 +74,7 @@ Internal routes require the existing actor payload and passcode rules:
 - Records transfer creates approval; no silent send.
 - Invoice review creates report/task; no invoice mutation.
 - Pricing review creates report/task; no repricing.
-- OpenAI/E2B/Apify are optional. Deterministic mock behavior keeps demo routes working without live tools. The app reads `APIFY_API_TOKEN`; the Apify CLI skill reads `APIFY_TOKEN`.
+- Google ADK/E2B/Apify are optional live tools. Deterministic mock behavior keeps demo routes working without live tools. Google ADK TypeScript is the target live agent runtime behind `AGENT_RUNTIME=google-adk`; use `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini, or Vertex env for Google Cloud. The app reads `APIFY_API_TOKEN`; the Apify CLI skill reads `APIFY_TOKEN`.
 
 ## Scenario Proof
 
