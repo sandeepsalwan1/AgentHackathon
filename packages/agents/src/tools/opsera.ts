@@ -54,8 +54,13 @@ type AuditCandidate = {
 
 const defaultToolName = "audit_records_transfer";
 const maxReasonLength = 500;
-const textStatusPattern =
-  /\b(approved|approve|pass|passed|flagged|review required|review_required|warning|blocked|block|failed|deny|denied)\b/i;
+const negativeApprovalPattern =
+  /\b(not approved|approved\s*[:=]\s*false|approval\s*[:=]\s*false)\b/i;
+const blockedTextPattern =
+  /\b(blocked|failed|deny|denied|missing authorization|no authorization|without consent|not authorized)\b/i;
+const flaggedTextPattern = /\b(flagged|review required|review_required|warning|manual review)\b/i;
+const approvedTextPattern =
+  /\b(approved|approve|pass|passed|status\s*[:=]\s*approved|decision\s*[:=]\s*approved)\b/i;
 
 function clean(value: string | null | undefined) {
   const trimmed = value?.trim();
@@ -71,7 +76,6 @@ function localAudit(packet: RecordsTransferPacket, reasonPrefix?: string): Opser
   const hasClientLocator = Boolean(clean(packet.client.id) || clean(packet.client.phone));
   const requestText = packet.request.text.toLowerCase();
   const destination = clean(packet.request.destinationHospital);
-  const destinationInText = /\b(to|at)\s+[a-z0-9][a-z0-9 .'&-]{2,}/i.test(packet.request.text);
   const blockedLanguage =
     /without consent|not authorized|no authorization|do not send|wrong (client|patient|pet)|not my pet/i.test(
       requestText
@@ -92,7 +96,7 @@ function localAudit(packet: RecordsTransferPacket, reasonPrefix?: string): Opser
     status = "flagged";
     reasons.push("No client ID or phone number is attached for identity verification.");
   }
-  if (!destination && !destinationInText && status !== "blocked") {
+  if (!destination && status !== "blocked") {
     status = "flagged";
     reasons.push("Destination hospital is not clearly identified.");
   }
@@ -174,7 +178,13 @@ function contentCandidates(value: unknown): unknown[] {
 function statusFromText(value: string) {
   const exactStatus = normalizeStatus(value);
   if (exactStatus) return exactStatus;
-  return normalizeStatus(value.match(textStatusPattern)?.[1]);
+  const withoutNegatedBlocked = value.replace(/\bnot\s+blocked\b/gi, "");
+  if (negativeApprovalPattern.test(value) || blockedTextPattern.test(withoutNegatedBlocked)) {
+    return "blocked";
+  }
+  if (flaggedTextPattern.test(value)) return "flagged";
+  if (approvedTextPattern.test(value)) return "approved";
+  return null;
 }
 
 function auditFromTextCandidate(value: unknown): OpseraAuditResult | null {
