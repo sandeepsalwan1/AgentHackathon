@@ -1,174 +1,399 @@
-# VetAgent 4-Person Execution Plan
+# VetAgent 4-Person Technical Execution Plan
 
 Date: 2026-05-31
 
-Goal: build the fastest credible VetAgent MVP: external agent, internal agent, existing task manager, mock-first data, Supabase, Render, E2B, Apify, and approval-safe workflows.
+Goal: ship an agent-first VetAgent MVP this week. Use the existing Central Veterinary Hospital task manager as the shared work queue. Build with mock data only for now. Use Supabase, Render, E2B, Opsera, Apify, and OpenAI Agents SDK.
 
-Name assumption: "Apofine/Apofy" means Apify. If wrong, rename the account/tool lane before build.
+Decisions already made:
 
-## Best MVP Shape
+- Apofy/Apofine = Apify.
+- Mock data only this week.
+- Sandeep owns Supabase and all Render work.
+- Use Render, not Vercel, for this phase.
+- Use E2B.
+- Use Opsera.
+- Keep current passcode auth. Do not add Supabase Auth yet.
+- Keep current role/passcode envs: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`.
+- Use TypeScript in this repo, not a separate Python service.
+- Person 4 is frontend/product and must be able to work in parallel from contracts/fixtures.
 
-Keep it simple:
+## Current Codebase
 
-- Existing task manager stays the work queue.
-- Supabase becomes the shared product database.
-- Render hosts the app.
-- OpenAI Agents SDK powers agent orchestration.
-- E2B runs isolated scenario/eval jobs first, not every normal app request.
-- Apify handles competitor/public-web research.
-- Opsera is useful for CI/CD visibility, but not allowed to block the MVP.
+Existing apps:
 
-AI-friendly default:
+- `apps/internal`: staff task board.
+- `apps/client-request`: public client request form.
+- `packages/db`: Postgres connection, migrations, task/auth/settings helpers.
+- `packages/notifications`: Resend notification helpers.
+- `db/migrations`: SQL migrations.
 
-- TypeScript first, because this repo is already Next.js/TypeScript.
-- Every agent action goes through typed tools.
-- Every tool writes workflow/audit events.
-- Every risky action becomes an approval request.
-- Every workflow works in mock mode before live integrations.
+Important current files:
 
-## Four People
+- `apps/internal/app/components/TaskBoard.tsx`: existing staff UI.
+- `apps/client-request/app/components/RequestForm.tsx`: existing public request UI.
+- `apps/internal/app/api/tasks/route.ts`: list/create tasks.
+- `apps/internal/app/api/tasks/[id]/route.ts`: update task/status.
+- `apps/internal/app/api/events/route.ts`: audit log.
+- `apps/internal/app/api/auth/route.ts`: passcode login.
+- `apps/internal/app/api/_shared.ts`: auth helpers. Do not rewrite this for MVP.
+- `apps/client-request/app/api/requests/route.ts`: public request -> task.
+- `packages/db/src/tasks.ts`: task CRUD/event helpers.
+- `packages/db/src/types.ts`: shared task types.
+- `packages/db/scripts/migrate.mjs`: current migration runner.
+- `.env.example`: current env surface.
 
-### Person 1 - Sandeep: Supabase, Render, Production Path
+## Target Architecture This Week
 
-Mission: make the product real and deployable.
+Add these modules:
 
-Sandeep owns all Render work. No split ownership there.
+```text
+packages/agents/
+  package.json
+  src/
+    index.ts
+    contracts.ts
+    guardrails.ts
+    tools.ts
+    mockProvider.ts
+    externalAgent.ts
+    internalAgent.ts
+    scenarioRunner.ts
+    e2bRunner.ts
+    apifyPricing.ts
+
+packages/mock-data/
+  package.json
+  src/
+    vetSandbox.ts
+    scenarios.ts
+
+apps/internal/app/api/agent/internal/route.ts
+apps/internal/app/api/agent/external/route.ts
+apps/internal/app/api/agent/runs/[id]/route.ts
+apps/internal/app/api/approvals/route.ts
+apps/internal/app/api/approvals/[id]/route.ts
+apps/internal/app/api/mock/clinic/route.ts
+
+apps/client-request/app/booking/page.tsx
+apps/client-request/app/checkin/page.tsx
+apps/client-request/app/pickup/page.tsx
+apps/client-request/app/records/page.tsx
+```
+
+Add migrations:
+
+```text
+db/migrations/016_agent_workflows.sql
+db/migrations/017_vetagent_mock_entities.sql
+```
+
+Keep current task tables:
+
+- `tasks`
+- `task_events`
+- `notification_events`
+- passcode/auth tables already present
+
+Do not break the current task board while adding agents.
+
+## Person 1 - Sandeep: Supabase, Render, Opsera Deploy Path
+
+Mission: make this repo deployable and repeatable.
 
 Owns:
 
 - Supabase project.
-- Supabase keys and secrets.
-- Database migration path.
+- Supabase connection string.
+- Supabase SQL migration execution.
 - Render services.
 - Render env vars.
-- Mock/mirror/live mode config.
-- Base tenant: Central Veterinary Hospital.
-- Production deploy proof.
-- Opsera connection only if ready quickly.
+- Render deploy verification.
+- Opsera pipeline setup.
+- Production/mock-mode readiness.
 
 Does not own:
 
-- Agent prompts.
-- Frontend screens.
-- Apify actor research.
-- Workflow copy.
+- Frontend implementation.
+- Agent prompts/tools.
+- Apify actor selection.
+- Passcode/auth rewrite.
 
-First 4 hours:
+### Person 1 Exact Tasks
 
-- Create Supabase project.
-- Save exact secret names, not values, in setup notes.
-- Decide Render shape: two services, `internal` and `client`.
-- Add required env vars in Render.
-- Run existing migrations.
-- Deploy both apps with `MOCK_MODE=true`.
-- Smoke test public request -> task board.
+1. Create Supabase project.
+2. Set Postgres connection string as `DATABASE_URL`.
+3. Keep `POSTGRES_URL` supported because `packages/db/src/connection.ts` already supports both.
+4. Run migrations with existing command:
 
-Deliverables:
+```bash
+npm run db:migrate
+```
 
-- Supabase project URL configured.
-- Render internal URL.
-- Render public/client URL.
-- Env var checklist.
-- Migration command documented.
-- Smoke-test notes.
+5. Create two Render web services:
 
-Done when:
+- `vetagent-internal`
+- `vetagent-client`
 
-- Public request creates a task in Supabase.
-- Internal board reads and updates that task.
-- Clean Render deploy works from repo.
-- Another person can run migrations from docs.
+6. Render service config:
 
-### Person 2 - Accounts/Tools Scout: Apify, E2B, Opsera, Vendor Readiness
+Internal service:
 
-Mission: unblock external tools and prove what each can do.
+```text
+root: repo root
+build command: npm install && npm run build --workspace @central-vet/internal
+start command: npm run start --workspace @central-vet/internal
+env:
+  DATABASE_URL
+  HOSPITAL_NAME
+  APP_TIME_ZONE
+  VET_ADMIN_PASSCODE
+  VET_APP_ADMIN_PASSCODE
+  VET_VETERINARIAN_PASSCODE
+  OPENAI_API_KEY
+  E2B_API_KEY
+  APIFY_TOKEN
+  MOCK_MODE=true
+  AGENT_RUNTIME=mock
+```
 
-This is the person already making accounts and exploring Apify/tools.
+Client service:
+
+```text
+root: repo root
+build command: npm install && npm run build --workspace @central-vet/client-request
+start command: npm run start --workspace @central-vet/client-request
+env:
+  DATABASE_URL
+  HOSPITAL_NAME
+  APP_TIME_ZONE
+  MOCK_MODE=true
+```
+
+7. Add missing `start` scripts if needed in:
+
+- `apps/internal/package.json`
+- `apps/client-request/package.json`
+
+8. Do not change login UX/passcodes.
+9. Create Opsera pipeline:
+
+- source: GitHub repo `sandeepsalwan1/AgentHackathon`
+- build: `npm install`
+- checks: `npm run typecheck`, `npm run build`
+- deploy target: Render
+- required envs: documented by name only, no values
+
+10. Write/update deploy notes in:
+
+```text
+docs/render-supabase-opsera.md
+```
+
+### Person 1 First 4 Hours
+
+- Supabase project exists.
+- `DATABASE_URL` works locally.
+- `npm run db:migrate` runs against Supabase.
+- Render service shells created.
+- Opsera project/pipeline started, even if deploy gate is not perfect yet.
+
+### Person 1 Done This Week
+
+- Render internal URL works.
+- Render client URL works.
+- Public request creates Supabase task.
+- Internal task board reads/updates Supabase task.
+- Opsera pipeline runs build/check/deploy or has a clear documented blocker.
+
+## Person 2 - Accounts/Tools Scout: Apify, E2B, Opsera Support
+
+Mission: make external accounts usable by Person 1 and Person 3.
 
 Owns:
 
-- Apify account.
-- Apify actor/tool research.
-- E2B account and token readiness.
-- Opsera account readiness.
-- Vendor/system research notes.
-- Free-tier/pricing limits.
-- Credential status list.
-- Sample outputs from tools.
+- Apify account and actor research.
+- E2B account/token readiness.
+- Opsera access support.
+- Tool notes.
+- Sample outputs.
 
-Does not own:
+This lane is intentionally smaller. Main execution focus is Person 1, Person 3, Person 4.
 
-- App deploy.
-- Frontend implementation.
-- Agent code.
-- Supabase schema.
+### Person 2 Exact Tasks
 
-First 4 hours:
+1. Confirm Apify token.
+2. Find Apify actors for:
 
-- Confirm whether the tool is Apify.
-- Create/login to Apify.
-- Find 3 useful actors:
-  - local business discovery,
-  - website/page scraping,
-  - Google Maps or local search equivalent.
-- Run one sample scrape for competitor veterinary clinics.
-- Export JSON/CSV sample.
-- Confirm E2B account/token can be created.
-- Confirm Opsera account access or blocker.
-- Write short tool notes.
+- Google Maps/local business discovery.
+- Website scraping/crawling.
+- Structured page extraction.
 
-Deliverables:
+3. Run one veterinary competitor scrape.
+4. Export sample to:
 
-- `docs/tool-readiness.md`
-- Apify token status.
-- E2B token status.
-- Opsera status.
-- Sample Apify JSON/CSV.
-- Recommended Apify actor list.
-- Free-tier/credit notes.
+```text
+docs/samples/apify-competitor-sample.json
+```
 
-Done when:
+5. Confirm E2B token.
+6. Confirm Opsera login/access.
+7. Write:
 
-- Backend person can call Apify or has a clear blocker.
-- Backend person can call E2B or has a clear blocker.
-- Team knows whether Opsera is this-week or later.
-- There is one real competitor-research sample file.
+```text
+docs/tool-readiness.md
+```
 
-### Person 3 - AI/Backend Engineer: Agents, Tools, Workflows
+Include:
 
-Mission: make the agents actually take useful, safe actions.
+- tool name,
+- account owner,
+- token secret name,
+- free-tier limits,
+- chosen actor IDs,
+- sample output path,
+- blocker if any.
+
+## Person 3 - AI/Backend Engineer: Agents, Tools, Data, E2B
+
+Mission: build the actual agent system on mock data.
 
 Owns:
 
 - OpenAI Agents SDK integration.
-- External agent.
-- Internal agent.
-- Typed tool registry.
+- Typed tool contracts.
 - Mock provider.
-- Workflow run storage.
-- Agent trace storage.
-- Approval request logic.
-- E2B scenario/eval runner.
-- Apify integration once Person 2 proves account/tool.
+- Workflow persistence.
+- Approval persistence.
+- Internal/external agent routes.
+- E2B scenario runner.
+- Apify integration after Person 2 provides token/actor.
+- Backend support for Person 4.
 
 Does not own:
 
-- Final frontend polish.
-- Supabase account creation.
-- Render service setup.
-- Manual account exploration.
+- Supabase/Render/Opsera setup.
+- Frontend polish.
+- Passcode rewrite.
 
-First 4 hours:
+### Person 3 Code Decisions
 
-- Define provider interface.
-- Build mock provider.
-- Build typed tool registry.
-- Add `workflow_runs`, `workflow_events`, `approval_requests`, `agent_traces` schema draft.
-- Build first external-agent API route.
-- Build first internal-agent API route.
-- Add one mock booking scenario.
+- Create `packages/agents` TypeScript workspace.
+- Create `packages/mock-data` TypeScript workspace.
+- Add dependencies only after quick package health check.
+- Use Zod for tool input/output validation, matching current repo style.
+- Use existing `@central-vet/db` functions for task writes.
+- Add new DB helpers in `packages/db/src/agents.ts`, not inside route files.
+- Export from `packages/db/src/index.ts`.
+- Add Next.js routes under `apps/internal/app/api/agent/*`.
+- Do not let model text write SQL directly.
 
-First tools:
+### Person 3 Migration Work
+
+Create `db/migrations/016_agent_workflows.sql`:
+
+```sql
+create type workflow_status as enum ('running', 'needs_approval', 'completed', 'failed');
+create type approval_status as enum ('pending', 'approved', 'rejected', 'expired');
+
+create table if not exists workflow_runs (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'central-vet',
+  agent_type text not null,
+  scenario text,
+  status workflow_status not null default 'running',
+  input jsonb not null default '{}',
+  output jsonb not null default '{}',
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists workflow_events (
+  id uuid primary key default gen_random_uuid(),
+  workflow_run_id uuid not null references workflow_runs(id) on delete cascade,
+  event_type text not null,
+  tool_name text,
+  payload jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists approval_requests (
+  id uuid primary key default gen_random_uuid(),
+  workflow_run_id uuid references workflow_runs(id) on delete set null,
+  task_id uuid references tasks(id) on delete set null,
+  approval_type text not null,
+  status approval_status not null default 'pending',
+  title text not null,
+  summary text not null,
+  proposed_payload jsonb not null default '{}',
+  decided_by_name text,
+  decided_by_role app_role,
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists agent_traces (
+  id uuid primary key default gen_random_uuid(),
+  workflow_run_id uuid references workflow_runs(id) on delete set null,
+  provider_trace_id text,
+  compact_summary text,
+  metadata jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+```
+
+Create `db/migrations/017_vetagent_mock_entities.sql` with MVP mock entities:
+
+- `clients`
+- `pets`
+- `appointments`
+- `visits`
+- `records_requests`
+- `invoices`
+- `invoice_items`
+- `service_catalog`
+- `competitor_price_snapshots`
+
+Keep it minimal. Only fields needed by this week's demo.
+
+### Person 3 Package Work
+
+`packages/agents/src/contracts.ts` should define shared frontend/backend shapes:
+
+```ts
+export type AgentMode = "mock" | "mirror" | "live";
+export type AgentType = "external" | "internal" | "pricing" | "records";
+
+export type WorkflowStatus = "running" | "needs_approval" | "completed" | "failed";
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+
+export type AgentRunRequest = {
+  tenantId: string;
+  agentType: AgentType;
+  scenario: string;
+  message: string;
+  context?: Record<string, unknown>;
+};
+
+export type AgentRunResponse = {
+  runId: string;
+  status: WorkflowStatus;
+  message: string;
+  taskIds: string[];
+  approvalIds: string[];
+  events: WorkflowEventDTO[];
+};
+
+export type WorkflowEventDTO = {
+  id: string;
+  eventType: string;
+  toolName?: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+};
+```
+
+`packages/agents/src/tools.ts` first tools:
 
 - `lookup_client`
 - `lookup_pet`
@@ -185,353 +410,335 @@ First tools:
 - `run_competitor_scan`
 - `create_price_review_report`
 
-AI safety requirements:
+`packages/agents/src/mockProvider.ts` must use only mock/local DB data. No live PMS integration.
 
-- No direct database writes from model text.
-- No arbitrary tool names.
-- No silent records transfer.
-- No silent billing or pricing changes.
-- Medical-ish input escalates to task.
-- Tool guardrails around every risky function.
-- Trace every run and tool call.
+`packages/agents/src/guardrails.ts` rules:
 
-Deliverables:
+- no diagnosis,
+- emergency language escalates,
+- records transfer needs approval,
+- billing/pricing changes need approval,
+- no live writes this week.
 
-- `packages/agents` or equivalent app-local agent module.
-- Typed tool registry.
-- Mock provider adapter.
-- External agent route.
-- Internal agent route.
-- Scenario test runner.
-- E2B eval runner or local fallback.
+### Person 3 API Routes
 
-Done when:
+Create:
 
-- External booking scenario passes on mock data.
-- External sick-pet scenario creates urgent task, no diagnosis.
-- Internal daily-summary scenario ranks task-board work.
-- Records-transfer scenario creates approval request.
-- Every agent run has trace/workflow events.
+```text
+apps/internal/app/api/agent/external/route.ts
+apps/internal/app/api/agent/internal/route.ts
+apps/internal/app/api/agent/runs/[id]/route.ts
+apps/internal/app/api/approvals/route.ts
+apps/internal/app/api/approvals/[id]/route.ts
+apps/internal/app/api/mock/clinic/route.ts
+```
 
-### Person 4 - Frontend/Product Builder: User Flows, Screens, Demo
+Route contracts:
 
-Mission: make the product usable and demoable.
+```text
+POST /api/agent/external
+body: AgentRunRequest
+returns: AgentRunResponse
+
+POST /api/agent/internal
+body: AgentRunRequest
+returns: AgentRunResponse
+
+GET /api/agent/runs/:id
+returns: run + events + approvals + taskIds
+
+GET /api/approvals
+returns: pending approvals
+
+PATCH /api/approvals/:id
+body: { actor, decision: "approved" | "rejected", note?: string }
+returns: approval
+
+GET /api/mock/clinic
+returns: mock clients, pets, appointments, service catalog
+```
+
+Auth decision:
+
+- Internal agent routes use current actor/passcode helpers from `apps/internal/app/api/_shared.ts`.
+- Public client pages call internal routes only through safe public/external endpoints or mock fixture route.
+- Do not add Supabase Auth this week.
+
+### Person 3 E2B Work
+
+Use E2B for:
+
+- scenario/eval execution,
+- isolated data-processing experiments,
+- validating agent runs without touching production data.
+
+Add script:
+
+```text
+packages/agents/src/e2bRunner.ts
+```
+
+Add npm script:
+
+```json
+"agent:test:e2b": "tsx packages/agents/src/scenarioRunner.ts --runner=e2b"
+```
+
+Scenarios:
+
+- booking,
+- check-in,
+- sick-pet escalation,
+- records-transfer approval,
+- pricing-review.
+
+### Person 3 First 4 Hours
+
+- Create `packages/agents`.
+- Create `packages/mock-data`.
+- Add contracts.
+- Add mock provider.
+- Add route stubs returning fixture data.
+- Give Person 4 stable response shapes.
+
+### Person 3 Done This Week
+
+- External booking/check-in/sick-pet scenarios work in mock mode.
+- Internal daily-summary/records-transfer scenarios work in mock mode.
+- Approval requests persist.
+- Agent runs and events persist.
+- E2B runs at least one scenario.
+- Apify pricing scan creates a pricing-review task.
+
+## Person 4 - Frontend/Product Engineer: Screens, Flows, Demo
+
+Mission: build the user-facing product in parallel without waiting for backend completion.
 
 Owns:
 
 - All frontend screens.
-- Public/client flows.
-- Staff/internal flows.
-- Agent chat/command panels.
-- Mock demo data shape with backend person.
-- Demo script.
-- UX acceptance testing.
-- Safety wording in UI.
+- Public/client workflows.
+- Staff/internal agent surfaces.
+- Approval queue UI.
+- Workflow run status UI.
+- Demo-ready UX.
+- Screenshot proof.
 
 Does not own:
 
-- Supabase/Render accounts.
-- Agent SDK wiring.
-- Apify account/tool exploration.
-- Production secrets.
+- Supabase/Render setup.
+- Agent SDK internals.
+- Apify/E2B/Opsera accounts.
+- Passcode auth rewrite.
 
-First 4 hours:
+### Person 4 Parallel Work Rule
 
-- Map screens needed for demo.
-- Wire public external-agent flow.
-- Wire staff internal-agent panel.
-- Define mock data needed by UI.
-- Keep existing task board usable.
-- Draft demo script.
+Person 4 should not wait for Person 3.
 
-First screens:
+Use this order:
 
-- Client booking flow.
-- Client check-in / "I'm here" flow.
-- Client pickup/status flow.
-- Sick-pet request flow.
-- Records-transfer request flow.
-- Internal agent command panel.
-- Daily ops digest view.
-- Records-transfer approval queue.
-- Pricing-review report view.
+1. Build screens against static fixtures in `packages/mock-data`.
+2. Switch to `GET /api/mock/clinic` when Person 3 adds it.
+3. Switch submit actions to `/api/agent/*` when ready.
+4. Keep old task board usable the whole time.
 
-Frontend rules:
+### Person 4 Exact Files
 
-- No landing page for MVP.
-- First screen should be actual workflow.
-- Staff UI should be dense, clear, operational.
-- Client UI should be simple and mobile-first.
-- Every agent action should show status: drafted, approved, done, blocked.
+Modify/add:
+
+```text
+apps/client-request/app/page.tsx
+apps/client-request/app/components/RequestForm.tsx
+apps/client-request/app/booking/page.tsx
+apps/client-request/app/checkin/page.tsx
+apps/client-request/app/pickup/page.tsx
+apps/client-request/app/records/page.tsx
+apps/client-request/app/components/AgentFlowShell.tsx
+
+apps/internal/app/page.tsx
+apps/internal/app/components/TaskBoard.tsx
+apps/internal/app/components/InternalAgentPanel.tsx
+apps/internal/app/components/ApprovalQueue.tsx
+apps/internal/app/components/WorkflowRunTimeline.tsx
+apps/internal/app/components/DailyOpsDigest.tsx
+apps/internal/app/components/PricingReviewPanel.tsx
+```
+
+Do not split `TaskBoard.tsx` unless needed. It is large, but avoid risky refactor this week.
+
+### Person 4 Screens
+
+Public app:
+
+- `/`: keep current client request path working.
+- `/booking`: appointment request -> slot suggestion -> confirm.
+- `/checkin`: "I'm here" -> arrival/check-in -> queue status.
+- `/pickup`: pickup/status lookup -> status update.
+- `/records`: records transfer request -> internal approval task.
+
+Internal app:
+
+- task board remains primary.
+- add internal agent panel near top or side.
+- add approval queue for records/billing/pricing.
+- add workflow timeline drawer/panel.
+- add pricing review panel.
+- add daily ops digest.
+
+### Person 4 Frontend Contracts
+
+Assume these types from Person 3:
+
+```ts
+type AgentRunResponse = {
+  runId: string;
+  status: "running" | "needs_approval" | "completed" | "failed";
+  message: string;
+  taskIds: string[];
+  approvalIds: string[];
+  events: {
+    id: string;
+    eventType: string;
+    toolName?: string;
+    createdAt: string;
+    payload: Record<string, unknown>;
+  }[];
+};
+```
+
+Temporary frontend fixture path:
+
+```text
+packages/mock-data/src/scenarios.ts
+```
+
+Person 4 can import fixture data or duplicate a tiny local fixture until package wiring exists.
+
+### Person 4 UX Rules
+
+- No marketing landing page.
+- First screen is workflow, not pitch.
+- Mobile-first for client pages.
+- Dense operational layout for internal pages.
+- Always show agent status: drafted, needs approval, completed, blocked.
 - Risky actions must show approval state.
+- No medical advice copy. Use escalation language.
+- Do not change passcode screens except visual polish if necessary.
 
-Deliverables:
+### Person 4 First 4 Hours
 
-- Public workflow screens.
-- Internal agent panel.
-- Approval queue UI.
-- Workflow status UI.
-- Demo script.
-- Screenshot proof.
+- Add screen skeletons.
+- Add `AgentFlowShell`.
+- Add fixture-backed booking/check-in/pickup/records flows.
+- Add `InternalAgentPanel` skeleton.
+- Add `ApprovalQueue` skeleton.
+- Keep current `/api/requests` form working.
 
-Done when:
+### Person 4 Done This Week
 
-- A non-technical tester can complete booking/check-in/pickup.
-- Staff can see agent-created work on the task board.
-- Approval requests are obvious.
-- Demo can be run without explaining hidden backend state.
+- Full demo can be clicked without manual DB edits.
+- Public booking/check-in/pickup/records pages exist.
+- Internal agent panel calls backend route when available.
+- Approval queue shows pending approvals.
+- Workflow timeline shows agent/tool events.
+- Screenshots prove desktop + mobile layout.
 
-## Clean Ownership Boundaries
+## Parallel Execution Plan
 
-Sandeep owns infrastructure.
+No one blocks anyone else.
 
-- If it is Supabase, Render, env vars, deployment, or prod readiness, Sandeep owns it.
+Hour 0-4:
 
-Person 2 owns tool/account readiness.
-
-- If it needs signup, token, free-tier check, marketplace/actor research, or vendor investigation, Person 2 owns it.
-
-Person 3 owns AI/backend.
-
-- If it is an agent, tool, provider adapter, workflow run, trace, approval rule, or E2B eval, Person 3 owns it.
-
-Person 4 owns frontend/product.
-
-- If a user clicks it, sees it, demos it, or needs to understand it, Person 4 owns it.
-
-## Interfaces Between People
-
-### Sandeep -> Backend
-
-Provides:
-
-- Supabase URL secret name.
-- Supabase anon key secret name.
-- Supabase service role secret name.
-- Render service URLs.
-- Database migration command.
-- `MOCK_MODE` / `MIRROR_MODE` / `LIVE_MODE` env var names.
-
-### Accounts Scout -> Backend
-
-Provides:
-
-- Apify token secret name.
-- E2B token secret name.
-- Opsera status.
-- Apify actor IDs.
-- Sample dataset output.
-- Tool cost/free-limit notes.
-
-### Backend -> Frontend
-
-Provides:
-
-- API routes.
-- Request/response shapes.
-- Workflow status enum.
-- Approval status enum.
-- Mock data endpoint.
-- Agent run event stream or polling endpoint.
-
-### Frontend -> Backend
-
-Provides:
-
-- Required screen states.
-- Missing fields.
-- Demo scenarios.
-- UX bugs.
-- Copy/safety needs.
-
-## First 5 Days
+- Person 1: Supabase/Render/Opsera shells.
+- Person 2: Apify/E2B/Opsera tokens and samples.
+- Person 3: contracts, mock provider, route stubs.
+- Person 4: fixture-backed UI skeletons.
 
 Day 1:
 
-- Sandeep: Supabase project + Render plan.
-- Person 2: Apify/E2B/Opsera status.
-- Person 3: provider interface + mock provider.
-- Person 4: screen map + demo script draft.
+- Person 1: Supabase migrations and Render deploy.
+- Person 3: agent route stubs and DB migration draft.
+- Person 4: public flow screens and internal panel skeleton.
 
 Day 2:
 
-- Sandeep: migrations + mock deploy.
-- Person 2: sample Apify output.
-- Person 3: typed tool registry + first agent route.
-- Person 4: booking/check-in UI shell.
+- Person 1: env docs and Render smoke checks.
+- Person 3: external booking/check-in tools.
+- Person 4: connect screens to route stubs.
 
 Day 3:
 
-- Sandeep: deploy smoke test.
-- Person 2: account/tool notes complete.
-- Person 3: booking/check-in scenarios.
-- Person 4: internal agent panel + task-board integration.
+- Person 1: Opsera pipeline build/check/deploy.
+- Person 3: internal daily summary and records approval.
+- Person 4: approval queue and timeline UI.
 
 Day 4:
 
-- Sandeep: stabilize env/deploy docs.
-- Person 2: E2B/Apify handoff to backend.
-- Person 3: records-transfer + approval logic.
-- Person 4: approval queue UI.
+- Person 1: deploy stabilization.
+- Person 3: E2B scenario runner.
+- Person 4: demo polish and screenshots.
 
 Day 5:
 
-- Sandeep: final deploy proof.
-- Person 2: pricing scan sample refreshed.
-- Person 3: competitor scan -> pricing report task.
-- Person 4: final demo flow + screenshots.
+- Person 1: final deploy proof.
+- Person 3: Apify pricing scan -> task.
+- Person 4: final demo path.
 
-## MVP Demo Script
+## MVP Demo Path
 
-Show this, in order:
-
-1. Client books a vaccine appointment.
-2. External agent suggests slot and confirms in mock data.
-3. Client checks in with "I'm here".
-4. Staff board shows the new state.
-5. Client sends sick-pet message.
-6. Agent refuses diagnosis and creates urgent staff task.
-7. Client requests records transfer.
-8. Internal agent prepares draft/approval task.
-9. Staff approves or edits the request.
-10. Internal agent shows daily ops digest.
-11. Apify competitor scan creates pricing report.
-12. Pricing report creates review task, not automatic repricing.
-
-## Data Model Needed For MVP
-
-Keep:
-
-- `tasks`
-- `task_events`
-- notification tables
-
-Add:
-
-- `tenants`
-- `locations`
-- `clients`
-- `pets`
-- `appointments`
-- `visits`
-- `messages`
-- `records_requests`
-- `invoices`
-- `invoice_items`
-- `service_catalog`
-- `competitor_price_snapshots`
-- `workflow_runs`
-- `workflow_events`
-- `approval_requests`
-- `agent_traces`
-- `integration_configs`
-
-Add later:
-
-- `provider_capabilities`
-- `lab_results`
-- `campaigns`
-- `mirror_imports`
-- `live_sync_jobs`
-
-## AI Architecture
-
-Use manager + specialists:
-
-- Router agent: chooses external vs internal.
-- External agent: client workflows.
-- Internal agent: staff workflows.
-- Pricing/research specialist: Apify-backed research.
-- Records specialist: records-transfer workflow.
-
-Tool design:
-
-- Tools are small and typed.
-- Tools return structured JSON.
-- Tools never return raw secrets.
-- Tools include tenant ID.
-- Tools log workflow events.
-- Tools enforce approval rules.
-
-Tracing:
-
-- Store our own `agent_traces` row for every run.
-- Keep OpenAI SDK tracing enabled in server runtime unless privacy policy says no.
-- Store compact summaries in DB, not full sensitive records unless needed.
-
-E2B usage:
-
-- Use first for scenario/eval runs.
-- Use for risky code execution or data-processing experiments.
-- Do not put normal low-risk app requests through E2B unless there is a reason.
-
-Apify usage:
-
-- Use for public competitor research.
-- Store raw snapshots separately from normalized price observations.
-- Never let pricing changes auto-apply.
-
-## Human Approval Rules
-
-Fully automated:
-
-- task creation,
-- internal summaries,
-- queue updates,
-- low-risk reminders,
-- mock-mode actions.
-
-Draft + approval:
-
-- records transfer,
-- billing response,
-- invoice issue,
-- competitor-pricing recommendation,
-- ambiguous client message,
-- live provider write.
-
-Never autonomous:
-
-- diagnosis,
-- medical treatment advice,
-- silent records release,
-- silent billing change,
-- silent price change,
-- destructive integration action.
+1. Open public booking page.
+2. Ask for vaccine appointment.
+3. Agent suggests slot from mock data.
+4. Confirm appointment.
+5. Open check-in page.
+6. Mark client arrived.
+7. Internal board shows task/state.
+8. Send sick-pet message.
+9. Agent refuses diagnosis and creates urgent staff task.
+10. Request records transfer.
+11. Internal approval queue shows records approval.
+12. Internal agent generates daily ops digest.
+13. Apify scan creates pricing-review report.
+14. Pricing report creates task; no automatic repricing.
 
 ## Acceptance Criteria
 
-MVP is acceptable when:
+Technical:
 
-- Render public app works.
-- Render internal app works.
-- Supabase stores tasks and workflow events.
-- External agent completes booking/check-in flow in mock mode.
-- External agent escalates sick-pet message safely.
-- Internal agent creates daily ops summary.
-- Internal agent creates records-transfer approval task.
-- Apify competitor scan creates pricing-review task.
-- E2B can run at least one scenario/eval.
-- Frontend can demo the full path without manual DB edits.
+- `npm run typecheck` passes.
+- `npm run build` passes.
+- `npm run db:migrate` works on Supabase.
+- Render internal app deploys.
+- Render client app deploys.
+- Opsera runs at least build/typecheck or has documented blocker.
+- E2B scenario runner runs at least one scenario.
 
-## Questions To Answer
+Product:
 
-Need answers before freezing the plan:
+- Current task board still works.
+- Current passcodes still work.
+- Public request form still works.
+- Public booking/check-in/pickup/records flows exist.
+- Internal agent panel exists.
+- Approval queue exists.
+- Workflow events visible.
+- Mock-only mode works end to end.
 
-- Is the tool definitely Apify?
-- What are the names of the four people?
-- Is Person 4 a frontend engineer or more product/design?
-- Supabase auth now, or keep passcode-style MVP login?
-- OpenAI Agents SDK in TypeScript inside this repo, yes/no?
-- E2B eval-only for MVP, yes/no?
-- Opsera required for first demo, or allowed after demo?
-- Any real clinic CSV/export data available this week?
+Safety:
 
-## References Checked
+- No diagnosis.
+- No silent records release.
+- No silent billing/pricing changes.
+- No live vendor writes.
+- Every risky action creates approval request.
 
-- OpenAI Agents SDK tracing: https://openai.github.io/openai-agents-js/guides/tracing/
-- OpenAI Agents SDK guardrails: https://openai.github.io/openai-agents-js/guides/guardrails
-- OpenAI Agents SDK handoffs: https://openai.github.io/openai-agents-js/guides/handoffs/
-- E2B docs: https://www.e2b.dev/docs
-- Apify for AI agents: https://docs.apify.com/platform/integrations/agent-onboarding
-- Apify Actors: https://docs.apify.com/platform/actors
+## Research Notes
+
+Use official docs while implementing:
+
+- OpenAI Agents SDK agents/tools/guardrails/tracing: https://openai.github.io/openai-agents-js/
+- E2B JavaScript/TypeScript SDK and sandboxes: https://www.e2b.dev/docs
+- Apify Actors and structured runs: https://docs.apify.com/platform/actors
+- Render monorepo services/root/build/start commands: https://render.com/docs/monorepo-support
+- Supabase migrations and remote deploy flow: https://supabase.com/docs/guides/deployment/database-migrations
+- Opsera pipelines, approval gates, build/deploy orchestration: https://docs.opsera.io/
