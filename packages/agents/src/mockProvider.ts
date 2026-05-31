@@ -42,7 +42,6 @@ export function classifyIntent(input: AgentInput, fallback: AgentIntent = "unkno
 export function resolveMode(options: RunAgentOptions = {}): AgentMode {
   if (options.mode) return options.mode;
   if (process.env.AGENT_RUNTIME === "google-adk" && hasGoogleAdkCredentials()) return "google-adk";
-  if (process.env.AGENT_RUNTIME === "openai" && process.env.OPENAI_API_KEY) return "openai";
   return "mock";
 }
 
@@ -95,26 +94,4 @@ export function buildResult(input: {
     effects,
     toolCalls
   };
-}
-
-export async function maybeRunOpenAISummary(input: {
-  name: string;
-  instructions: string;
-  prompt: string;
-  options?: RunAgentOptions;
-}) {
-  if (!process.env.OPENAI_API_KEY) return null;
-  try {
-    const sdk = await import("@openai/agents");
-    const agent = new sdk.Agent({
-      name: input.name,
-      instructions: input.instructions,
-      model: input.options?.model ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini"
-    });
-    const result = await sdk.run(agent, input.prompt);
-    const finalOutput = "finalOutput" in result ? result.finalOutput : null;
-    return typeof finalOutput === "string" ? finalOutput : null;
-  } catch {
-    return null;
-  }
 }

@@ -12,7 +12,6 @@ import {
   buildResult,
   classifyIntent,
   createRuntime,
-  maybeRunOpenAISummary,
   normalizeAgentInput,
   resolveMode
 } from "./mockProvider";
@@ -46,13 +45,6 @@ type BookingToolResult = {
 type TaskToolResult = {
   task: AgentTaskDraft;
 };
-
-const externalInstructions = [
-  "You are the client-facing VetAgent.",
-  "Ask only necessary questions.",
-  "Do not diagnose or prescribe.",
-  "Risky actions become staff tasks or approvals."
-].join("\n");
 
 export async function runExternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
@@ -122,18 +114,10 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime) as WaitResult;
     const waitMinutes = wait.waitStatus?.waitMinutes ?? arrival.appointment.waitMinutes;
     const message = `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes. Staff has been notified.`;
-    const openaiMessage = mode === "openai"
-      ? await maybeRunOpenAISummary({
-          name: "ExternalVetAgent",
-          instructions: externalInstructions,
-          prompt: `${message}\nClient input: ${getInputText(normalized)}`,
-          options
-        })
-      : null;
     return buildResult({
       intent,
       mode,
-      message: openaiMessage ?? message,
+      message,
       result: {
         matched: true,
         client: arrival.client,

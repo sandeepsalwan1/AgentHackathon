@@ -41,7 +41,15 @@ services:
         value: "true"
       - key: AGENT_RUNTIME
         value: mock
-      - key: OPENAI_API_KEY
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CLOUD_LOCATION
         sync: false
       - key: E2B_API_KEY
         sync: false

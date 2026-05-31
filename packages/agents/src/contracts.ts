@@ -14,7 +14,7 @@ export const agentIntentSchema = z.enum([
   "unknown"
 ]);
 
-export const agentModeSchema = z.enum(["mock", "google-adk", "openai", "apify", "e2b-local", "e2b"]);
+export const agentModeSchema = z.enum(["mock", "google-adk", "apify", "e2b-local", "e2b"]);
 
 export const actorSchema = z.object({
   name: z.string().trim().min(1).optional(),
