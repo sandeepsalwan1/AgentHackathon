@@ -53,7 +53,7 @@ Does not own:
 - Apify actor research.
 - Workflow copy.
 
-First 48 hours:
+First 4 hours:
 
 - Create Supabase project.
 - Save exact secret names, not values, in setup notes.
@@ -103,7 +103,7 @@ Does not own:
 - Agent code.
 - Supabase schema.
 
-First 48 hours:
+First 4 hours:
 
 - Confirm whether the tool is Apify.
 - Create/login to Apify.
@@ -158,7 +158,7 @@ Does not own:
 - Render service setup.
 - Manual account exploration.
 
-First 48 hours:
+First 4 hours:
 
 - Define provider interface.
 - Build mock provider.
@@ -235,7 +235,7 @@ Does not own:
 - Apify account/tool exploration.
 - Production secrets.
 
-First 48 hours:
+First 4 hours:
 
 - Map screens needed for demo.
 - Wire public external-agent flow.
