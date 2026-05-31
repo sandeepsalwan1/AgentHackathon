@@ -42,7 +42,7 @@ services:
       - key: AGENT_RUNTIME
         value: mock
       - key: OPSERA_MCP_URL
-        sync: false
+        value: https://agent.opsera.ai/mcp
       - key: OPSERA_API_KEY
         sync: false
       - key: OPSERA_MCP_TOOL
@@ -107,7 +107,7 @@ services:
       - key: AGENT_RUNTIME
         value: mock
       - key: OPSERA_MCP_URL
-        sync: false
+        value: https://agent.opsera.ai/mcp
       - key: OPSERA_API_KEY
         sync: false
       - key: OPSERA_MCP_TOOL
