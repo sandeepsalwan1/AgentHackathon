@@ -1,7 +1,13 @@
 import {
+  auditRecordsTransfer,
+  buildRecordsTransferPacket,
+  type OpseraAuditResult
+} from "@central-vet/agents";
+import {
   editTask,
   escalateTask,
   getTask,
+  recordTaskEvent,
   transitionTask,
   type UpdateTaskInput
 } from "@central-vet/db";
@@ -49,6 +55,27 @@ const bodySchema = z.object({
   invalidReason: z.string().trim().max(500).optional().nullable()
 });
 
+const auditedPacketFields = [
+  "clientName",
+  "clarityId",
+  "clientPhone",
+  "clientDateOfBirth",
+  "petName",
+  "petWeight",
+  "lastVisit",
+  "request",
+  "requestType"
+] as const satisfies readonly (keyof UpdateTaskInput)[];
+
+function editsAuditedPacket(input: UpdateTaskInput) {
+  return auditedPacketFields.some((field) => field in input);
+}
+
+function nullableText(input: UpdateTaskInput, key: keyof UpdateTaskInput, current: string | null) {
+  const value = input[key];
+  return key in input ? (typeof value === "string" ? value : null) : current;
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -85,12 +112,75 @@ export async function PATCH(
       if (workflowError) {
         return NextResponse.json({ error: workflowError.error }, { status: workflowError.status });
       }
-      const task = await editTask(
-        id,
-        (body.data.task ?? {}) as UpdateTaskInput,
-        actor
-      );
+      const taskPatch = (body.data.task ?? {}) as UpdateTaskInput;
+      let opseraAudit: OpseraAuditResult | null = null;
+      const nextRequestType =
+        "requestType" in taskPatch
+          ? taskPatch.requestType ?? "labs_xrays"
+          : currentTask.requestType;
+
+      if (editsAuditedPacket(taskPatch)) {
+        if (nextRequestType === "records_request") {
+          opseraAudit = await auditRecordsTransfer(
+            buildRecordsTransferPacket({
+              clientName: nullableText(taskPatch, "clientName", currentTask.clientName),
+              clientPhone: nullableText(taskPatch, "clientPhone", currentTask.clientPhone),
+              clientDateOfBirth: nullableText(
+                taskPatch,
+                "clientDateOfBirth",
+                currentTask.clientDateOfBirth
+              ),
+              clientId: nullableText(taskPatch, "clarityId", currentTask.clarityId),
+              petName: nullableText(taskPatch, "petName", currentTask.petName),
+              petWeight: nullableText(taskPatch, "petWeight", currentTask.petWeight),
+              lastVisit: nullableText(taskPatch, "lastVisit", currentTask.lastVisit),
+              request:
+                "request" in taskPatch && taskPatch.request
+                  ? taskPatch.request
+                  : currentTask.request,
+              requestedBy: actor.name,
+              metadata: {
+                source: "task_edit",
+                actorRole: actor.role,
+                taskId: id
+              }
+            })
+          );
+          taskPatch.opseraAuditStatus = opseraAudit.status;
+          taskPatch.opseraAuditReason = opseraAudit.reason;
+          taskPatch.opseraAuditId = opseraAudit.auditId;
+          taskPatch.opseraAuditCheckedAt = opseraAudit.checkedAt;
+        } else {
+          taskPatch.opseraAuditStatus = null;
+          taskPatch.opseraAuditReason = null;
+          taskPatch.opseraAuditId = null;
+          taskPatch.opseraAuditCheckedAt = null;
+        }
+      }
+
+      const task = await editTask(id, taskPatch, actor);
       if (task) {
+        if (opseraAudit) {
+          await recordTaskEvent({
+            taskId: task.id,
+            actor,
+            eventType: "opsera_records_audit",
+            previousStatus: currentTask.status,
+            nextStatus: task.status,
+            metadata: {
+              opseraStatus: opseraAudit.status,
+              opseraReason: opseraAudit.reason,
+              opseraAuditId: opseraAudit.auditId,
+              opseraSource: opseraAudit.source,
+              reason: "task_edit"
+            }
+          });
+          logInfo("opsera_records_audit", {
+            taskId: task.id,
+            actorRole: actor.role,
+            status: opseraAudit.status
+          });
+        }
         logInfo("task_updated", {
           taskId: id,
           action: "edit",

@@ -54,6 +54,8 @@ type AuditCandidate = {
 
 const defaultToolName = "audit_records_transfer";
 const maxReasonLength = 500;
+const textStatusPattern =
+  /\b(approved|approve|pass|passed|flagged|review required|review_required|warning|blocked|block|failed|deny|denied)\b/i;
 
 function clean(value: string | null | undefined) {
   const trimmed = value?.trim();
@@ -117,7 +119,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function normalizeStatus(value: unknown): OpseraAuditStatus | null {
   if (typeof value !== "string") return null;
   const normalized = value.toLowerCase().replace(/[^a-z_]/g, "");
-  if (normalized === "approved" || normalized === "approve" || normalized === "pass") {
+  if (
+    normalized === "approved" ||
+    normalized === "approve" ||
+    normalized === "pass" ||
+    normalized === "passed"
+  ) {
     return "approved";
   }
   if (
@@ -129,7 +136,13 @@ function normalizeStatus(value: unknown): OpseraAuditStatus | null {
   ) {
     return "flagged";
   }
-  if (normalized === "blocked" || normalized === "block" || normalized === "failed" || normalized === "deny") {
+  if (
+    normalized === "blocked" ||
+    normalized === "block" ||
+    normalized === "failed" ||
+    normalized === "deny" ||
+    normalized === "denied"
+  ) {
     return "blocked";
   }
   return null;
@@ -158,6 +171,26 @@ function contentCandidates(value: unknown): unknown[] {
   });
 }
 
+function statusFromText(value: string) {
+  const exactStatus = normalizeStatus(value);
+  if (exactStatus) return exactStatus;
+  return normalizeStatus(value.match(textStatusPattern)?.[1]);
+}
+
+function auditFromTextCandidate(value: unknown): OpseraAuditResult | null {
+  const text = textFrom(value);
+  if (!text) return null;
+  const status = statusFromText(text);
+  if (!status) return null;
+  return {
+    status,
+    reason: formatOpseraAuditReason(text),
+    auditId: auditId("opsera"),
+    checkedAt: new Date().toISOString(),
+    source: "opsera_mcp"
+  };
+}
+
 function normalizeRemoteAudit(payload: unknown): OpseraAuditResult | null {
   const root = asRecord(payload);
   const candidates = [
@@ -172,6 +205,9 @@ function normalizeRemoteAudit(payload: unknown): OpseraAuditResult | null {
   ];
 
   for (const candidate of candidates) {
+    const textAudit = auditFromTextCandidate(candidate);
+    if (textAudit) return textAudit;
+
     const record = asRecord(candidate) as AuditCandidate | null;
     if (!record) continue;
     const status = normalizeStatus(record.status ?? record.auditStatus ?? record.complianceStatus);
@@ -185,21 +221,6 @@ function normalizeRemoteAudit(payload: unknown): OpseraAuditResult | null {
       checkedAt: new Date().toISOString(),
       source: "opsera_mcp"
     };
-  }
-
-  const textPayload = textFrom(payload);
-  if (textPayload) {
-    const status =
-      normalizeStatus(textPayload.match(/\b(approved|flagged|blocked|review required)\b/i)?.[1]) ?? null;
-    if (status) {
-      return {
-        status,
-        reason: formatOpseraAuditReason(textPayload),
-        auditId: auditId("opsera"),
-        checkedAt: new Date().toISOString(),
-        source: "opsera_mcp"
-      };
-    }
   }
 
   return null;

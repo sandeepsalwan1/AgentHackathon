@@ -65,7 +65,7 @@ Opsera:
 - Records-transfer audit entrypoint: `packages/agents/src/tools/opsera.ts`.
 - Runtime routes call Opsera before records request task creation and persist `opsera_audit_*` fields on `tasks`.
 - Internal tool route: `POST /api/tools/prepare-records-packet`.
-- Runtime env: `OPSERA_MCP_URL=https://agent.opsera.ai/mcp`, `OPSERA_API_KEY`, `OPSERA_MCP_TOOL`, `OPSERA_MCP_TIMEOUT_MS`.
+- Runtime env: set `OPSERA_MCP_URL` to `https://agent.opsera.ai/mcp` when remote audit is intended; also configure `OPSERA_API_KEY`, `OPSERA_MCP_TOOL`, `OPSERA_MCP_TIMEOUT_MS`.
 - If `OPSERA_MCP_URL` is not configured, the app uses a local fallback policy and flags the audit source as `local_policy`.
 - Blocker state should be documented here instead of blocking local development.
 

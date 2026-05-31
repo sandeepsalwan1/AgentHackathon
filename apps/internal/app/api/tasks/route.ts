@@ -217,6 +217,19 @@ export async function POST(request: Request) {
       assignedTo
     });
 
+    const guardError = await internalCreateGuard({
+      request,
+      actor,
+      task: taskResult.data
+    });
+    if (guardError) {
+      logWarn("task_create_rejected", {
+        reason: "internal_guard",
+        actorRole: actor.role
+      });
+      return NextResponse.json({ error: guardError }, { status: 429 });
+    }
+
     const opseraAudit =
       taskResult.data.requestType === "records_request"
         ? await auditRecordsTransfer(
@@ -250,19 +263,6 @@ export async function POST(request: Request) {
       opseraAuditId: opseraAudit?.auditId ?? null,
       opseraAuditCheckedAt: opseraAudit?.checkedAt ?? null
     };
-
-    const guardError = await internalCreateGuard({
-      request,
-      actor,
-      task: taskResult.data
-    });
-    if (guardError) {
-      logWarn("task_create_rejected", {
-        reason: "internal_guard",
-        actorRole: actor.role
-      });
-      return NextResponse.json({ error: guardError }, { status: 429 });
-    }
 
     const task = await createTask(input, actor);
     if (opseraAudit) {

@@ -295,6 +295,12 @@ function toPatch(input: UpdateTaskInput, actor: Actor) {
   if ("priority" in input) patch.priority = priorityOrDefault(input.priority);
   if ("dueDate" in input && input.dueDate) patch.due_date = input.dueDate;
   if ("dueTime" in input) patch.due_time = timeOrDefault(input.dueTime);
+  if ("opseraAuditStatus" in input) patch.opsera_audit_status = input.opseraAuditStatus ?? null;
+  if ("opseraAuditReason" in input) patch.opsera_audit_reason = cleanText(input.opseraAuditReason);
+  if ("opseraAuditId" in input) patch.opsera_audit_id = cleanText(input.opseraAuditId);
+  if ("opseraAuditCheckedAt" in input) {
+    patch.opsera_audit_checked_at = cleanText(input.opseraAuditCheckedAt);
+  }
   return patch;
 }
 

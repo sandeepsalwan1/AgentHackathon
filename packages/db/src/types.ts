@@ -125,5 +125,9 @@ export type UpdateTaskInput = Partial<
     | "priority"
     | "dueDate"
     | "dueTime"
+    | "opseraAuditStatus"
+    | "opseraAuditReason"
+    | "opseraAuditId"
+    | "opseraAuditCheckedAt"
   >
 >;
