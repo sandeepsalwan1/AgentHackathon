@@ -11,6 +11,7 @@
     "test:scenarios": "tsx src/scenarioRunner.ts"
   },
   "dependencies": {
+    "@google/adk": "^1.1.0",
     "@openai/agents": "^0.11.6",
     "zod": "^4.4.3"
   },

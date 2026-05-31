@@ -41,8 +41,18 @@ export function classifyIntent(input: AgentInput, fallback: AgentIntent = "unkno
 
 export function resolveMode(options: RunAgentOptions = {}): AgentMode {
   if (options.mode) return options.mode;
+  if (process.env.AGENT_RUNTIME === "google-adk" && hasGoogleAdkCredentials()) return "google-adk";
   if (process.env.AGENT_RUNTIME === "openai" && process.env.OPENAI_API_KEY) return "openai";
   return "mock";
+}
+
+function hasGoogleAdkCredentials() {
+  return Boolean(
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENAI_USE_VERTEXAI === "TRUE" ||
+    process.env.GOOGLE_GENAI_USE_VERTEXAI === "true"
+  );
 }
 
 export function makeRunId(intent: AgentIntent, options: RunAgentOptions = {}) {
