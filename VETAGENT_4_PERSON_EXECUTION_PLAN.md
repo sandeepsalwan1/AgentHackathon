@@ -42,6 +42,8 @@ Everything else supports those two priorities:
 - Use Apify.
 - Use OpenAI Agents SDK.
 - Use mock data for the sprint.
+- Final demo should be one deployed web app, not two separate frontend deploys.
+- Preferred one-app target: `apps/internal` becomes the unified app with public routes and staff routes.
 - Keep current passcode auth.
 - Do not add Supabase Auth right now.
 - Do not change passcode env names:
@@ -59,7 +61,7 @@ Everything else supports those two priorities:
 Use these instead of inventing a new app:
 
 - `apps/internal`: staff/internal app.
-- `apps/client-request`: public/client app.
+- `apps/client-request`: public/client app source to reuse or move into the unified app.
 - `packages/db`: database boundary.
 - `packages/notifications`: existing notification helpers.
 - `db/migrations`: schema.
@@ -169,61 +171,86 @@ Must support:
 - competitor pricing -> report task,
 - daily ops -> ranked work list.
 
-## Person 1 vs Person 3 - Clean Split
+## Person 1 vs Person 3 - Plain Split
 
-This is the ownership line so work does not overlap.
+Person 1 is not the frontend person. Person 1 is the backend/product-systems owner for the whole hackathon.
 
-Person 1 owns the agent-ready product system.
+Person 1 works across all 5 product steps:
 
-- database,
-- mock clinic data,
-- route contracts,
-- API routes,
-- task/approval/workflow persistence,
-- check-in backend path,
-- Render/Supabase/Opsera deploy path,
-- deterministic mock responses so frontend and demos never block.
+1. Check-in / arrival backend.
+2. Agent endpoints and workflow execution.
+3. Booking / phone-backlog backend.
+4. Follow-up / outtake revenue backend.
+5. Internal-work automation backend.
 
-Person 3 owns the agent intelligence.
+Person 1 does both agent endpoints, but not the final agent brain.
 
-- OpenAI Agents SDK usage,
-- agent prompts/instructions,
-- tool definitions,
-- tool calling behavior,
+- Person 1 builds the external-agent API route and internal-agent API route.
+- Person 1 makes both routes work with deterministic mock behavior.
+- Person 1 stores agent runs, tool calls, workflow events, tasks, approvals, and reports.
+- Person 1 makes the demo work even if live OpenAI, E2B, Apify, or PMS integrations are not ready.
+- Person 3 later plugs real agent behavior into those same routes.
+
+Person 3 owns the actual agent intelligence.
+
+- prompts,
+- OpenAI Agents SDK behavior,
+- tool-calling decisions,
 - guardrails,
-- scenario behavior,
-- E2B evals,
-- Apify pricing-agent logic.
+- escalation logic,
+- scenario/eval behavior,
+- agent wording and reasoning.
 
-Fast rule:
+Simple rule:
 
-- If it needs to exist as a route, table, deploy, stored workflow, task, approval, or reusable backend contract: Person 1.
-- If it decides what the agent asks, says, classifies, recommends, escalates, or tests in scenarios: Person 3.
-- If both touch it, Person 1 defines the contract first and Person 3 plugs agent behavior into that contract.
+- Person 1 answers: "Does the product have the backend route, data, workflow, persistence, task, approval, deploy, and fallback?"
+- Person 3 answers: "Does the agent behave intelligently, safely, and convincingly when it uses those routes/tools?"
 
-Examples:
+Apify ownership:
+
+- Person 2: account, token, actor research, sample run.
+- Person 1: Apify env wiring, backend endpoint, normalized storage, pricing report/task persistence, sample fallback.
+- Person 3: pricing-agent logic that decides what to compare, what to flag, and what recommendation/task to create.
+
+E2B ownership:
+
+- Person 2: account/token readiness.
+- Person 1: route stubs and mock data so E2B scenarios have a product to hit.
+- Person 3: scenario runner and eval cases.
+
+Concrete examples:
 
 - Check-in route: Person 1.
 - Check-in conversation behavior: Person 3.
 - Mock appointments and wait status data: Person 1.
-- Agent deciding whether arrival is matched, ambiguous, or urgent: Person 3.
-- Creating a task from a workflow: Person 1 provides the task/approval persistence path; Person 3 decides when to call it.
-- Records-transfer approval route: Person 1.
-- Records-transfer agent flow and wording: Person 3.
-- Pricing report storage/task: Person 1.
-- Competitor price comparison logic: Person 3.
-- E2B scenario runner behavior: Person 3, with Person 1 providing route stubs and mock data.
+- Agent deciding matched vs ambiguous vs urgent: Person 3.
+- Task/approval/workflow storage: Person 1.
+- Agent deciding when to create a task/approval: Person 3.
+- Records-transfer route and approval persistence: Person 1.
+- Records-transfer flow, wording, and escalation logic: Person 3.
+- Pricing scrape endpoint/storage/report/task: Person 1.
+- Pricing comparison reasoning/recommendation: Person 3.
+- One Render web deploy: Person 1 handles build/deploy; Person 4 handles frontend consolidation.
 
 ## Person 1 - Platform + Backend + Agent Foundation
 
 Person 1 outcome:
 
-- backend-ready foundation deployed or locally runnable,
-- mock clinic data available,
-- stable agent API contracts,
-- check-in route path usable by frontend,
-- task/approval/workflow persistence usable by agents,
+- one backend-ready product system deployed or locally runnable,
+- one deployed web app path supported on Render,
+- mock clinic data available for all five product steps,
+- external-agent route works,
+- internal-agent route works,
+- check-in route works,
+- booking route path works,
+- call/transcript-to-task route path works,
+- follow-up route path works,
+- records-transfer approval route path works,
+- invoice/admin review route path works,
+- Apify pricing backend path works with sample fallback,
+- task/approval/workflow/report persistence usable by agents,
 - agent run history and workflow timeline available,
+- deterministic fallback behavior so Person 4 can demo immediately,
 - clear deploy/run notes for everyone else.
 
 Person 1 owns:
@@ -233,18 +260,26 @@ Person 1 owns:
 - Opsera.
 - env vars.
 - deploys.
+- one-web-app deployment path.
 - migrations.
 - seed/mock data path.
 - DB helpers.
 - API route stubs.
+- real API route implementations where time allows.
 - agent run persistence.
 - approval persistence.
-- basic agent endpoint wiring.
+- workflow event persistence.
+- report persistence.
+- basic agent endpoint wiring for both agents.
 - check-in agent foundation.
 - external/internal agent route wiring.
 - mock agent responses that can be replaced or extended by Person 3's current work.
+- deterministic first-pass behavior for external agent routes.
+- deterministic first-pass behavior for internal agent routes.
 - agent workflow storage and timeline.
 - agent API contracts for Person 3 and Person 4.
+- Apify backend wiring and pricing report storage.
+- E2B scenario target routes and data.
 - smoke tests.
 - docs for deployment and handoff.
 
@@ -255,17 +290,36 @@ Person 1 build sequence:
 3. Get Supabase migrations and seed data working.
 4. Add mock clinic DB helpers.
 5. Add agent run, workflow event, and approval persistence.
-6. Add route stubs with stable JSON for Person 3 and Person 4.
-7. Add check-in backend path first.
-8. Add call, follow-up, records, pricing, and internal-agent route paths.
-9. Verify existing task board, public request form, and passcodes still work.
-10. Keep Render/Opsera deploy path moving.
+6. Add report storage for pricing, follow-ups, invoices, and daily ops.
+7. Add route stubs with stable JSON for Person 3 and Person 4.
+8. Add check-in backend path first.
+9. Add external-agent route path for booking, pickup, follow-up, records, sick-pet, and call intake.
+10. Add internal-agent route path for daily ops, records, invoices, pricing, and task prioritization.
+11. Add Apify pricing backend route with sample fallback.
+12. Support one deployed web app on Render.
+13. Verify existing task board, public request form, and passcodes still work.
+14. Keep Render/Opsera deploy path moving.
+
+Person 1 proof to show:
+
+- `docs/agent-api-contracts.md` exists and is accurate,
+- Supabase migration/seed path works,
+- one Render web app deploy is documented,
+- `/api/mock/clinic` returns clients, pets, appointments, wait status, follow-ups, invoices, and pricing data,
+- `/api/agent/checkin` returns a check-in result,
+- `/api/agent/external` returns deterministic booking/pickup/records/follow-up/sick-pet outputs,
+- `/api/agent/internal` returns deterministic daily-ops/records/invoice/pricing outputs,
+- `/api/agent/call` turns a transcript into a task or approval candidate,
+- `/api/agent/pricing` returns Apify sample/live normalized output,
+- task board still works after all backend changes,
+- approval and workflow timeline data can be read by Person 4.
 
 Person 1 does not own:
 
 - final frontend polish,
 - final prompts,
-- Apify actor research,
+- final agent personality,
+- final agent eval scoring,
 - final demo copy.
 
 ### Person 1 Workstream A - Platform
@@ -276,8 +330,7 @@ Do:
 - set `DATABASE_URL`,
 - run existing migrations,
 - make root build pass,
-- create Render internal service,
-- create Render client service,
+- create one Render web service for the unified app,
 - add Render env vars,
 - connect Opsera to GitHub,
 - add Opsera install/typecheck/build/deploy path,
@@ -295,8 +348,8 @@ Files:
 
 Done when:
 
-- internal app deploys,
-- client app deploys,
+- one unified web app deploys,
+- public routes and staff routes are reachable from that app,
 - Supabase connection works,
 - Opsera runs at least install/typecheck/build or blocker is documented,
 - no secret values are committed.
@@ -310,7 +363,8 @@ Do:
 - keep existing `tasks` untouched,
 - add agent workflow tables,
 - add approval tables,
-- add call/message/follow-up mock data.
+- add report tables,
+- add call/message/follow-up/pricing mock data.
 
 Data needed:
 
@@ -324,7 +378,10 @@ Data needed:
 - mock inbound messages,
 - mock call transcripts,
 - mock invoices,
-- competitor price observations.
+- competitor price observations,
+- daily ops summaries,
+- pricing reports,
+- invoice review reports.
 
 Files:
 
@@ -341,6 +398,7 @@ Done when:
 - routes can read mock clinic data,
 - agent runs can be stored,
 - approvals can be created/decided,
+- reports can be created/read,
 - the existing task board still works.
 
 ### Person 1 Workstream C - Agent API Foundation
@@ -349,13 +407,23 @@ Person 1 should create stable endpoints quickly and can implement the first mock
 
 Create:
 
+- `apps/internal/app/api/agent/checkin/route.ts`
+- `apps/internal/app/api/agent/booking/route.ts`
 - `apps/internal/app/api/agent/external/route.ts`
 - `apps/internal/app/api/agent/internal/route.ts`
 - `apps/internal/app/api/agent/followup/route.ts`
 - `apps/internal/app/api/agent/call/route.ts`
+- `apps/internal/app/api/agent/pickup/route.ts`
+- `apps/internal/app/api/agent/records/route.ts`
+- `apps/internal/app/api/agent/invoice/route.ts`
+- `apps/internal/app/api/agent/pricing/route.ts`
+- `apps/internal/app/api/agent/daily-ops/route.ts`
 - `apps/internal/app/api/agent/runs/[id]/route.ts`
 - `apps/internal/app/api/approvals/route.ts`
 - `apps/internal/app/api/approvals/[id]/route.ts`
+- `apps/internal/app/api/reports/pricing/route.ts`
+- `apps/internal/app/api/reports/invoices/route.ts`
+- `apps/internal/app/api/reports/followups/route.ts`
 - `apps/internal/app/api/mock/clinic/route.ts`
 
 Rules:
@@ -371,6 +439,7 @@ Done when:
 
 - Person 4 can call mock/agent routes,
 - Person 3 can connect current or new agent internals with package logic,
+- every one of the five product steps has a backend route path,
 - route shapes are documented in `docs/agent-api-contracts.md`.
 
 ### Person 1 Workstream D - Check-In Foundation
@@ -390,12 +459,16 @@ Done when:
 - Person 3 can plug current or new arrival-agent work into the endpoint,
 - internal task board can show an arrival-related task.
 
-### Person 1 Workstream E - Phone/Call Foundation
+### Person 1 Workstream E - Booking + Phone/Call Foundation
 
 Do:
 
+- add fake appointment slots,
+- add fake appointment types,
+- add `/api/agent/booking` stub,
 - add mock call transcripts,
 - add `/api/agent/call` stub,
+- add booking-to-task/appointment response shape,
 - add call-to-task response shape,
 - document later phone-provider options,
 - do not block on live Twilio/phone integration.
@@ -413,11 +486,44 @@ Call intents:
 
 Done when:
 
+- Person 4 can build booking from mock slots,
 - Person 3 can classify transcript examples,
 - Person 4 can build a call/transcript intake page,
 - a mock call can become a task/approval.
 
-### Person 1 Workstream F - Verification
+### Person 1 Workstream F - Follow-Up, Records, Invoices, Pricing, Apify Backend
+
+Do:
+
+- add `/api/agent/followup` route,
+- add `/api/agent/records` route,
+- add `/api/agent/invoice` route,
+- add `/api/agent/pricing` route,
+- add `/api/agent/daily-ops` route,
+- add follow-up candidate storage,
+- add records-transfer approval storage,
+- add invoice review report storage,
+- add pricing report storage,
+- add Apify sample/live response normalizer,
+- add Apify sample fallback if token or actor is missing,
+- create tasks from follow-up, records, invoice, and pricing flows.
+
+Apify backend details:
+
+- Person 2 finds actor/sample/token status.
+- Person 1 wires env names, route, parser, storage, report/task creation.
+- Person 3 uses the pricing route/tool to decide what to flag.
+
+Done when:
+
+- follow-up route can create an appointment/task candidate,
+- records route can create an approval,
+- invoice route can create a review task,
+- pricing route can return sample or live competitor comparison data,
+- pricing route can create a report/task,
+- no automatic repricing exists.
+
+### Person 1 Workstream G - Verification
 
 Run:
 
@@ -432,6 +538,8 @@ Manual smoke:
 - current passcodes still work,
 - approval route returns mock/pending approvals,
 - mock clinic route returns useful data,
+- pricing route returns sample output,
+- follow-up/records/invoice routes create task or approval output,
 - Render deploy still boots.
 
 ## Person 2 - Tools + Accounts + Research Support
@@ -444,7 +552,7 @@ Person 2 owns:
 - E2B account/token status,
 - Opsera access support,
 - sponsor/vendor notes,
-- Apify actor selection,
+- Apify actor selection and sample run notes,
 - competitor research samples,
 - mock call/email/follow-up examples,
 - product-content QA with Person 4.
@@ -527,7 +635,7 @@ Person 3 owns:
 - tool registry,
 - guardrails,
 - E2B scenario runner,
-- Apify pricing wrapper,
+- pricing-agent logic using Person 1's Apify/pricing backend,
 - scenario tests/evals.
 
 Person 3 build sequence:
@@ -540,7 +648,7 @@ Person 3 build sequence:
 6. Implement internal agent behavior for daily ops, triage, records, invoice/admin, follow-up, and pricing review.
 7. Add guardrails for medical, billing, records, and pricing risk.
 8. Add E2B scenario runner with local fallback.
-9. Add Apify pricing wrapper with sample-data fallback.
+9. Add pricing-agent behavior using Person 1's pricing route and sample fallback.
 10. Plug package functions into Person 1 route contracts.
 
 Person 3 does not own:
@@ -698,9 +806,11 @@ Done when:
 
 Do:
 
-- use Apify sample or live actor,
-- normalize competitor pricing,
+- call Person 1's pricing backend route,
+- use Apify sample or live actor data from that route,
 - compare against service catalog,
+- decide which price differences matter,
+- write a clear recommendation,
 - create pricing report,
 - create task,
 - never update prices automatically.
@@ -711,6 +821,7 @@ Person 4 owns the actual experience people see. Person 4 should not wait for Per
 
 Person 4 owns:
 
+- frontend consolidation into one deployed web app,
 - public client flows,
 - internal agent surfaces,
 - approval queue UI,
@@ -720,7 +831,47 @@ Person 4 owns:
 - demo script,
 - screenshot proof.
 
-### Person 4 Workstream A - Public Flow Shell
+### Person 4 Workstream A - One Deployed Web App Shape
+
+Change the frontend plan from two separate deployed apps to one deployed web app.
+
+Target:
+
+- one Render web app,
+- public/client routes do not require passcode,
+- staff/internal routes keep current passcode gate,
+- public routes and staff routes feel like one product,
+- use existing components instead of rebuilding from scratch.
+
+Preferred route shape:
+
+- `/arrival`
+- `/booking`
+- `/pickup`
+- `/records`
+- `/followup`
+- `/call`
+- `/staff`
+- `/staff/tasks`
+- `/staff/agent`
+- `/staff/approvals`
+
+Implementation rule:
+
+- Person 4 owns frontend route/component consolidation.
+- Person 1 owns Render/build config for the single deploy.
+- Keep current passcodes.
+- Do not add Supabase Auth.
+- If full consolidation blocks the demo, document the blocker and keep one primary deployed app with links to the remaining source route.
+
+Done when:
+
+- one deployed app is the main demo URL,
+- public check-in works from that URL,
+- staff task/agent UI works from that URL,
+- existing public/request and task-board behavior is preserved.
+
+### Person 4 Workstream B - Public Flow Shell
 
 Create:
 
@@ -736,7 +887,7 @@ Use for:
 - follow-up,
 - call/transcript.
 
-### Person 4 Workstream B - Check-In / Arrival UI
+### Person 4 Workstream C - Check-In / Arrival UI
 
 Build:
 
@@ -754,7 +905,7 @@ Must show:
 
 This is the top-priority screen.
 
-### Person 4 Workstream C - Agent-Driven Public Pages
+### Person 4 Workstream D - Agent-Driven Public Pages
 
 Build:
 
@@ -772,7 +923,7 @@ Rules:
 - show agent status,
 - show staff-review/approval states clearly.
 
-### Person 4 Workstream D - Internal Agent UI
+### Person 4 Workstream E - Internal Agent UI
 
 Create:
 
@@ -795,7 +946,7 @@ Quick buttons:
 - pricing review,
 - call/message triage.
 
-### Person 4 Workstream E - Demo Script
+### Person 4 Workstream F - Demo Script
 
 Write:
 
@@ -823,10 +974,10 @@ Done when:
 
 Immediate parallel start:
 
-- Person 1: Supabase/Render/Opsera, route stubs, mock data route.
+- Person 1: Supabase/Render/Opsera, one-app deploy path, route stubs, mock data route.
 - Person 2: tool accounts, sample content, Apify/E2B/Opsera status.
 - Person 3: contracts, tool registry, check-in agent skeleton.
-- Person 4: arrival screen, flow shell, internal panel skeleton.
+- Person 4: one-app frontend shape, arrival screen, flow shell, internal panel skeleton.
 
 Track A - check-in and agent foundation:
 
@@ -837,23 +988,23 @@ Track A - check-in and agent foundation:
 
 Track B - internal agents and task execution:
 
-- Person 1: approvals/workflow persistence, Opsera pipeline.
+- Person 1: approvals/workflow/report persistence, internal-agent route paths, Opsera pipeline.
 - Person 2: competitor sample and UI/content QA.
 - Person 3: internal agent, records, sick-pet triage.
 - Person 4: approval queue, internal agent panel.
 
 Track C - revenue and backlog relief:
 
-- Person 1: deploy stabilization, smoke tests.
+- Person 1: booking, follow-up, records, invoice, pricing, Apify backend paths.
 - Person 2: support demo content and sample cleanup.
 - Person 3: E2B scenarios, follow-up agent, pricing agent.
 - Person 4: follow-up, pickup, call/transcript pages.
 
 Track D - proof and final polish:
 
-- Person 1: final deploy proof and reliability.
+- Person 1: final one-app deploy proof, route reliability, smoke tests.
 - Person 3: scenario fixes and agent behavior polish.
-- Person 4: demo polish, screenshots, final click-through.
+- Person 4: one-app frontend polish, screenshots, final click-through.
 - Person 2: final account/tool/readiness notes.
 
 ## Final Acceptance
@@ -866,7 +1017,8 @@ Must have:
 - existing task board still works,
 - existing passcodes still work,
 - public request form still works,
-- Render deploy works,
+- one Render web deploy works,
+- public and staff routes are reachable from the main deployed app,
 - Supabase works,
 - Opsera path exists,
 - E2B scenario proof exists,
