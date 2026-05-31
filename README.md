@@ -1,5 +1,7 @@
 # VetAgent / Central Veterinary Hospital MVP
 
+https://vetagent-internal.onrender.com
+
 One Render app in one npm workspace, backed by Supabase Postgres.
 
 - `apps/internal`: unified public client flows, staff task board, and agent APIs.
