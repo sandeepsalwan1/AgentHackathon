@@ -20,6 +20,7 @@ export type RecordsTransferPacket = {
   pet: {
     id?: string | null;
     name?: string | null;
+    dateOfBirth?: string | null;
     weight?: string | null;
     lastVisit?: string | null;
   };
@@ -266,12 +267,12 @@ export function buildRecordsTransferPacket(input: {
     client: {
       id: clean(input.clientId),
       name: clean(input.clientName),
-      phone: clean(input.clientPhone),
-      dateOfBirth: clean(input.clientDateOfBirth)
+      phone: clean(input.clientPhone)
     },
     pet: {
       id: clean(input.petId),
       name: clean(input.petName),
+      dateOfBirth: clean(input.clientDateOfBirth),
       weight: clean(input.petWeight),
       lastVisit: clean(input.lastVisit)
     },
