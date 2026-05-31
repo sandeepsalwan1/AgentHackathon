@@ -12,23 +12,23 @@ Stack:
 Deployment:
 
 - Internal: `https://vetagent-internal.onrender.com`
-- Public request form: `https://vetagent-client.onrender.com`
+- Public request form: `https://vetagent-internal.onrender.com/request`
 - Database: Supabase Postgres, exposed to the apps through `DATABASE_URL`.
 - Database migration `001_initial.sql` applied.
 - Internal Render cron: `/api/notifications/overdue`, `0 2 * * *` UTC.
 
 Deployment notes:
 
-- `render.yaml` defines `vetagent-internal`, `vetagent-client`, and the overdue-summary cron job.
+- `render.yaml` defines one web app, `vetagent-internal`, and the overdue-summary cron job.
 - `0 2 * * *` maps to 6 PM Pacific Standard Time and 7 PM Pacific Daylight Time; app code still checks local hour before sending.
 - Production internal cron requires `CRON_SECRET`; without it the overdue endpoint fails closed.
 - Internal passcodes are deployment defaults: VA and Admin env passcodes plus doctor profile passcodes from Admin settings.
 
 Deploy shape:
 
-- Internal app and public request form should be separate Render services.
-- Both projects use the same database.
-- Public form only has insert route; no task read routes.
+- Staff and public routes are served by the unified internal app.
+- `apps/client-request` is legacy/reference source only.
+- The legacy `vetagent-client` Render service was deleted on 2026-05-31.
 
 Notification behavior:
 

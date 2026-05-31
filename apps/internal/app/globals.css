@@ -55,6 +55,394 @@ button {
   cursor: pointer;
 }
 
+.publicShell {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.publicPanel {
+  width: min(780px, 100%);
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(251, 252, 251, 0.96);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.publicHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 6px solid var(--blue);
+  padding-left: 14px;
+  margin-bottom: 20px;
+}
+
+.publicHeader svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.publicHeader p {
+  margin: 0 0 4px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.publicForm {
+  display: grid;
+  gap: 14px;
+}
+
+.publicGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.publicForm label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.publicForm input,
+.publicForm textarea,
+.sessionNameEdit input {
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink);
+  outline: none;
+}
+
+.publicForm input,
+.publicForm textarea {
+  width: 100%;
+  border-radius: 8px;
+  padding: 12px 13px;
+}
+
+.publicForm textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.publicForm input:focus,
+.publicForm textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.15);
+}
+
+.publicForm input.fieldInvalid,
+.publicForm textarea.fieldInvalid {
+  border-color: var(--red);
+  background: #fff8f7;
+  box-shadow: 0 0 0 3px rgba(197, 60, 53, 0.12);
+}
+
+.sendButton,
+.successBox button {
+  min-height: 46px;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--blue);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.sendButton:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.spinIcon {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorBox {
+  border: 1px solid #eaa29d;
+  border-radius: 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  padding: 12px;
+  font-weight: 800;
+}
+
+.agentResult,
+.successBox {
+  min-width: 0;
+  border: 1px solid #9dcfad;
+  border-radius: 8px;
+  background: var(--green);
+  padding: 18px;
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.agentResult svg,
+.successBox svg {
+  flex: 0 0 auto;
+  color: #0d5f35;
+}
+
+.agentResult h2,
+.agentResult p,
+.successBox h2,
+.successBox p {
+  margin: 0;
+}
+
+.agentResult h2 {
+  text-transform: capitalize;
+}
+
+.agentResult p,
+.successBox p {
+  color: #335044;
+}
+
+.agentResult dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.agentResult dl div {
+  min-width: 0;
+  border: 1px solid #9dcfad;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 7px 9px;
+}
+
+.agentResult dt {
+  color: #335044;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.agentResult dd {
+  margin: 0;
+  max-width: 220px;
+  overflow: hidden;
+  color: #102d1f;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publicNav {
+  width: min(780px, 100%);
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.publicNav a {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.requestTypePicker {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+}
+
+.requestTypePicker legend {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0;
+}
+
+.requestTypePicker button {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 900;
+  padding: 0 10px;
+  white-space: normal;
+}
+
+.requestTypePicker button.selected {
+  border-color: var(--blue);
+  background: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.12);
+}
+
+.labelText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  width: fit-content;
+}
+
+.requiredStar,
+.fieldError {
+  color: var(--red);
+}
+
+.fieldError {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.requiredNote {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.staffToolShell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 0 max(56px, env(safe-area-inset-bottom));
+}
+
+.staffToolPanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(251, 252, 251, 0.94);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.staffToolHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.staffToolHeader svg {
+  color: var(--blue);
+}
+
+.staffToolHeader p {
+  margin: 0 0 4px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.staffQuickActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.staffAgentPrompt {
+  display: grid;
+  gap: 12px;
+}
+
+.staffAgentPrompt label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.staffAgentPrompt textarea {
+  min-height: 120px;
+}
+
+.staffAgentResult {
+  margin-top: 16px;
+}
+
+.approvalStack {
+  display: grid;
+  gap: 12px;
+}
+
+.approvalItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.approvalItem p {
+  margin: 0 0 4px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.approvalItem h2 {
+  margin-bottom: 5px;
+}
+
+.approvalItem span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.approvalActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .appShell {
   width: min(1800px, calc(100% - 32px));
   margin: 0 auto;
@@ -1195,8 +1583,28 @@ textarea:focus {
   }
 
   .formGrid,
+  .publicGrid,
   .settingsGrid {
     grid-template-columns: 1fr;
+  }
+
+  .publicShell {
+    place-items: start center;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .publicPanel,
+  .staffToolPanel {
+    padding: 14px;
+  }
+
+  .staffToolShell {
+    width: calc(100% - 16px);
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .approvalItem {
+    display: grid;
   }
 
   .boardGrid {

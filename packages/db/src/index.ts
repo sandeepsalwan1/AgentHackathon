@@ -25,6 +25,47 @@ export {
   markNotificationSkipped
 } from "./notifications";
 export {
+  createAgentReport,
+  createAgentRun,
+  createApproval,
+  createWorkflowEvent,
+  decideApproval,
+  getAgentRun,
+  listAgentReports,
+  listApprovals,
+  listWorkflowEvents,
+  updateAgentRun
+} from "./agents";
+export type {
+  AgentReport,
+  AgentRun,
+  Approval,
+  WorkflowEvent
+} from "./agents";
+export {
+  createPricingObservation,
+  findArrivalAppointment,
+  listAvailableSlots,
+  listMockClinic,
+  listOpenFollowups,
+  listPricingObservations,
+  listReviewInvoices,
+  listServiceCatalog,
+  markAppointmentArrived
+} from "./mockClinic";
+export type {
+  MockAppointment,
+  MockCallTranscript,
+  MockClient,
+  MockFollowup,
+  MockInvoice,
+  MockMessage,
+  MockPet,
+  MockService,
+  MockSlot,
+  PricingObservation
+} from "./mockClinic";
+export {
   isPriorityAlertsEnabled,
   deactivateRecipientProfile,
   getRecipientProfile,

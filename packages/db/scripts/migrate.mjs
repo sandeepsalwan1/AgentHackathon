@@ -5,9 +5,8 @@ import postgres from "postgres";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const { loadEnvConfig } = nextEnv;
-loadEnvConfig(path.join(root, "apps", "internal"));
-loadEnvConfig(path.join(root, "apps", "client-request"));
 loadEnvConfig(root);
+loadEnvConfig(path.join(root, "apps", "internal"));
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

@@ -1,5 +1,5 @@
-import { TaskBoard } from "./components/TaskBoard";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <TaskBoard />;
+  redirect("/arrival");
 }

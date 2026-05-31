@@ -1,10 +1,7 @@
-const defaultClientRequestBaseUrl = "https://vetagent-client.onrender.com";
+const defaultClientRequestBaseUrl = "https://vetagent-internal.onrender.com/request";
 
 export function clientRequestBaseUrl() {
-  const raw =
-    process.env.CLIENT_REQUEST_BASE_URL ||
-    process.env.NEXT_PUBLIC_CLIENT_REQUEST_BASE_URL ||
-    defaultClientRequestBaseUrl;
+  const raw = defaultClientRequestBaseUrl;
   const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
   return withProtocol.replace(/\/+$/, "");
 }
