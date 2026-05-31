@@ -24,7 +24,7 @@ Agent runtime:
 
 - Demo-safe default: `AGENT_RUNTIME=mock`.
 - Target live runtime: Google Agent Development Kit for TypeScript (`AGENT_RUNTIME=google-adk`).
-- Open-source ADK package: `@google/adk` in the agents workspace, from `google/adk-js` under Apache-2.0.
+- Open-source ADK package: `@google/adk` in the agents workspace, from `google/adk-js` under Apache-2.0. Provenance lives in `opensrc/google-adk/`.
 - Google ADK env: `GEMINI_API_KEY` or `GOOGLE_API_KEY`; for Vertex, also configure `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
 - E2B is for sandboxed proof/evals, not the normal check-in/booking request path.
 
