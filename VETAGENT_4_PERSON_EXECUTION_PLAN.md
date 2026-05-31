@@ -171,8 +171,6 @@ Must support:
 
 ## Person 1 - Platform + Backend + Agent Foundation
 
-Person 1 has a lot of work. Person 1 is not just infra. Person 1 owns the foundation that makes everyone else fast.
-
 Person 1 owns:
 
 - Supabase.
@@ -189,7 +187,7 @@ Person 1 owns:
 - basic agent endpoint wiring.
 - check-in agent foundation.
 - external/internal agent route wiring.
-- mock agent responses until Person 3 plugs in full behavior.
+- mock agent responses that can be replaced or extended by Person 3's current work.
 - agent workflow storage and timeline.
 - agent API contracts for Person 3 and Person 4.
 - smoke tests.
@@ -279,7 +277,7 @@ Done when:
 
 ### Person 1 Workstream C - Agent API Foundation
 
-Person 1 should create stable endpoints quickly and can implement the first mock agent behavior. Person 3 can then deepen the internals without changing the route contracts.
+Person 1 should create stable endpoints quickly and can implement the first mock agent behavior. Person 3 may already have agent pieces in progress; keep route contracts stable so that work can plug in cleanly.
 
 Create:
 
@@ -304,7 +302,7 @@ Rules:
 Done when:
 
 - Person 4 can call mock/agent routes,
-- Person 3 can deepen route internals with package logic,
+- Person 3 can connect current or new agent internals with package logic,
 - route shapes are documented in `docs/agent-api-contracts.md`.
 
 ### Person 1 Workstream D - Check-In Foundation
@@ -321,7 +319,7 @@ Do:
 Done when:
 
 - Person 4 can build `/arrival` from mock data,
-- Person 3 can plug arrival agent into the endpoint,
+- Person 3 can plug current or new arrival-agent work into the endpoint,
 - internal task board can show an arrival-related task.
 
 ### Person 1 Workstream E - Phone/Call Foundation
@@ -438,7 +436,7 @@ Done when:
 
 ## Person 3 - Agents + Tools + Behavior
 
-Person 3 owns agent behavior depth. Person 1 co-owns the agent foundation and route wiring; Person 3 builds the tool logic, guardrails, scenarios, and agent quality on top.
+Person 3 owns agent behavior depth. Person 1 co-owns the agent foundation and route wiring. If Person 3 already has pieces started, preserve that work and connect it through the shared contracts.
 
 Person 3 owns:
 
