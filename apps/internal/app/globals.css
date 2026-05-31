@@ -1765,3 +1765,1748 @@ textarea:focus {
     font-size: 30px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   VETAGENT EXPERIENCE — Auth, Customer, Veterinarian, Admin
+   New CSS below — extends the base design system without modifying existing rules
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Font variables ──────────────────────────────────────────────────────────── */
+.authShell,
+.customerShell,
+.vetShell,
+.adminShell {
+  --font-display-active: var(--font-display, "Georgia", serif);
+  --font-body-active: var(--font-body, "Avenir Next", "Segoe UI", sans-serif);
+  font-family: var(--font-body-active);
+}
+
+/* ══ AUTH SCREEN ══════════════════════════════════════════════════════════════ */
+
+.authShell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Left brand panel */
+.authBrandPanel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 52px;
+  background:
+    linear-gradient(145deg, #1a3a2e 0%, #1d5f47 35%, #2a7a5c 60%, #3d8f6e 80%, #c4a87a 110%);
+}
+
+/* Grain overlay */
+.authBrandPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  opacity: 0.06;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Decorative orb */
+.authBrandPanel::after {
+  content: "";
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(196, 168, 122, 0.25) 0%, transparent 70%);
+  top: -80px;
+  right: -100px;
+  pointer-events: none;
+}
+
+.authBrandContent {
+  position: relative;
+  z-index: 1;
+  color: #ffffff;
+  max-width: 400px;
+  animation: authBrandReveal 0.7s ease both;
+}
+
+@keyframes authBrandReveal {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.authBrandLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 14px;
+  margin-bottom: 28px;
+  backdrop-filter: blur(8px);
+  color: #ffd9b0;
+}
+
+.authBrandEyebrow {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.authBrandTitle {
+  margin: 0 0 20px;
+  font-family: var(--font-display-active);
+  font-size: clamp(36px, 4vw, 52px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.authBrandTagline {
+  margin: 0 0 36px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.authBrandFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.authBrandFeature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.authBrandFeatureDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd9b0;
+  flex-shrink: 0;
+}
+
+/* Right form panel */
+.authFormPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--paper);
+  min-height: 100vh;
+  animation: authFormReveal 0.6s 0.1s ease both;
+}
+
+@keyframes authFormReveal {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.authCard {
+  width: min(440px, 100%);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 0;
+  box-shadow: 0 8px 48px rgba(23, 32, 51, 0.1), 0 1px 2px rgba(23, 32, 51, 0.06);
+  overflow: hidden;
+}
+
+/* Tabs */
+.authTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--line);
+}
+
+.authTab {
+  padding: 16px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms;
+}
+
+.authTab:hover {
+  color: var(--ink);
+}
+
+.authTab--active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+/* Form content */
+.authForm {
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: authFormSlide 0.25s ease both;
+}
+
+@keyframes authFormSlide {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.authFormTitle {
+  margin: 0 0 2px;
+  font-family: var(--font-display-active);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.authFormSubtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.authLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.authLabel input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--field);
+  color: var(--ink);
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.authLabel input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.12);
+}
+
+.authRequired {
+  color: var(--red);
+}
+
+.authMuted {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.authPasswordWrap {
+  position: relative;
+}
+
+.authPasswordWrap input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.authPasswordToggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.authPasswordToggle:hover {
+  color: var(--ink);
+}
+
+.authPrimaryBtn {
+  height: 44px;
+  background: var(--blue);
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 150ms, transform 100ms;
+  margin-top: 4px;
+}
+
+.authPrimaryBtn:hover:not(:disabled) {
+  background: #16537f;
+  transform: translateY(-1px);
+}
+
+.authPrimaryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.authGhostBtn {
+  height: 38px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 150ms, color 150ms;
+}
+
+.authGhostBtn:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.authError {
+  padding: 10px 12px;
+  background: var(--red-soft);
+  border: 1px solid rgba(197, 60, 53, 0.25);
+  border-radius: 8px;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.authSwitch {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.authSwitch button {
+  background: none;
+  border: none;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+
+.authDivider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+
+.authDemoHint {
+  padding: 10px 12px;
+  background: var(--sage);
+  border: 1px solid rgba(22, 131, 74, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.authDemoLabel {
+  font-weight: 700;
+  color: var(--green-strong);
+  margin-right: 6px;
+}
+
+.authDemoHint code {
+  background: rgba(22, 131, 74, 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--ink);
+}
+
+/* Auth responsive */
+@media (max-width: 768px) {
+  .authShell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .authBrandPanel {
+    padding: 36px 24px;
+    min-height: 0;
+  }
+
+  .authBrandTitle {
+    font-size: 30px;
+  }
+
+  .authBrandTagline {
+    display: none;
+  }
+
+  .authFormPanel {
+    min-height: 0;
+    align-items: flex-start;
+    padding: 24px 16px 40px;
+  }
+
+  .authCard {
+    border-radius: 16px;
+  }
+
+  .authForm {
+    padding: 24px 20px 28px;
+  }
+}
+
+/* ══ CHAT PANEL ═══════════════════════════════════════════════════════════════ */
+
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chatMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.chatEmpty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+}
+
+.chatEmpty p {
+  margin: 0;
+  font-size: 14px;
+  max-width: 280px;
+}
+
+.chatMessage {
+  display: flex;
+  gap: 10px;
+  max-width: 86%;
+  animation: chatSlide 0.2s ease both;
+}
+
+@keyframes chatSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chatMessage--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chatMessage--assistant {
+  align-self: flex-start;
+}
+
+.chatAvatar {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.chatMessage--user .chatAvatar {
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.chatMessage--assistant .chatAvatar {
+  background: var(--sage);
+  color: var(--green-strong);
+  border: 1px solid rgba(22, 131, 74, 0.2);
+}
+
+.chatBubbleWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chatBubble {
+  padding: 11px 15px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.chatMessage--user .chatBubble {
+  background: var(--blue);
+  color: #ffffff;
+  border-bottom-right-radius: 5px;
+}
+
+.chatMessage--assistant .chatBubble {
+  background: #f0f4f0;
+  color: var(--ink);
+  border-bottom-left-radius: 5px;
+  border: 1px solid var(--line);
+}
+
+/* Loading dots */
+.chatBubble--loading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 18px;
+}
+
+.typingDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typingBounce 1.2s ease infinite;
+}
+
+.typingDot:nth-child(2) { animation-delay: 0.2s; }
+.typingDot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%           { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Agent status chips */
+.chatMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.agentChip--running {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.agentChip--approval {
+  background: var(--amber);
+  color: #7a5a00;
+}
+
+.agentChip--done {
+  background: var(--green);
+  color: var(--green-strong);
+}
+
+.agentChip--failed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.chatApprovalNote {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Chat composer */
+.chatComposer {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.chatInput {
+  flex: 1;
+  min-height: 42px;
+  max-height: 120px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+  resize: none;
+  background: var(--paper);
+  color: var(--ink);
+  transition: border-color 150ms, box-shadow 150ms;
+  overflow-y: auto;
+  field-sizing: content;
+}
+
+.chatInput:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.1);
+}
+
+.chatSendButton {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--blue);
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms, transform 100ms;
+}
+
+.chatSendButton:hover:not(:disabled) {
+  background: #16537f;
+  transform: scale(1.05);
+}
+
+.chatSendButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ══ CUSTOMER SHELL ═══════════════════════════════════════════════════════════ */
+
+.customerShell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--paper);
+}
+
+.customerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.customerHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green-strong);
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.customerHeaderName {
+  font-family: var(--font-display-active);
+  font-size: 17px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.customerHeaderUser {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customerHeaderGreeting {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customerLogoutBtn {
+  color: var(--muted);
+}
+
+.customerMain {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* ══ VETERINARIAN DASHBOARD ═══════════════════════════════════════════════════ */
+
+.vetShell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(29, 95, 145, 0.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(22, 131, 74, 0.025) 1px, transparent 1px),
+    #f6f8f6;
+  background-size: 32px 32px;
+}
+
+.vetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.vetHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--green-strong);
+}
+
+.vetHeaderLeft > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vetHeaderEyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.vetHeaderTitle {
+  margin: 0;
+  font-family: var(--font-display-active);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.vetHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vetHeaderDate {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.vetChatToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.vetChatToggle:hover,
+.vetChatToggle--active {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* Content area */
+.vetContent {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: hidden;
+}
+
+.vetContent--withChat {
+  grid-template-columns: 1fr 380px;
+}
+
+.vetContent--withChat--wide {
+  grid-template-columns: 1fr 640px;
+}
+
+.vetMain {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Stat cards */
+.vetStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.statCard {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(23, 32, 51, 0.05);
+  animation: statReveal 0.4s ease both;
+}
+
+@keyframes statReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.statCard:nth-child(2) { animation-delay: 0.05s; }
+.statCard:nth-child(3) { animation-delay: 0.1s; }
+.statCard:nth-child(4) { animation-delay: 0.15s; }
+
+.statCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.statCardValue {
+  font-family: var(--font-display-active);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.statCardUrgent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.statCard--blue .statCardHeader { color: var(--blue); }
+.statCard--blue .statCardUrgent { color: var(--blue); }
+.statCard--amber .statCardHeader { color: #b47e00; }
+.statCard--red .statCardHeader { color: var(--red); }
+.statCard--red .statCardUrgent { color: var(--red); }
+.statCard--green .statCardHeader { color: var(--green-strong); }
+
+/* Task panel */
+.vetTaskPanel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(23, 32, 51, 0.05);
+}
+
+.vetTaskPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(248, 250, 249, 0.8);
+}
+
+.vetTaskPanelHeader h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+}
+
+.vetTaskPanelCount {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--gray-soft);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.vetTaskList {
+  display: flex;
+  flex-direction: column;
+}
+
+.vetTaskRow {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background 150ms;
+}
+
+.vetTaskRow:last-child {
+  border-bottom: none;
+}
+
+.vetTaskRow:hover {
+  background: var(--sage);
+}
+
+.vetTaskRow--escalated {
+  border-left: 3px solid var(--red);
+  background: rgba(197, 60, 53, 0.03);
+}
+
+.vetTaskRow--escalated:hover {
+  background: rgba(197, 60, 53, 0.06);
+}
+
+.vetTaskRowMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vetEscalateIcon {
+  color: var(--red);
+  flex-shrink: 0;
+}
+
+.vetTaskRowPet {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.vetTaskRowClient {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.vetTaskRowRequest {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.vetTaskRowMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.vetPriorityBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vetPriorityBadge--high { background: var(--red-soft); color: var(--red); }
+.vetPriorityBadge--medium { background: var(--amber); color: #7a5a00; }
+.vetPriorityBadge--low { background: var(--gray-soft); color: var(--muted); }
+
+.vetStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vetStatusBadge--due { background: var(--blue-soft); color: var(--blue); }
+.vetStatusBadge--review { background: var(--purple); color: #5b45a0; }
+.vetStatusBadge--escalated { background: var(--red-soft); color: var(--red); }
+.vetStatusBadge--done { background: var(--green); color: var(--green-strong); }
+
+.vetTaskRowTime {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.vetTaskPanelNote {
+  padding: 10px 18px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+  background: rgba(248, 250, 249, 0.6);
+  border-top: 1px solid var(--line);
+}
+
+/* Vet loading states */
+.statCard--loading {
+  background: var(--sage);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  height: 96px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.vetTaskListLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Vet quick-action toolbar */
+.vetQuickBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(248, 250, 249, 0.7);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.vetQuickBarLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.vetQuickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms;
+  white-space: nowrap;
+}
+
+.vetQuickBtn:hover:not(:disabled) {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: rgba(29, 95, 145, 0.04);
+}
+
+.vetQuickBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Vet approval actions */
+.vetApprovalRow {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.vetApprovalActions {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.vetApproveBtn,
+.vetRejectBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms;
+  white-space: nowrap;
+}
+
+/* Approve — solid filled, clearly the primary action */
+.vetApproveBtn {
+  background: var(--green-strong);
+  color: #ffffff;
+  border-color: var(--green-strong);
+}
+
+.vetApproveBtn:hover:not(:disabled) {
+  background: #127a40;
+  border-color: #127a40;
+}
+
+/* Reject — ghost, clearly secondary */
+.vetRejectBtn {
+  background: transparent;
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+.vetRejectBtn:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.vetApproveBtn:disabled,
+.vetRejectBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Vet chat panel */
+.vetChatPanel {
+  border-left: 1px solid var(--line);
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vetChatPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(248, 250, 249, 0.8);
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* ── Report cards (chat inline + dashboard panel) ── */
+
+/* Chat inline report card */
+.reportCard {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.reportCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(248, 250, 249, 0.8);
+  border-bottom: 1px solid var(--line);
+}
+
+.reportCardType {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+  background: rgba(29, 95, 145, 0.08);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.reportCardTitle {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.reportCardSummary {
+  padding: 8px 14px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.reportCardToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 14px 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.reportCardToggle:hover {
+  background: rgba(29, 95, 145, 0.05);
+}
+
+.reportCardData {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reportCardRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.reportCardKey {
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: capitalize;
+  padding-top: 2px;
+}
+
+.reportCardValue {
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.reportCardJson {
+  font-size: 11px;
+  font-family: monospace;
+  background: var(--sage);
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Dashboard report panel */
+.vetReportList {
+  display: flex;
+  flex-direction: column;
+}
+
+.vetReportItem {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 18px;
+}
+
+.vetReportItem:last-child {
+  border-bottom: none;
+}
+
+.vetReportItemHeader {
+  cursor: pointer;
+}
+
+.vetReportItemMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.vetReportType {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+  background: rgba(29, 95, 145, 0.08);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.vetReportItemTitle {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.vetReportItemSummary {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.vetReportToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms;
+  margin-top: 4px;
+}
+
+.vetReportToggle:hover {
+  background: rgba(29, 95, 145, 0.05);
+}
+
+.vetReportData {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vetReportRow {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.vetReportKey {
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: capitalize;
+  padding-top: 2px;
+}
+
+.vetReportValue {
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.vetReportJson {
+  font-size: 11px;
+  font-family: monospace;
+  background: var(--sage);
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* Vet responsive */
+@media (max-width: 900px) {
+  .vetStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .vetContent--withChat,
+  .vetContent--withChat--wide {
+    grid-template-columns: 1fr;
+  }
+
+  .vetChatPanel {
+    position: fixed;
+    inset: 0;
+    top: 103px;
+    z-index: 20;
+    height: calc(100dvh - 103px);
+  }
+}
+
+@media (max-width: 600px) {
+  .vetHeader {
+    padding: 12px 16px;
+  }
+
+  .vetHeaderDate {
+    display: none;
+  }
+
+  .vetStats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .vetMain {
+    padding: 16px;
+  }
+}
+
+/* ══ ADMIN PANEL ══════════════════════════════════════════════════════════════ */
+
+.adminShell {
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+.adminHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.adminHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--blue);
+}
+
+.adminHeaderLeft > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.adminHeaderEyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.adminHeaderTitle {
+  margin: 0;
+  font-family: var(--font-display-active);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.adminHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminHeaderUser {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.adminBoardBtn {
+  font-size: 13px;
+  height: 36px;
+}
+
+.adminMain {
+  padding: 28px 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.adminCard {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(23, 32, 51, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.adminCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.adminCardHeader h2 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.adminCardDesc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.adminForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.adminSuccessBox {
+  background: #f0faf4;
+  border: 1px solid rgba(22, 131, 74, 0.3);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: adminSuccessReveal 0.3s ease;
+}
+
+@keyframes adminSuccessReveal {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.adminSuccessBox h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--green-strong);
+}
+
+.adminSuccessBox p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adminSuccessNote {
+  font-size: 12px !important;
+  color: var(--muted) !important;
+  font-style: italic;
+  line-height: 1.5 !important;
+}
+
+.otpDisplay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid rgba(22, 131, 74, 0.3);
+  border-radius: 8px;
+}
+
+.otpCode {
+  flex: 1;
+  font-family: "Courier New", monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--ink);
+}
+
+.otpCopyBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: var(--sage);
+  border: 1px solid rgba(22, 131, 74, 0.25);
+  border-radius: 6px;
+  color: var(--green-strong);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.otpCopyBtn:hover {
+  background: #d0e8da;
+}
+
+/* Vet list */
+.adminVetCount {
+  margin-left: auto;
+  background: var(--sage);
+  color: var(--green-strong);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.adminEmptyState {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.adminVetList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.adminVetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  gap: 10px;
+}
+
+.adminVetRow:last-child {
+  border-bottom: none;
+}
+
+.adminVetInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adminVetName {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.adminVetEmail {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adminVetStatus {
+  flex-shrink: 0;
+}
+
+.adminVetPending {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--amber);
+  color: #7a5a00;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.adminVetActive {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--green);
+  color: var(--green-strong);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+@media (max-width: 700px) {
+  .adminGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .adminMain {
+    padding: 16px;
+  }
+}

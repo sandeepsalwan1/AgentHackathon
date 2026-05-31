@@ -1,8 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+  axes: ["SOFT", "WONK"],
+});
+
+const hankenGrotesk = Hanken_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Central Veterinary Hospital Tasks",
+  title: "Central Veterinary Hospital",
   description: "Internal task board for Central Veterinary Hospital",
   robots: { index: false, follow: false },
   icons: {
@@ -21,7 +35,7 @@ export default function RootLayout({
   children
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fraunces.variable} ${hankenGrotesk.variable}`}>
       <body>{children}</body>
     </html>
   );
