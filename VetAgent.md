@@ -3,6 +3,7 @@
 This document is a revised, fuller implementation brief for VetAgent. It is meant to be handed to another AI or engineer so they can understand the complete intent, missing context, exact priorities, constraints, architecture, and execution plan.
 
 This version explicitly adds the details that were previously underemphasized:
+
 - The current top priority is **internal and external agents**.
 - A **task manager already exists** in a Central Veterinary Hospital implementation and should be reused.
 - There is **not yet reliable access to all integrations**, so the early system must be designed to work with **mock data, simulated adapters, and local mirrors** until real integrations are available.
@@ -693,7 +694,7 @@ Because the user explicitly said to focus on the agents, the first workflows sho
 
 - create monorepo,
 - define schema,
-- import/reuse Central task manager,
+- import/reuse Central Veterinary Hospital task manager,
 - define generic tool interfaces,
 - create mock provider layer,
 - create veterinary seed dataset.
@@ -794,17 +795,17 @@ VetAgent dev up
 VetAgent dev down
 VetAgent db migrate
 VetAgent db seed --dataset vet-sandbox
-VetAgent tenant create "Central Veterinary Hospital" --slug Central
-VetAgent provider enable mock --tenant Central
-VetAgent workflow install default-vet --tenant Central
-VetAgent agent test external --tenant Central --scenario booking
-VetAgent agent test external --tenant Central --scenario checkin
-VetAgent agent test internal --tenant Central --scenario records-transfer
-VetAgent agent test internal --tenant Central --scenario pricing-review
-VetAgent import csv appointments.csv --tenant Central
-VetAgent import csv clients.csv --tenant Central
-VetAgent integration connect avimark --tenant Central
-VetAgent integration validate --tenant Central
+VetAgent tenant create "Central Veterinary Hospital" --slug central-vet
+VetAgent provider enable mock --tenant central-vet
+VetAgent workflow install default-vet --tenant central-vet
+VetAgent agent test external --tenant central-vet --scenario booking
+VetAgent agent test external --tenant central-vet --scenario checkin
+VetAgent agent test internal --tenant central-vet --scenario records-transfer
+VetAgent agent test internal --tenant central-vet --scenario pricing-review
+VetAgent import csv appointments.csv --tenant central-vet
+VetAgent import csv clients.csv --tenant central-vet
+VetAgent integration connect avimark --tenant central-vet
+VetAgent integration validate --tenant central-vet
 VetAgent agent trace --run-id <id>
 ```
 
@@ -829,4 +830,4 @@ That is the thing that makes this scalable instead of turning it into a consulti
 
 Use this if another AI is going to build the system:
 
-> Build VetAgent as a multi-tenant veterinary operations platform with two main agents and a shared task engine. Reuse the existing Central task-manager concept instead of rebuilding it. Focus first on the external and internal agents. The external agent handles booking, check-in, intake, pickup/drop-off, status updates, follow-ups, and turning client requests into structured actions. The internal agent handles inbox triage, records-switch workflows, task prioritization, invoice/admin assistance, competitor price research, and internal recommendations. Build the system so it works even before real integrations exist by using mock providers, local normalized data, and mirror mode. Put Avimark, Cornerstone, Idexx, Antech, and Demandforce-like systems behind capability-based adapters later. Use generic tools, guardrails, tracing, and human-approval flows. Optimize for rapid development, low-touch onboarding, and long-term reuse across clinics and eventually other local-business verticals.[cite:34][cite:61][cite:69][cite:70][cite:79][cite:82][cite:85][cite:88][cite:90]
+> Build VetAgent as a multi-tenant veterinary operations platform with two main agents and a shared task engine. Reuse the existing Central Veterinary Hospital task-manager concept instead of rebuilding it. Focus first on the external and internal agents. The external agent handles booking, check-in, intake, pickup/drop-off, status updates, follow-ups, and turning client requests into structured actions. The internal agent handles inbox triage, records-switch workflows, task prioritization, invoice/admin assistance, competitor price research, and internal recommendations. Build the system so it works even before real integrations exist by using mock providers, local normalized data, and mirror mode. Put Avimark, Cornerstone, Idexx, Antech, and Demandforce-like systems behind capability-based adapters later. Use generic tools, guardrails, tracing, and human-approval flows. Optimize for rapid development, low-touch onboarding, and long-term reuse across clinics and eventually other local-business verticals.[cite:34][cite:61][cite:69][cite:70][cite:79][cite:82][cite:85][cite:88][cite:90]

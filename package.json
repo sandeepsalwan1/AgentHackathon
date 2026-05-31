@@ -1,0 +1,41 @@
+{
+  "name": "central-vet",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:internal": "npm --workspace @central-vet/internal run dev -- --port 3000",
+    "dev:client": "npm --workspace @central-vet/client-request run dev -- --port 3001",
+    "build": "npm run build --workspace @central-vet/internal && npm run build --workspace @central-vet/client-request",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:migrate": "node packages/db/scripts/migrate.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@next/env": "^16.0.0",
+    "lucide-react": "^0.475.0",
+    "next": "^16.0.0",
+    "postgres": "^3.4.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "resend": "^4.1.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^16.0.0",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "postcss": "8.5.15"
+  }
+}

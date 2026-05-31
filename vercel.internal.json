@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build --workspace @central-vet/internal",
+  "outputDirectory": "apps/internal/.next",
+  "crons": [
+    {
+      "path": "/api/notifications/overdue",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@central-vet/notifications",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@central-vet/db": "*",
+    "resend": "^4.1.2"
+  }
+}
