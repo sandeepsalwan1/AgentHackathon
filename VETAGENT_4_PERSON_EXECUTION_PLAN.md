@@ -187,6 +187,11 @@ Person 1 owns:
 - agent run persistence.
 - approval persistence.
 - basic agent endpoint wiring.
+- check-in agent foundation.
+- external/internal agent route wiring.
+- mock agent responses until Person 3 plugs in full behavior.
+- agent workflow storage and timeline.
+- agent API contracts for Person 3 and Person 4.
 - smoke tests.
 - docs for deployment and handoff.
 
@@ -274,7 +279,7 @@ Done when:
 
 ### Person 1 Workstream C - Agent API Foundation
 
-Person 1 should create stable endpoints quickly, even if Person 3 later replaces internals.
+Person 1 should create stable endpoints quickly and can implement the first mock agent behavior. Person 3 can then deepen the internals without changing the route contracts.
 
 Create:
 
@@ -299,7 +304,7 @@ Rules:
 Done when:
 
 - Person 4 can call mock/agent routes,
-- Person 3 can replace route internals with package logic,
+- Person 3 can deepen route internals with package logic,
 - route shapes are documented in `docs/agent-api-contracts.md`.
 
 ### Person 1 Workstream D - Check-In Foundation
@@ -365,7 +370,7 @@ Manual smoke:
 
 ## Person 2 - Tools + Accounts + Research Support
 
-Person 2 is lighter than Person 1/3/4 but still important. Person 2 unblocks tools and supports Person 4 with realistic content.
+Person 2 owns tool readiness and realistic product inputs. This keeps agent scenarios, frontend copy, and demo content grounded in actual clinic work.
 
 Person 2 owns:
 
@@ -433,7 +438,7 @@ Done when:
 
 ## Person 3 - Agents + Tools + Behavior
 
-Person 3 owns agent behavior. Person 1 gives the foundation; Person 3 makes the agents useful.
+Person 3 owns agent behavior depth. Person 1 co-owns the agent foundation and route wiring; Person 3 builds the tool logic, guardrails, scenarios, and agent quality on top.
 
 Person 3 owns:
 
@@ -718,35 +723,35 @@ Done when:
 
 ## How Everyone Works In Parallel
 
-Hour 0-4:
+Immediate parallel start:
 
 - Person 1: Supabase/Render/Opsera, route stubs, mock data route.
 - Person 2: tool accounts, sample content, Apify/E2B/Opsera status.
 - Person 3: contracts, tool registry, check-in agent skeleton.
 - Person 4: arrival screen, flow shell, internal panel skeleton.
 
-Day 1:
+Track A - check-in and agent foundation:
 
-- Person 1: DB helpers, mock data, deploy route stubs.
-- Person 2: realistic transcripts/messages/follow-up examples.
-- Person 3: external agent arrival + booking behavior.
-- Person 4: arrival + booking clickable with fixtures.
+- Person 1: DB helpers, mock data, route stubs, check-in agent endpoint.
+- Person 2: realistic arrival phrases, transcripts, and client examples.
+- Person 3: external agent arrival behavior and tool calls.
+- Person 4: arrival flow clickable with fixtures and then route stubs.
 
-Day 2:
+Track B - internal agents and task execution:
 
 - Person 1: approvals/workflow persistence, Opsera pipeline.
 - Person 2: competitor sample and UI/content QA.
 - Person 3: internal agent, records, sick-pet triage.
 - Person 4: approval queue, internal agent panel.
 
-Day 3:
+Track C - revenue and backlog relief:
 
 - Person 1: deploy stabilization, smoke tests.
 - Person 2: support demo content and sample cleanup.
 - Person 3: E2B scenarios, follow-up agent, pricing agent.
 - Person 4: follow-up, pickup, call/transcript pages.
 
-Day 4+:
+Track D - proof and final polish:
 
 - Person 1: final deploy proof and reliability.
 - Person 3: scenario fixes and agent behavior polish.
