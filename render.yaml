@@ -41,6 +41,14 @@ services:
         value: "true"
       - key: AGENT_RUNTIME
         value: mock
+      - key: OPSERA_MCP_URL
+        sync: false
+      - key: OPSERA_API_KEY
+        sync: false
+      - key: OPSERA_MCP_TOOL
+        value: audit_records_transfer
+      - key: OPSERA_MCP_TIMEOUT_MS
+        value: "8000"
       - key: NOTIFICATION_MODE
         value: disabled
       - key: NOTIFICATION_CHANNEL
@@ -98,6 +106,14 @@ services:
         value: "true"
       - key: AGENT_RUNTIME
         value: mock
+      - key: OPSERA_MCP_URL
+        sync: false
+      - key: OPSERA_API_KEY
+        sync: false
+      - key: OPSERA_MCP_TOOL
+        value: audit_records_transfer
+      - key: OPSERA_MCP_TIMEOUT_MS
+        value: "8000"
       - key: CLIENT_REQUEST_BASE_URL
         value: https://vetagent-client.onrender.com
       - key: CLIENT_REQUEST_HOST

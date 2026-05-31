@@ -202,6 +202,20 @@ function priorityLabel(value: TaskPriority) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function opseraAuditLabel(value: Task["opseraAuditStatus"]) {
+  if (value === "approved") return "Opsera Approved";
+  if (value === "blocked") return "Opsera Blocked";
+  if (value === "flagged") return "Opsera Review";
+  return "Opsera Missing";
+}
+
+function opseraEventStatus(event: TaskEvent) {
+  const value = event.metadata.opseraStatus;
+  return value === "approved" || value === "flagged" || value === "blocked"
+    ? value
+    : null;
+}
+
 function formatPhone(value: string | null) {
   const clean = value?.trim();
   if (!clean) return "Not listed";
@@ -1167,21 +1181,27 @@ export function TaskBoard() {
               <span>{events.length}</span>
             </div>
             <div className="activityList" aria-label="Recent audit events">
-              {events.slice(0, 40).map((event) => (
-                <div className="activityItem" key={event.id}>
-                  <strong>{event.eventType.replaceAll("_", " ")}</strong>
-                  <span>
-                    {actorDisplay(event.actorName, event.actorRole, session.role)} ·{" "}
-                    {new Date(event.createdAt).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit"
-                    })}
-                  </span>
-                  <small>{event.taskId.slice(0, 8)} · {event.nextStatus || event.previousStatus || "logged"}</small>
-                </div>
-              ))}
+              {events.slice(0, 40).map((event) => {
+                const auditStatus = opseraEventStatus(event);
+                return (
+                  <div className="activityItem" key={event.id}>
+                    <strong>{event.eventType.replaceAll("_", " ")}</strong>
+                    <span>
+                      {actorDisplay(event.actorName, event.actorRole, session.role)} ·{" "}
+                      {new Date(event.createdAt).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit"
+                      })}
+                    </span>
+                    <small>
+                      {event.taskId.slice(0, 8)} ·{" "}
+                      {auditStatus ? opseraAuditLabel(auditStatus) : event.nextStatus || event.previousStatus || "logged"}
+                    </small>
+                  </div>
+                );
+              })}
             </div>
           </section>
           <div className="archiveUnderAudit">
@@ -1767,11 +1787,27 @@ function TaskCard({
   const invalidArchived = archived && Boolean(task.invalidReason);
   const showAssignment = Boolean(task.assignedTo) && !finished && !archived;
   const invalidAllowed = canMarkInvalid(role, task);
+  const showOpseraAudit = task.requestType === "records_request" && task.opseraAuditStatus;
+  const OpseraIcon =
+    task.opseraAuditStatus === "approved"
+      ? ShieldCheck
+      : task.opseraAuditStatus === "blocked"
+        ? XCircle
+        : AlertTriangle;
 
   return (
     <article className={`taskCard status-${task.status} ${overdue ? "isOverdue" : ""} ${task.escalatedAt ? "isEscalated" : ""}`}>
       <div className="cardTop">
         <span className={`sourceBadge source-${task.source}`}>{sourceDisplay(task, role)}</span>
+        {showOpseraAudit ? (
+          <span
+            className={`opseraBadge opsera-${task.opseraAuditStatus}`}
+            title={task.opseraAuditReason ?? undefined}
+          >
+            <OpseraIcon size={13} />
+            {opseraAuditLabel(task.opseraAuditStatus)}
+          </span>
+        ) : null}
         <span className={`statusBadge badge-${invalidArchived ? "invalid" : task.status}`}>
           {overdue ? "Overdue" : invalidArchived ? "Invalid" : statusLabel(task.status)}
         </span>
@@ -1786,6 +1822,12 @@ function TaskCard({
         <div className="priorityBanner">
           <AlertTriangle size={15} />
           {priorityLabel(task.priority)} priority
+        </div>
+      ) : null}
+      {showOpseraAudit ? (
+        <div className={`opseraBanner opsera-${task.opseraAuditStatus}`}>
+          <OpseraIcon size={15} />
+          {task.opseraAuditReason || opseraAuditLabel(task.opseraAuditStatus)}
         </div>
       ) : null}
       <h3 className={task.status === "completed" ? "doneTitle" : ""}>

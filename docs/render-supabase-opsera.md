@@ -57,6 +57,13 @@ Smoke:
 Opsera:
 
 - Pipeline source: `sandeepsalwan1/AgentHackathon`.
+- Pipeline entrypoint in repo: `.github/workflows/opsera-render.yml`.
 - Steps: install, typecheck, build, optional migration check, Render deploy trigger.
-- Add manual approval before production deploy if quick.
+- Manual approval is represented by the GitHub `production` environment on the deploy job.
+- Required pipeline secrets: `DATABASE_URL` for optional migration check, `RENDER_INTERNAL_DEPLOY_HOOK_URL`, and `RENDER_CLIENT_DEPLOY_HOOK_URL`.
+- Records-transfer audit entrypoint: `packages/agents/src/tools/opsera.ts`.
+- Runtime routes call Opsera before records request task creation and persist `opsera_audit_*` fields on `tasks`.
+- Internal tool route: `POST /api/tools/prepare-records-packet`.
+- Runtime env: `OPSERA_MCP_URL`, `OPSERA_API_KEY`, `OPSERA_MCP_TOOL`, `OPSERA_MCP_TIMEOUT_MS`.
+- If `OPSERA_MCP_URL` is not configured, the app uses a local fallback policy and flags the audit source as `local_policy`.
 - Blocker state should be documented here instead of blocking local development.

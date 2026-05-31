@@ -207,6 +207,21 @@ export async function PATCH(
       return NextResponse.json({ error: workflowError.error }, { status: workflowError.status });
     }
 
+    if (nextStatus === "completed" && currentTask.requestType === "records_request") {
+      if (!currentTask.opseraAuditStatus) {
+        return NextResponse.json(
+          { error: "Records transfers require an Opsera audit before completion." },
+          { status: 403 }
+        );
+      }
+      if (currentTask.opseraAuditStatus === "blocked") {
+        return NextResponse.json(
+          { error: "Opsera blocked this records transfer. It cannot be completed." },
+          { status: 403 }
+        );
+      }
+    }
+
     const task = await transitionTask({
       id,
       nextStatus: persistedStatusForRequest(nextStatus),

@@ -17,6 +17,7 @@ export type TaskSource =
   | "admin";
 
 export type TaskPriority = "low" | "medium" | "high";
+export type OpseraAuditStatus = "approved" | "flagged" | "blocked";
 export type TaskRequestType =
   | "prescription"
   | "labs_xrays"
@@ -63,6 +64,10 @@ export type Task = {
   escalatedAt: string | null;
   escalatedByName: string | null;
   escalatedByRole: AppRole | null;
+  opseraAuditStatus: OpseraAuditStatus | null;
+  opseraAuditReason: string | null;
+  opseraAuditId: string | null;
+  opseraAuditCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -97,6 +102,10 @@ export type CreateTaskInput = {
   dueDate?: string | null;
   dueTime?: string | null;
   hospitalName?: string | null;
+  opseraAuditStatus?: OpseraAuditStatus | null;
+  opseraAuditReason?: string | null;
+  opseraAuditId?: string | null;
+  opseraAuditCheckedAt?: string | null;
 };
 
 export type UpdateTaskInput = Partial<
