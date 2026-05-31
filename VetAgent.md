@@ -2,6 +2,10 @@
 
 This document is a revised, fuller implementation brief for VetAgent. It is meant to be handed to another AI or engineer so they can understand the complete intent, missing context, exact priorities, constraints, architecture, and execution plan.
 
+Implementation plans:
+
+- `VETAGENT_4_PERSON_EXECUTION_PLAN.md`
+
 This version explicitly adds the details that were previously underemphasized:
 
 - The current top priority is **internal and external agents**.
