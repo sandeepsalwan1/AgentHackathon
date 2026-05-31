@@ -10,6 +10,7 @@
     "lint": "eslint app next.config.mjs"
   },
   "dependencies": {
+    "@central-vet/agents": "*",
     "@central-vet/db": "*"
   }
 }

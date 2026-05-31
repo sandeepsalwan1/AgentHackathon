@@ -3,6 +3,7 @@ import type {
   Actor,
   AppRole,
   CreateTaskInput,
+  OpseraAuditStatus,
   Task,
   TaskEvent,
   TaskStatus,
@@ -42,6 +43,10 @@ type TaskRow = {
   escalated_at: string | null;
   escalated_by_name: string | null;
   escalated_by_role: AppRole | null;
+  opsera_audit_status: OpseraAuditStatus | null;
+  opsera_audit_reason: string | null;
+  opsera_audit_id: string | null;
+  opsera_audit_checked_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -124,6 +129,10 @@ const taskColumns = `
   escalated_at,
   escalated_by_name,
   escalated_by_role,
+  opsera_audit_status,
+  opsera_audit_reason,
+  opsera_audit_id,
+  opsera_audit_checked_at,
   created_at,
   updated_at
 `;
@@ -174,6 +183,10 @@ function normalizeTask(row: TaskRow): Task {
     escalatedAt: row.escalated_at,
     escalatedByName: row.escalated_by_name,
     escalatedByRole: row.escalated_by_role,
+    opseraAuditStatus: row.opsera_audit_status,
+    opseraAuditReason: row.opsera_audit_reason,
+    opseraAuditId: row.opsera_audit_id,
+    opseraAuditCheckedAt: row.opsera_audit_checked_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -250,6 +263,10 @@ function toInsert(input: CreateTaskInput, actor: Actor) {
     priority: priorityOrDefault(input.priority),
     due_date: input.dueDate || new Date().toISOString().slice(0, 10),
     due_time: timeOrDefault(input.dueTime),
+    opsera_audit_status: input.opseraAuditStatus ?? null,
+    opsera_audit_reason: cleanText(input.opseraAuditReason),
+    opsera_audit_id: cleanText(input.opseraAuditId),
+    opsera_audit_checked_at: cleanText(input.opseraAuditCheckedAt),
     created_by_name: actor.name,
     created_by_role: actor.role,
     updated_by_name: actor.name
@@ -278,6 +295,12 @@ function toPatch(input: UpdateTaskInput, actor: Actor) {
   if ("priority" in input) patch.priority = priorityOrDefault(input.priority);
   if ("dueDate" in input && input.dueDate) patch.due_date = input.dueDate;
   if ("dueTime" in input) patch.due_time = timeOrDefault(input.dueTime);
+  if ("opseraAuditStatus" in input) patch.opsera_audit_status = input.opseraAuditStatus ?? null;
+  if ("opseraAuditReason" in input) patch.opsera_audit_reason = cleanText(input.opseraAuditReason);
+  if ("opseraAuditId" in input) patch.opsera_audit_id = cleanText(input.opseraAuditId);
+  if ("opseraAuditCheckedAt" in input) {
+    patch.opsera_audit_checked_at = cleanText(input.opseraAuditCheckedAt);
+  }
   return patch;
 }
 
@@ -310,6 +333,17 @@ async function logTaskEvent(args: {
       ${sql.json(args.metadata ?? {})}
     )
   `;
+}
+
+export async function recordTaskEvent(args: {
+  taskId: string;
+  actor: Actor;
+  eventType: string;
+  previousStatus?: TaskStatus | null;
+  nextStatus?: TaskStatus | null;
+  metadata?: JsonObject;
+}) {
+  await logTaskEvent(args);
 }
 
 export async function listTasks(options?: {

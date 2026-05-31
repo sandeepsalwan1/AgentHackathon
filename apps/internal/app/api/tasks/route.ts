@@ -1,8 +1,13 @@
 import {
+  auditRecordsTransfer,
+  buildRecordsTransferPacket
+} from "@central-vet/agents";
+import {
   archiveCompletedTasksBefore,
   createTask,
   getSql,
   listTasks,
+  recordTaskEvent,
   type Actor,
   type CreateTaskInput,
   type TaskSource,
@@ -84,6 +89,15 @@ function localDateString(
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function priorityForAudit(
+  auditStatus: "approved" | "flagged" | "blocked" | null | undefined,
+  requestedPriority: "low" | "medium" | "high"
+) {
+  if (auditStatus === "blocked") return "high";
+  if (auditStatus === "flagged" && requestedPriority === "low") return "medium";
+  return requestedPriority;
 }
 
 async function internalCreateGuard(args: {
@@ -203,13 +217,6 @@ export async function POST(request: Request) {
       assignedTo
     });
 
-    const input: CreateTaskInput = {
-      ...taskResult.data,
-      assignedTo,
-      source,
-      status
-    };
-
     const guardError = await internalCreateGuard({
       request,
       actor,
@@ -223,7 +230,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: guardError }, { status: 429 });
     }
 
+    const opseraAudit =
+      taskResult.data.requestType === "records_request"
+        ? await auditRecordsTransfer(
+            buildRecordsTransferPacket({
+              clientName: taskResult.data.clientName,
+              clientPhone: taskResult.data.clientPhone,
+              clientDateOfBirth: taskResult.data.clientDateOfBirth,
+              clientId: taskResult.data.clarityId,
+              petName: taskResult.data.petName,
+              petWeight: taskResult.data.petWeight,
+              lastVisit: taskResult.data.lastVisit,
+              request: taskResult.data.request,
+              requestedBy: actor.name,
+              metadata: {
+                source,
+                actorRole: actor.role,
+                requestedStatus: status
+              }
+            })
+          )
+        : null;
+
+    const input: CreateTaskInput = {
+      ...taskResult.data,
+      assignedTo,
+      source,
+      status,
+      priority: priorityForAudit(opseraAudit?.status, taskResult.data.priority),
+      opseraAuditStatus: opseraAudit?.status ?? null,
+      opseraAuditReason: opseraAudit?.reason ?? null,
+      opseraAuditId: opseraAudit?.auditId ?? null,
+      opseraAuditCheckedAt: opseraAudit?.checkedAt ?? null
+    };
+
     const task = await createTask(input, actor);
+    if (opseraAudit) {
+      await recordTaskEvent({
+        taskId: task.id,
+        actor,
+        eventType: "opsera_records_audit",
+        previousStatus: null,
+        nextStatus: task.status,
+        metadata: {
+          opseraStatus: opseraAudit.status,
+          opseraReason: opseraAudit.reason,
+          opseraAuditId: opseraAudit.auditId,
+          opseraSource: opseraAudit.source
+        }
+      });
+      logInfo("opsera_records_audit", {
+        taskId: task.id,
+        actorRole: actor.role,
+        status: opseraAudit.status
+      });
+    }
     logInfo("task_created", {
       taskId: task.id,
       actorRole: actor.role,

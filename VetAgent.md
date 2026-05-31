@@ -592,12 +592,14 @@ The important point is that even without live integrations, the local model shou
 
 ## 14. Agent runtime recommendation
 
-Use the OpenAI Agents SDK first because it gives production-relevant primitives around agents, tools, handoffs, guardrails, and tracing.[cite:82][cite:85][cite:89][cite:92]
+Use Google Agent Development Kit for TypeScript first. It is open source, fits the TypeScript/Next.js codebase, supports Gemini/Vertex while staying model-agnostic, and gives production-relevant primitives around agents, tools, workflow agents, multi-agent orchestration, evaluation, and deployment.
 
 Use LangGraph later if the workflow graph becomes significantly more stateful, explicit, looping, or orchestration-heavy than the initial system requires.[cite:87][cite:90][cite:96]
 
 This means the practical first design is:
 
+- `AGENT_RUNTIME=mock` as the deterministic demo fallback,
+- `AGENT_RUNTIME=google-adk` as the live agent target,
 - one external agent,
 - one internal agent,
 - optional router/handoff,

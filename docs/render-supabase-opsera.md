@@ -38,7 +38,8 @@ Render setup:
 Required Render env:
 
 - Web service: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`.
-- Agent/tool env: `OPENAI_API_KEY`, `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
+- Agent runtime env: `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Google ADK TypeScript. For Vertex-backed ADK, also set `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
+- Tool/proof env: `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
 - Internal auth/env: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
 - Cron only: `INTERNAL_BASE_URL`, `CRON_SECRET`.
 
@@ -57,8 +58,15 @@ Smoke:
 Opsera:
 
 - Pipeline source: `sandeepsalwan1/AgentHackathon`.
-- Steps: install, typecheck, build, optional migration check, Render deploy trigger.
-- Add manual approval before production deploy if quick.
+- Pipeline entrypoint in repo: `.github/workflows/opsera-render.yml`.
+- Steps: install, typecheck, build, optional Render deploy trigger.
+- Manual approval is represented by the GitHub `production` environment on the deploy job.
+- Required pipeline secrets: `RENDER_INTERNAL_DEPLOY_HOOK_URL` and `RENDER_CLIENT_DEPLOY_HOOK_URL`.
+- Records-transfer audit entrypoint: `packages/agents/src/tools/opsera.ts`.
+- Runtime routes call Opsera before records request task creation and persist `opsera_audit_*` fields on `tasks`.
+- Internal tool route: `POST /api/tools/prepare-records-packet`.
+- Runtime env: set `OPSERA_MCP_URL` to `https://agent.opsera.ai/mcp` when remote audit is intended; also configure `OPSERA_API_KEY`, `OPSERA_MCP_TOOL`, `OPSERA_MCP_TIMEOUT_MS`.
+- If `OPSERA_MCP_URL` is not configured, the app uses a local fallback policy and flags the audit source as `local_policy`.
 - Blocker state should be documented here instead of blocking local development.
 
 Security note:

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { createTask, getSql, MissingDatabaseUrlError } from "@central-vet/db";
+import { auditRecordsTransfer, buildRecordsTransferPacket } from "@central-vet/agents";
+import { createTask, getSql, MissingDatabaseUrlError, recordTaskEvent } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logError, logInfo, logWarn } from "../_logging";
@@ -275,22 +276,73 @@ export async function POST(request: Request) {
       );
     }
 
+    const opseraAudit =
+      parsed.data.requestType === "records_request"
+        ? await auditRecordsTransfer(
+            buildRecordsTransferPacket({
+              clientName: parsed.data.clientName,
+              clientPhone: parsed.data.clientPhone,
+              clientDateOfBirth: parsed.data.clientDateOfBirth,
+              petName: parsed.data.petName,
+              petWeight: parsed.data.petWeight,
+              lastVisit: parsed.data.lastVisit,
+              request: parsed.data.request,
+              requestedBy: parsed.data.clientName,
+              metadata: {
+                source: "client_form",
+                clarityId: parsed.data.clarityId ?? null
+              }
+            })
+          )
+        : null;
+
+    const actor = {
+      name: parsed.data.clientName,
+      role: "staff" as const
+    };
     const task = await createTask(
       {
         ...parsed.data,
         hospitalName: process.env.HOSPITAL_NAME || "Central Veterinary Hospital",
         source: "client_form",
         status: "pending_review",
-        priority: "low",
+        priority:
+          opseraAudit?.status === "blocked"
+            ? "high"
+            : opseraAudit?.status === "flagged"
+              ? "medium"
+              : "low",
         requestType: parsed.data.requestType,
         dueDate: new Date().toISOString().slice(0, 10),
-        dueTime: "19:00"
+        dueTime: "19:00",
+        opseraAuditStatus: opseraAudit?.status ?? null,
+        opseraAuditReason: opseraAudit?.reason ?? null,
+        opseraAuditId: opseraAudit?.auditId ?? null,
+        opseraAuditCheckedAt: opseraAudit?.checkedAt ?? null
       },
-      {
-        name: parsed.data.clientName,
-        role: "staff"
-      }
+      actor
     );
+
+    if (opseraAudit) {
+      await recordTaskEvent({
+        taskId: task.id,
+        actor,
+        eventType: "opsera_records_audit",
+        previousStatus: null,
+        nextStatus: task.status,
+        metadata: {
+          opseraStatus: opseraAudit.status,
+          opseraReason: opseraAudit.reason,
+          opseraAuditId: opseraAudit.auditId,
+          opseraSource: opseraAudit.source
+        }
+      });
+      logInfo("opsera_records_audit", {
+        ...logIds(),
+        taskId: task.id,
+        status: opseraAudit.status
+      });
+    }
 
     await recordGuard(clientHash, requestHash, "accepted");
     logInfo("client_request_accepted", {

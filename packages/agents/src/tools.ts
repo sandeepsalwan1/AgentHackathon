@@ -36,6 +36,12 @@ type ToolDefinition<T extends z.ZodTypeAny> = {
   execute: (args: z.infer<T>, runtime: ToolRuntime) => Promise<Record<string, unknown>>;
 };
 
+type AnyToolDefinition = {
+  description: string;
+  parameters: z.ZodTypeAny;
+  execute: (args: any, runtime: ToolRuntime) => Promise<Record<string, unknown>>;
+};
+
 type RunnableTool = {
   parameters: z.ZodTypeAny;
   execute: (args: unknown, runtime: ToolRuntime) => Promise<Record<string, unknown>>;
@@ -47,7 +53,7 @@ function defineTool<TParameters extends z.ZodTypeAny>(
   return definition;
 }
 
-function defineTools<const TTools extends Record<string, ToolDefinition<z.ZodTypeAny>>>(
+function defineTools<const TTools extends Record<string, AnyToolDefinition>>(
   definitions: TTools
 ) {
   return definitions;

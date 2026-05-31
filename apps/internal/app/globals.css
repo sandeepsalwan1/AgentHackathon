@@ -668,6 +668,7 @@ button:hover {
 .rolePill,
 .statusBadge,
 .sourceBadge,
+.opseraBadge,
 .liveDot {
   display: inline-flex;
   align-items: center;
@@ -686,6 +687,12 @@ button:hover {
   padding-bottom: 5px;
   line-height: 1.15;
   white-space: normal;
+}
+
+.opseraBadge {
+  border: 1px solid transparent;
+  gap: 5px;
+  text-transform: none;
 }
 
 .role-staff {
@@ -994,6 +1001,38 @@ button:hover {
   padding: 0 9px;
   font-size: 12px;
   font-weight: 900;
+}
+
+.opseraBanner {
+  margin-top: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.opsera-approved {
+  border-color: #8bcf9f;
+  background: #e9f8ed;
+  color: #0d5f35;
+}
+
+.opsera-flagged {
+  border-color: #e3bf55;
+  background: #fff3ca;
+  color: #7a5408;
+}
+
+.opsera-blocked {
+  border-color: #f0aca7;
+  background: var(--red-soft);
+  color: #8b251f;
 }
 
 .status-completed {

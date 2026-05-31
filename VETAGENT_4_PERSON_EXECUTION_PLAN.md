@@ -40,7 +40,8 @@ Everything else supports those two priorities:
 - Use Opsera.
 - Use E2B.
 - Use Apify.
-- Use OpenAI Agents SDK.
+- Use Google Agent Development Kit for TypeScript as the target live agent SDK.
+- Keep deterministic mock mode as the demo-safe fallback.
 - Use mock data for the sprint.
 - Final demo should be one deployed web app, not two separate frontend deploys.
 - Preferred one-app target: `apps/internal` becomes the unified app with public routes and staff routes.
@@ -188,13 +189,13 @@ Person 1 does both agent endpoints, but not the final agent brain.
 - Person 1 builds the external-agent API route and internal-agent API route.
 - Person 1 makes both routes work with deterministic mock behavior.
 - Person 1 stores agent runs, tool calls, workflow events, tasks, approvals, and reports.
-- Person 1 makes the demo work even if live OpenAI, E2B, Apify, or PMS integrations are not ready.
+- Person 1 makes the demo work even if live Google ADK, E2B, Apify, or PMS integrations are not ready.
 - Person 3 later plugs real agent behavior into those same routes.
 
 Person 3 owns the actual agent intelligence.
 
 - prompts,
-- OpenAI Agents SDK behavior,
+- Google ADK behavior,
 - tool-calling decisions,
 - guardrails,
 - escalation logic,
@@ -626,7 +627,7 @@ Person 3 outcome:
 
 Person 3 owns:
 
-- OpenAI Agents SDK integration,
+- Google ADK TypeScript integration,
 - `packages/agents`,
 - `packages/mock-data`,
 - external agent,
@@ -682,7 +683,7 @@ Done when:
 
 - route handlers can call agent package functions,
 - mocked agent responses are deterministic without external APIs,
-- OpenAI-backed path can be enabled by env.
+- Google ADK-backed path can be enabled with `AGENT_RUNTIME=google-adk` and Gemini or Vertex env.
 
 ### Person 3 Workstream B - Tool Registry
 

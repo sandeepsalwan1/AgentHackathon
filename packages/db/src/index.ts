@@ -15,6 +15,7 @@ export {
   listTaskEvents,
   listTasks,
   renameActorReferences,
+  recordTaskEvent,
   transitionTask,
   undoLastStatusChange
 } from "./tasks";
@@ -79,6 +80,7 @@ export type {
   Actor,
   AppRole,
   CreateTaskInput,
+  OpseraAuditStatus,
   Task,
   TaskEvent,
   TaskPriority,

@@ -20,11 +20,19 @@ Local commands:
 - `npm run smoke:e2b` to verify the configured E2B key can start a sandbox.
 - `npm run scenarios:e2b` to run the scenario harness through E2B when `SCENARIO_BASE_URL` is a public URL; localhost falls back to local scenarios after an E2B readiness check.
 
+Agent runtime:
+
+- Demo-safe default: `AGENT_RUNTIME=mock`.
+- Target live runtime: Google Agent Development Kit for TypeScript (`AGENT_RUNTIME=google-adk`).
+- Open-source ADK package: `@google/adk` in the agents workspace, from `google/adk-js` under Apache-2.0. Provenance lives in `opensrc/google-adk/`.
+- Google ADK env: `GEMINI_API_KEY` or `GOOGLE_API_KEY`; for Vertex, also configure `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
+- E2B is for sandboxed proof/evals, not the normal check-in/booking request path.
+
 Render + Supabase:
 
 - Create a Supabase project and use its Postgres connection string as `DATABASE_URL`.
 - Create one Render web service from `render.yaml`: `vetagent-internal`.
-- Add env vars: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`, `OPENAI_API_KEY`, `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_TOKEN` for Apify CLI skills, optional `APIFY_PRICING_ACTOR_ID`.
+- Add env vars: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`, `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_TOKEN` for Apify CLI skills, optional `APIFY_PRICING_ACTOR_ID`.
 - Add notification env vars and `CRON_SECRET`.
 - Internal passcodes: VA and Admin env passcodes plus doctor profile passcodes from Admin settings.
 - VA/Admin passcodes must be configured with `VET_ADMIN_PASSCODE` and `VET_APP_ADMIN_PASSCODE`.
