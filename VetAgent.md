@@ -4,7 +4,7 @@ This document is a revised, fuller implementation brief for VetAgent. It is mean
 
 This version explicitly adds the details that were previously underemphasized:
 - The current top priority is **internal and external agents**.
-- A **task manager already exists** in a Tri-City Veterinary Hospital implementation and should be reused.
+- A **task manager already exists** in a Central Veterinary Hospital implementation and should be reused.
 - There is **not yet reliable access to all integrations**, so the early system must be designed to work with **mock data, simulated adapters, and local mirrors** until real integrations are available.
 - The **internal agent** must do more than tasks and inbox work. It should also handle records-switch workflows, internal grunt work, invoice/admin support, and recurring competitor/price research.
 - The **external agent** must handle real end-to-end client workflows such as check-in, booking, requests, status updates, and follow-ups.
@@ -40,7 +40,7 @@ The founder intent is:
 
 ### 2.1 Existing work already done
 
-A version has already been built for Tri-City Veterinary Hospital.
+A version has already been built for Central Veterinary Hospital.
 
 That existing work has two parts:
 
@@ -693,7 +693,7 @@ Because the user explicitly said to focus on the agents, the first workflows sho
 
 - create monorepo,
 - define schema,
-- import/reuse Tri-City task manager,
+- import/reuse Central task manager,
 - define generic tool interfaces,
 - create mock provider layer,
 - create veterinary seed dataset.
@@ -794,17 +794,17 @@ VetAgent dev up
 VetAgent dev down
 VetAgent db migrate
 VetAgent db seed --dataset vet-sandbox
-VetAgent tenant create "Tri-City Veterinary Hospital" --slug tri-city
-VetAgent provider enable mock --tenant tri-city
-VetAgent workflow install default-vet --tenant tri-city
-VetAgent agent test external --tenant tri-city --scenario booking
-VetAgent agent test external --tenant tri-city --scenario checkin
-VetAgent agent test internal --tenant tri-city --scenario records-transfer
-VetAgent agent test internal --tenant tri-city --scenario pricing-review
-VetAgent import csv appointments.csv --tenant tri-city
-VetAgent import csv clients.csv --tenant tri-city
-VetAgent integration connect avimark --tenant tri-city
-VetAgent integration validate --tenant tri-city
+VetAgent tenant create "Central Veterinary Hospital" --slug Central
+VetAgent provider enable mock --tenant Central
+VetAgent workflow install default-vet --tenant Central
+VetAgent agent test external --tenant Central --scenario booking
+VetAgent agent test external --tenant Central --scenario checkin
+VetAgent agent test internal --tenant Central --scenario records-transfer
+VetAgent agent test internal --tenant Central --scenario pricing-review
+VetAgent import csv appointments.csv --tenant Central
+VetAgent import csv clients.csv --tenant Central
+VetAgent integration connect avimark --tenant Central
+VetAgent integration validate --tenant Central
 VetAgent agent trace --run-id <id>
 ```
 
@@ -829,4 +829,4 @@ That is the thing that makes this scalable instead of turning it into a consulti
 
 Use this if another AI is going to build the system:
 
-> Build VetAgent as a multi-tenant veterinary operations platform with two main agents and a shared task engine. Reuse the existing Tri-City task-manager concept instead of rebuilding it. Focus first on the external and internal agents. The external agent handles booking, check-in, intake, pickup/drop-off, status updates, follow-ups, and turning client requests into structured actions. The internal agent handles inbox triage, records-switch workflows, task prioritization, invoice/admin assistance, competitor price research, and internal recommendations. Build the system so it works even before real integrations exist by using mock providers, local normalized data, and mirror mode. Put Avimark, Cornerstone, Idexx, Antech, and Demandforce-like systems behind capability-based adapters later. Use generic tools, guardrails, tracing, and human-approval flows. Optimize for rapid development, low-touch onboarding, and long-term reuse across clinics and eventually other local-business verticals.[cite:34][cite:61][cite:69][cite:70][cite:79][cite:82][cite:85][cite:88][cite:90]
+> Build VetAgent as a multi-tenant veterinary operations platform with two main agents and a shared task engine. Reuse the existing Central task-manager concept instead of rebuilding it. Focus first on the external and internal agents. The external agent handles booking, check-in, intake, pickup/drop-off, status updates, follow-ups, and turning client requests into structured actions. The internal agent handles inbox triage, records-switch workflows, task prioritization, invoice/admin assistance, competitor price research, and internal recommendations. Build the system so it works even before real integrations exist by using mock providers, local normalized data, and mirror mode. Put Avimark, Cornerstone, Idexx, Antech, and Demandforce-like systems behind capability-based adapters later. Use generic tools, guardrails, tracing, and human-approval flows. Optimize for rapid development, low-touch onboarding, and long-term reuse across clinics and eventually other local-business verticals.[cite:34][cite:61][cite:69][cite:70][cite:79][cite:82][cite:85][cite:88][cite:90]
