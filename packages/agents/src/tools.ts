@@ -36,6 +36,23 @@ type ToolDefinition<T extends z.ZodTypeAny> = {
   execute: (args: z.infer<T>, runtime: ToolRuntime) => Promise<Record<string, unknown>>;
 };
 
+type RunnableTool = {
+  parameters: z.ZodTypeAny;
+  execute: (args: unknown, runtime: ToolRuntime) => Promise<Record<string, unknown>>;
+};
+
+function defineTool<TParameters extends z.ZodTypeAny>(
+  definition: ToolDefinition<TParameters>
+) {
+  return definition;
+}
+
+function defineTools<const TTools extends Record<string, ToolDefinition<z.ZodTypeAny>>>(
+  definitions: TTools
+) {
+  return definitions;
+}
+
 type ToolRegistry = typeof tools;
 export type ToolName = keyof ToolRegistry;
 
@@ -210,8 +227,8 @@ export function createToolRuntime(input: AgentInput, workflowType: AgentIntent, 
   };
 }
 
-export const tools = {
-  lookup_client: {
+export const tools = defineTools({
+  lookup_client: defineTool({
     description: "Look up a client by name or phone number.",
     parameters: z.object({
       clientName: z.string().optional(),
@@ -224,8 +241,8 @@ export const tools = {
       });
       return { clients };
     }
-  },
-  lookup_pet: {
+  }),
+  lookup_pet: defineTool({
     description: "Look up pets registered to a client.",
     parameters: z.object({
       clientId: z.string(),
@@ -237,8 +254,8 @@ export const tools = {
       );
       return { pets };
     }
-  },
-  list_slots: {
+  }),
+  list_slots: defineTool({
     description: "List available appointment slots.",
     parameters: z.object({
       appointmentType: z.string().optional()
@@ -249,8 +266,8 @@ export const tools = {
       );
       return { slots };
     }
-  },
-  book_appointment: {
+  }),
+  book_appointment: defineTool({
     description: "Prepare a booking confirmation for a client and pet.",
     parameters: z.object({
       slotId: z.string(),
@@ -281,8 +298,8 @@ export const tools = {
       });
       return { booked: true, slot, client, pet, task };
     }
-  },
-  start_arrival: {
+  }),
+  start_arrival: defineTool({
     description: "Match an arriving client and pet to today's appointment.",
     parameters: z.object({
       clientName: z.string().optional(),
@@ -302,8 +319,8 @@ export const tools = {
         : null;
       return { client, pet, appointment };
     }
-  },
-  get_wait_status: {
+  }),
+  get_wait_status: defineTool({
     description: "Return wait estimate for an appointment.",
     parameters: z.object({
       appointmentId: z.string().optional(),
@@ -325,8 +342,8 @@ export const tools = {
           : null
       };
     }
-  },
-  mark_arrived: {
+  }),
+  mark_arrived: defineTool({
     description: "Prepare arrival update and staff task.",
     parameters: z.object({
       appointmentId: z.string()
@@ -354,8 +371,8 @@ export const tools = {
       });
       return { arrived: true, appointment: { ...appointment, status: "arrived" }, client, pet, task };
     }
-  },
-  mark_pet_ready: {
+  }),
+  mark_pet_ready: defineTool({
     description: "Prepare a ready-for-pickup status update.",
     parameters: z.object({
       petId: z.string(),
@@ -375,8 +392,8 @@ export const tools = {
       })) : null;
       return { ready: Boolean(pet), pet, client, task };
     }
-  },
-  send_status_update: {
+  }),
+  send_status_update: defineTool({
     description: "Draft a client status update; no SMS is sent by the agent package.",
     parameters: z.object({
       clientId: z.string(),
@@ -392,8 +409,8 @@ export const tools = {
       });
       return { sent: false, delivery: "draft_only", client, message: args.message };
     }
-  },
-  create_task: {
+  }),
+  create_task: defineTool({
     description: "Create a structured task draft for clinic staff.",
     parameters: z.object({
       request: z.string(),
@@ -415,8 +432,8 @@ export const tools = {
       });
       return { task };
     }
-  },
-  update_task: {
+  }),
+  update_task: defineTool({
     description: "Draft a task update without mutating persistence directly.",
     parameters: z.object({
       taskId: z.string(),
@@ -432,22 +449,22 @@ export const tools = {
       });
       return { taskUpdate: args };
     }
-  },
-  triage_message: {
+  }),
+  triage_message: defineTool({
     description: "Classify client message urgency and intent.",
     parameters: z.object({
       message: z.string()
     }),
     execute: async (args) => triageText(args.message)
-  },
-  triage_call: {
+  }),
+  triage_call: defineTool({
     description: "Classify a phone transcript.",
     parameters: z.object({
       transcript: z.string()
     }),
     execute: async (args) => triageText(args.transcript)
-  },
-  request_records_transfer: {
+  }),
+  request_records_transfer: defineTool({
     description: "Create a human approval draft for records transfer.",
     parameters: z.object({
       clientName: z.string().optional().nullable(),
@@ -483,8 +500,8 @@ export const tools = {
       });
       return { task, approval };
     }
-  },
-  prepare_records_packet: {
+  }),
+  prepare_records_packet: defineTool({
     description: "Prepare records metadata for the application layer to audit/send.",
     parameters: z.object({
       clientName: z.string().optional().nullable(),
@@ -500,8 +517,8 @@ export const tools = {
         attachments: []
       }
     })
-  },
-  get_invoice_summary: {
+  }),
+  get_invoice_summary: defineTool({
     description: "Return invoice data for review.",
     parameters: z.object({
       clientName: z.string().optional(),
@@ -515,8 +532,8 @@ export const tools = {
       );
       return { client, pet, invoices };
     }
-  },
-  flag_invoice_issue: {
+  }),
+  flag_invoice_issue: defineTool({
     description: "Create invoice review task and report draft.",
     parameters: z.object({
       invoiceId: z.string(),
@@ -545,8 +562,8 @@ export const tools = {
       }));
       return { invoice, task, report };
     }
-  },
-  find_followup_candidates: {
+  }),
+  find_followup_candidates: defineTool({
     description: "Find open follow-up opportunities.",
     parameters: z.object({
       status: z.enum(["open", "contacted", "closed"]).optional()
@@ -556,8 +573,8 @@ export const tools = {
       const candidates = runtime.data.followups.filter((followup) => followup.status === status);
       return { candidates };
     }
-  },
-  create_followup_task: {
+  }),
+  create_followup_task: defineTool({
     description: "Create outreach task for a follow-up candidate.",
     parameters: z.object({
       candidateId: z.string()
@@ -579,8 +596,8 @@ export const tools = {
       }));
       return { candidate, client, pet, task };
     }
-  },
-  run_competitor_scan: {
+  }),
+  run_competitor_scan: defineTool({
     description: "Read sample or Apify-normalized competitor pricing observations.",
     parameters: z.object({
       source: z.enum(["sample", "apify"]).optional()
@@ -591,15 +608,15 @@ export const tools = {
       );
       return { observations };
     }
-  },
-  compare_service_prices: {
+  }),
+  compare_service_prices: defineTool({
     description: "Compare service catalog to competitor pricing observations.",
     parameters: z.object({}),
     execute: async (_args, runtime) => ({
       comparisons: comparePrices(runtime.data.services, runtime.data.pricingObservations)
     })
-  },
-  create_price_review_report: {
+  }),
+  create_price_review_report: defineTool({
     description: "Create pricing report and review task without changing prices.",
     parameters: z.object({
       summary: z.string(),
@@ -623,15 +640,15 @@ export const tools = {
       }));
       return { task, report };
     }
-  }
-} satisfies Record<string, ToolDefinition<z.ZodTypeAny>>;
+  })
+});
 
 export async function executeTool<TName extends ToolName>(
   name: TName,
   args: unknown,
   runtime: ToolRuntime
 ) {
-  const definition = tools[name];
+  const definition = tools[name] as RunnableTool;
   const parsed = definition.parameters.parse(args);
   const result = await definition.execute(parsed, runtime);
   runtime.toolCalls.push({
