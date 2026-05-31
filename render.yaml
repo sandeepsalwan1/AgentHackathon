@@ -13,6 +13,14 @@ services:
         value: 22.16.0
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_MAX_CONNECTIONS
+        value: "5"
+      - key: DATABASE_IDLE_TIMEOUT_SECONDS
+        value: "20"
+      - key: DATABASE_CONNECT_TIMEOUT_SECONDS
+        value: "10"
+      - key: DATABASE_MAX_LIFETIME_SECONDS
+        value: "600"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -70,6 +78,14 @@ services:
         value: 22.16.0
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_MAX_CONNECTIONS
+        value: "5"
+      - key: DATABASE_IDLE_TIMEOUT_SECONDS
+        value: "20"
+      - key: DATABASE_CONNECT_TIMEOUT_SECONDS
+        value: "10"
+      - key: DATABASE_MAX_LIFETIME_SECONDS
+        value: "600"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
