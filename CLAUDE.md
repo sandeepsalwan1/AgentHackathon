@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Central Veterinary Hospital MVP — a task management system for a veterinary clinic. Two Next.js apps share a Postgres database via an npm workspace.
+Central Veterinary Hospital MVP — a unified VetAgent task and public-flow system for a veterinary clinic. One Next.js app uses a Postgres database via an npm workspace.
 
-- `apps/internal` — staff/VA/veterinarian/admin task board (port 3000)
-- `apps/client-request` — public request intake form (port 3001)
+- `apps/internal` — unified public flows, staff/VA/veterinarian/admin task board, and agent APIs (port 3000)
+- `apps/client-request` — legacy/reference public intake source only; not deployed or part of root scripts
 - `packages/db` — Postgres schema, query helpers, and shared TypeScript types
 - `packages/notifications` — Resend email + carrier-gateway SMS (no Twilio)
 - `db/migrations/` — numbered SQL migrations applied via `npm run db:migrate`
@@ -19,10 +19,9 @@ npm install
 cp .env.example .env.local          # fill Supabase DATABASE_URL
 npm run db:migrate                   # run all pending SQL migrations
 
-npm run dev:internal                 # internal app on :3000
-npm run dev:client                   # public form on :3001
+npm run dev                          # unified app on :3000
 
-npm run build                        # build both apps
+npm run build                        # build unified app
 npm run typecheck                    # tsc --noEmit across all workspaces
 npm run lint                         # ESLint across all workspaces
 ```
@@ -74,7 +73,7 @@ All status transition and permission logic lives in [`apps/internal/app/lib/task
 
 ### Data layer (`packages/db`)
 
-Uses the `postgres` npm package (not an ORM). All queries are in [`packages/db/src/tasks.ts`](packages/db/src/tasks.ts), [`settings.ts`](packages/db/src/settings.ts), etc. The package exports everything through [`packages/db/src/index.ts`](packages/db/src/index.ts). Types are in [`packages/db/src/types.ts`](packages/db/src/types.ts) and shared across both apps.
+Uses the `postgres` npm package (not an ORM). All queries are in [`packages/db/src/tasks.ts`](packages/db/src/tasks.ts), [`settings.ts`](packages/db/src/settings.ts), etc. The package exports everything through [`packages/db/src/index.ts`](packages/db/src/index.ts). Types are in [`packages/db/src/types.ts`](packages/db/src/types.ts).
 
 Connection is obtained via `getSql()` from `packages/db/src/connection.ts`, which throws `MissingDatabaseUrlError` if no URL is configured — API routes catch this and return a `503`.
 
@@ -99,8 +98,8 @@ Render cron hits `/api/notifications/overdue` daily at `0 2 * * *` UTC (≈6 PM 
 | `POST /api/notifications/smoke` | Send a test notification |
 | `GET /api/notifications/overdue` | Daily priority summary (cron, requires `CRON_SECRET`) |
 
-The public app (`apps/client-request`) only has `POST /api/requests` — no read routes.
+Public flows are served by `apps/internal` at `/arrival`, `/booking`, `/pickup`, `/records`, `/followup`, `/call`, and `/request`.
 
 ### Deployment
 
-Two separate Render services, defined in `render.yaml`: `vetagent-internal` and `vetagent-client`. A Render cron service calls the internal overdue-summary endpoint. Both web services connect to the same Supabase Postgres database through `DATABASE_URL`.
+One Render web service, `vetagent-internal`, is defined in `render.yaml`. A Render cron service calls the overdue-summary endpoint. The legacy `vetagent-client` Render service was deleted on 2026-05-31.

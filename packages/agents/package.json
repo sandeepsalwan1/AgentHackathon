@@ -1,8 +1,20 @@
 {
   "name": "@central-vet/agents",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:scenarios": "tsx src/scenarioRunner.ts"
+  },
+  "dependencies": {
+    "@openai/agents": "^0.11.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
   }
 }

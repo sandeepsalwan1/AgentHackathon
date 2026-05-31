@@ -7,6 +7,7 @@ Current decision:
 - Deploy on Render, not Vercel.
 - Database on Supabase Postgres, not Neon.
 - Keep passcode auth. Do not add Supabase Auth for this sprint.
+- Use one unified web app: `apps/internal`.
 - Use `DATABASE_URL` for app DB access. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are reserved for realtime/storage/agent work.
 
 Supabase setup:
@@ -28,19 +29,17 @@ Render setup:
 - Environment: `evm-d8e98bmk1jcs739ogq2g`.
 - Services:
   - `vetagent-internal` (`srv-d8e9c019rddc73el6i5g`): `https://vetagent-internal.onrender.com`
-  - `vetagent-client` (`srv-d8e9c3l7vvec73ef0p30`): `https://vetagent-client.onrender.com`
   - `vetagent-overdue-summary`: defined in `render.yaml`, not created through the API yet.
+  - Legacy `vetagent-client` was deleted from Render on 2026-05-31.
 - Internal build: `npm ci && npm run build --workspace @central-vet/internal`
 - Internal start: `npm run start --workspace @central-vet/internal -- -p $PORT`
-- Client build: `npm ci && npm run build --workspace @central-vet/client-request`
-- Client start: `npm run start --workspace @central-vet/client-request -- -p $PORT`
 - Render MCP currently has no workspace selected; service creation was done through the Render REST API using the configured `RENDER_API_KEY`.
 
 Required Render env:
 
-- Both web services: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`.
-- Internal only: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
-- Client only: `CLIENT_REQUEST_BASE_URL`, `CLIENT_REQUEST_HOST`.
+- Web service: `DATABASE_URL`, `HOSPITAL_NAME`, `APP_TIME_ZONE`, `MOCK_MODE`, `AGENT_RUNTIME`.
+- Agent/tool env: `OPENAI_API_KEY`, `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
+- Internal auth/env: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
 - Cron only: `INTERNAL_BASE_URL`, `CRON_SECRET`.
 
 Smoke:
@@ -49,10 +48,11 @@ Smoke:
 2. Run `npm run db:migrate`.
 3. Run `npm run typecheck`.
 4. Run `npm run build`.
-5. Deploy Render services from `render.yaml`.
-6. Submit a public request on `vetagent-client`.
-7. Confirm it appears in internal Pending Review on `vetagent-internal`.
-8. Hit `/api/notifications/overdue` with `Authorization: Bearer $CRON_SECRET`.
+5. Deploy Render service from `render.yaml`.
+6. Open `/arrival` on `vetagent-internal` and check in a mock appointment.
+7. Submit a public request on `/request`.
+8. Confirm both appear in `/staff`.
+9. Hit `/api/notifications/overdue` with `Authorization: Bearer $CRON_SECRET`.
 
 Opsera:
 
@@ -67,3 +67,9 @@ Opsera:
 - Runtime env: `OPSERA_MCP_URL=https://agent.opsera.ai/mcp`, `OPSERA_API_KEY`, `OPSERA_MCP_TOOL`, `OPSERA_MCP_TIMEOUT_MS`.
 - If `OPSERA_MCP_URL` is not configured, the app uses a local fallback policy and flags the audit source as `local_policy`.
 - Blocker state should be documented here instead of blocking local development.
+
+Security note:
+
+- Supabase currently reports RLS disabled on existing server-side tables.
+- Do not enable RLS without policies during the hackathon; it would block current server-side flows if done incorrectly.
+- Later remediation should add policies and then enable RLS for public tables.
