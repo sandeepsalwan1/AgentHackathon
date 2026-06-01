@@ -453,12 +453,12 @@ async function runOne(scenario, provider, fetchImpl = fetch) {
 function emit(results, provider) {
   let failed = 0;
   for (const result of results) {
+    if (!result.ok) failed += 1;
     if (jsonl) {
       console.log(JSON.stringify(result));
       continue;
     }
     const state = result.ok ? "PASS" : "FAIL";
-    if (!result.ok) failed += 1;
     const detail = result.errors.length ? ` ${result.errors.join("; ")}` : "";
     console.log(`${state} ${result.label}: ${result.method} ${result.path} ${result.status} ${result.ms}ms ${result.bytes}b runId=${result.runId || "none"} traceId=${result.traceId || "none"} tools=${result.toolCallCount}${detail}`);
   }
@@ -478,6 +478,20 @@ function emit(results, provider) {
     console.log(`PASS all agent checks for ${baseUrl}`);
   }
   if (jsonl && failed) process.exitCode = 1;
+}
+
+async function resetClinic(fetchImpl = fetch) {
+  if (!managerPasscode) return;
+  const url = `${baseUrl}/api/mock/clinic?role=admin&name=Scenario%20Runner&passcode=${encodeURIComponent(managerPasscode)}`;
+  try {
+    const response = await fetchImpl(url, { method: "POST", headers: { "user-agent": scenarioUserAgent } });
+    if (!jsonl) {
+      const data = await response.json().catch(() => ({}));
+      console.log(`RESET mock clinic fixtures: ${response.status} reset=${data?.reset?.resetAppointments ?? "?"} (idempotent re-run support)`);
+    }
+  } catch {
+    // best-effort reset; scenarios still run if the reset route is unavailable
+  }
 }
 
 async function runLocal(provider = "local") {
@@ -500,6 +514,7 @@ async function runLocal(provider = "local") {
     emit([result], provider);
     return;
   }
+  await resetClinic();
   const results = [];
   for (const scenario of scenarios) {
     results.push(await runOne(scenario, provider));

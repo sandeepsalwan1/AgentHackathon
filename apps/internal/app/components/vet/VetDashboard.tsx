@@ -112,8 +112,8 @@ function TaskItem({ task }: { task: TaskRow }) {
     <div className={`vetTaskRow${isEscalated ? " vetTaskRow--escalated" : ""}`}>
       <div className="vetTaskRowMain">
         {isEscalated && <BellRing size={14} className="vetEscalateIcon" />}
-        <div className="vetTaskRowPet">{task.petName ?? "—"}</div>
-        <div className="vetTaskRowClient">{task.clientName ?? "—"}</div>
+        <div className="vetTaskRowPet">{task.petName ?? "No pet"}</div>
+        <div className="vetTaskRowClient">{task.clientName ?? "No client"}</div>
       </div>
       <div className="vetTaskRowRequest">{task.request}</div>
       <div className="vetTaskRowMeta">
@@ -352,9 +352,11 @@ export function VetDashboard({ session, onLogout }: Props) {
   // ── Initial load + polling every 20 seconds ────────────────────────────────
 
   useEffect(() => {
-    fetchTasks();
-    fetchApprovals();
-    fetchReports();
+    const initialLoad = window.setTimeout(() => {
+      fetchTasks();
+      fetchApprovals();
+      fetchReports();
+    }, 0);
 
     const POLL_MS = 20_000;
     const taskInterval = window.setInterval(() => fetchTasks(), POLL_MS);
@@ -362,6 +364,7 @@ export function VetDashboard({ session, onLogout }: Props) {
     const reportInterval = window.setInterval(() => fetchReports(), POLL_MS);
 
     return () => {
+      window.clearTimeout(initialLoad);
       window.clearInterval(taskInterval);
       window.clearInterval(approvalInterval);
       window.clearInterval(reportInterval);

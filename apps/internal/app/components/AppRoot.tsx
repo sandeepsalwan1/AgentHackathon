@@ -14,6 +14,7 @@ type View =
   | { kind: "legacy" } // staff/VA with existing passcode board
   | { kind: "customer"; session: AccountSession }
   | { kind: "veterinarian"; session: AccountSession }
+  | { kind: "staff"; session: AccountSession }
   | { kind: "admin"; session: AccountSession };
 
 export function AppRoot() {
@@ -68,7 +69,7 @@ export function AppRoot() {
     return <CustomerExperience session={view.session} onLogout={handleLogout} />;
   }
 
-  if (view.kind === "veterinarian") {
+  if (view.kind === "veterinarian" || view.kind === "staff") {
     return <VetDashboard session={view.session} onLogout={handleLogout} />;
   }
 

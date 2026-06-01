@@ -208,7 +208,7 @@ export function ChatPanel({ messages, onSend, isLoading, placeholder, className 
         {messages.length === 0 && (
           <div className="chatEmpty">
             <Bot size={32} />
-            <p>Your AI assistant is ready. Ask anything about your care.</p>
+            <p>Ask about visits, refills, or records.</p>
           </div>
         )}
         {messages.map((msg) => (

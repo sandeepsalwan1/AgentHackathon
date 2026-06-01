@@ -6,16 +6,18 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  Stethoscope,
   UserPlus,
   Users,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import {
-  createVeterinarian,
-  listVeterinarians,
+  createTeamMember,
+  listTeam,
   logout,
   type Account,
   type AccountSession,
+  type TeamRole,
 } from "../../lib/accountStore";
 
 type Props = {
@@ -47,10 +49,11 @@ function CopyableOtp({ otp }: { otp: string }) {
 export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<TeamRole>("veterinarian");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdOtp, setCreatedOtp] = useState<{ name: string; otp: string } | null>(null);
-  const [vets, setVets] = useState<Account[]>(() => listVeterinarians());
+  const [team, setTeam] = useState<Account[]>(() => listTeam());
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -59,9 +62,9 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
     setError("");
     setCreatedOtp(null);
     try {
-      const { account, otp } = await createVeterinarian({ name, email });
+      const { account, otp } = await createTeamMember({ name, email, role });
       setCreatedOtp({ name: account.name, otp });
-      setVets(listVeterinarians());
+      setTeam(listTeam());
       setName("");
       setEmail("");
     } catch (err) {
@@ -108,10 +111,10 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
           <section className="adminCard">
             <div className="adminCardHeader">
               <UserPlus size={18} />
-              <h2>Add Veterinarian</h2>
+              <h2>Add team member</h2>
             </div>
             <p className="adminCardDesc">
-              Create a veterinarian account and issue a one-time password for first login.
+              Create a vet or staff account. They get a one-time password to set their own login.
             </p>
 
             {createdOtp && (
@@ -120,13 +123,31 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
                 <p>Share this one-time password securely. It expires on first use.</p>
                 <CopyableOtp otp={createdOtp.otp} />
                 <p className="adminSuccessNote">
-                  The veterinarian visits the <strong>Clinic Team</strong> tab on the login page
-                  and clicks &ldquo;Redeem your one-time password&rdquo; to activate their account.
+                  They open the <strong>Clinic Team</strong> tab on the login page and redeem this
+                  password to finish setup.
                 </p>
               </div>
             )}
 
             <form className="adminForm" onSubmit={submit}>
+              <div className="adminRoleToggle" role="group" aria-label="Account type">
+                <button
+                  type="button"
+                  className={`adminRoleBtn${role === "veterinarian" ? " adminRoleBtn--active" : ""}`}
+                  onClick={() => setRole("veterinarian")}
+                >
+                  <Stethoscope size={15} />
+                  Veterinarian
+                </button>
+                <button
+                  type="button"
+                  className={`adminRoleBtn${role === "staff" ? " adminRoleBtn--active" : ""}`}
+                  onClick={() => setRole("staff")}
+                >
+                  <Users size={15} />
+                  Staff
+                </button>
+              </div>
               <label className="authLabel">
                 Full name
                 <input
@@ -151,7 +172,7 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
               {error && <div className="authError">{error}</div>}
               <button className="authPrimaryBtn" type="submit" disabled={loading}>
                 <UserPlus size={16} />
-                {loading ? "Creating…" : "Create account & generate OTP"}
+                {loading ? "Creating…" : `Add ${role === "staff" ? "staff" : "veterinarian"}`}
               </button>
             </form>
           </section>
@@ -160,22 +181,27 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
           <section className="adminCard">
             <div className="adminCardHeader">
               <Users size={18} />
-              <h2>Veterinarians</h2>
-              <span className="adminVetCount">{vets.length}</span>
+              <h2>Clinic team</h2>
+              <span className="adminVetCount">{team.length}</span>
             </div>
 
-            {vets.length === 0 ? (
-              <p className="adminEmptyState">No veterinarian accounts yet. Create one above.</p>
+            {team.length === 0 ? (
+              <p className="adminEmptyState">No team accounts yet. Add one above.</p>
             ) : (
               <div className="adminVetList">
-                {vets.map((vet) => (
-                  <div key={vet.id} className="adminVetRow">
+                {team.map((member) => (
+                  <div key={member.id} className="adminVetRow">
                     <div className="adminVetInfo">
-                      <span className="adminVetName">{vet.name}</span>
-                      <span className="adminVetEmail">{vet.email}</span>
+                      <span className="adminVetName">
+                        {member.name}
+                        <span className="adminRoleTag">
+                          {member.role === "staff" ? "Staff" : "Veterinarian"}
+                        </span>
+                      </span>
+                      <span className="adminVetEmail">{member.email}</span>
                     </div>
                     <div className="adminVetStatus">
-                      {vet.mustResetPassword ? (
+                      {member.mustResetPassword ? (
                         <span className="adminVetPending">Pending activation</span>
                       ) : (
                         <span className="adminVetActive">Active</span>

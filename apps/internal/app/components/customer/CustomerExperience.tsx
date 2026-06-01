@@ -4,12 +4,11 @@ import {
   Calendar,
   ClipboardList,
   FileText,
-  HeartPulse,
   LogOut,
   PawPrint,
   Pill,
-  Send,
   ShieldCheck,
+  Stethoscope,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { sendCustomerMessage, type ChatHistoryItem, type CustomerContext } from "../../lib/agentClient";
@@ -33,7 +32,7 @@ const QUICK_ACTIONS = [
   { label: "Prescription refill", prompt: "I need a prescription refill for my pet", icon: Pill, color: "customerQuickBtn--purple" },
   { label: "Pet records", prompt: "I'd like to access my pet's medical records", icon: FileText, color: "customerQuickBtn--amber" },
   { label: "Pickup status", prompt: "I want to know if my pet is ready for pickup", icon: ClipboardList, color: "customerQuickBtn--teal" },
-  { label: "Health concern", prompt: "My pet is unwell and I need some advice", icon: HeartPulse, color: "customerQuickBtn--red" },
+  { label: "Health concern", prompt: "My pet is unwell and I need some advice", icon: Stethoscope, color: "customerQuickBtn--red" },
 ] as const;
 
 export function CustomerExperience({ session, onLogout }: Props) {
@@ -44,7 +43,7 @@ export function CustomerExperience({ session, onLogout }: Props) {
     {
       id: uid(),
       role: "assistant",
-      content: `Hello ${firstName}! 👋 I'm your Central Vet assistant. I can help you book appointments, request prescription refills, check in on arrival, or manage ${petName}'s records. What can I help you with today?`,
+      content: `Hi ${firstName}. I can book a visit, handle a refill, check you in, or pull up ${petName}'s records. What do you need?`,
       status: "completed",
       timestamp: new Date(),
     },

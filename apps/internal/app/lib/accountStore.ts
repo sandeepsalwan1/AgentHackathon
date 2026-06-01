@@ -3,7 +3,10 @@
 // Replace implementations with real API calls when the backend is ready.
 // SECURITY NOTE: mockHash is NOT cryptographic. Replace with bcrypt server-side.
 
-export type AuthRole = "customer" | "veterinarian" | "admin";
+export type AuthRole = "customer" | "veterinarian" | "staff" | "admin";
+
+// Roles an admin can create from the clinic team panel.
+export type TeamRole = "veterinarian" | "staff";
 
 export type Account = {
   id: string;
@@ -125,9 +128,12 @@ export async function login(email: string, password: string): Promise<Account> {
   return account;
 }
 
-export async function createVeterinarian(params: {
+// Admin creates a clinic team member (veterinarian or staff). New members get a
+// one-time password and must set their own password on first sign-in.
+export async function createTeamMember(params: {
   name: string;
   email: string;
+  role: TeamRole;
 }): Promise<{ account: Account; otp: string }> {
   const accounts = loadAccounts();
   if (accounts.some((a) => a.email === params.email.toLowerCase().trim())) {
@@ -136,7 +142,7 @@ export async function createVeterinarian(params: {
   const otp = generateOtp();
   const account: Account = {
     id: uid(),
-    role: "veterinarian",
+    role: params.role,
     name: params.name.trim(),
     email: params.email.toLowerCase().trim(),
     passwordHash: "",
@@ -202,6 +208,8 @@ export function logout(): void {
   localStorage.removeItem(SESSION_KEY);
 }
 
-export function listVeterinarians(): Account[] {
-  return loadAccounts().filter((a) => a.role === "veterinarian");
+export function listTeam(): Account[] {
+  return loadAccounts()
+    .filter((a) => a.role === "veterinarian" || a.role === "staff")
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

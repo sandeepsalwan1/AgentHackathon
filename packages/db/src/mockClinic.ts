@@ -674,6 +674,20 @@ export async function findArrivalAppointment(input: {
   return row ? normalizeAppointment(row) : null;
 }
 
+export async function resetMockClinicState() {
+  const sql = getSql();
+  const rows = await sql<{ id: string }[]>`
+    update mock_appointments
+    set status = 'scheduled',
+      room_status = 'waiting',
+      arrived_at = null,
+      updated_at = now()
+    where status = 'arrived' or arrived_at is not null
+    returning id
+  `;
+  return { resetAppointments: rows.length };
+}
+
 export async function markAppointmentArrived(id: string) {
   const sql = getSql();
   const rows = await sql<AppointmentRow[]>`

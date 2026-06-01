@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, Calendar, Clock, FileText, Search, ShieldAlert } from "lucide-react";
+import { AlertTriangle, BellRing, Calendar, Clock, Search } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

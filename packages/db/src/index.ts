@@ -57,7 +57,8 @@ export {
   listPricingObservations,
   listReviewInvoices,
   listServiceCatalog,
-  markAppointmentArrived
+  markAppointmentArrived,
+  resetMockClinicState
 } from "./mockClinic";
 export type {
   MockAppointment,

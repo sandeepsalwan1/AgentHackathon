@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, Heart, LogIn, UserPlus } from "lucide-react";
+import { Eye, EyeOff, LogIn, PawPrint, ShieldCheck, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import {
   getDemoAdminCredentials,
@@ -97,7 +97,7 @@ function CustomerLogin({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitch
       {error && <div className="authError">{error}</div>}
       <button className="authPrimaryBtn" type="submit" disabled={loading}>
         <LogIn size={16} />
-        {loading ? "Signing in…" : "Sign in"}
+        {loading ? "Signing in..." : "Sign in"}
       </button>
       <p className="authSwitch">
         Don&apos;t have an account?{" "}
@@ -187,7 +187,7 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
           type="text"
           value={petName}
           onChange={(e) => setPetName(e.target.value)}
-          placeholder="Buddy, Luna, Max…"
+          placeholder="Buddy, Luna, Max"
           required
         />
       </label>
@@ -198,7 +198,7 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
       {error && <div className="authError">{error}</div>}
       <button className="authPrimaryBtn" type="submit" disabled={loading}>
         <UserPlus size={16} />
-        {loading ? "Creating account…" : "Create account"}
+        {loading ? "Creating account..." : "Create account"}
       </button>
       <p className="authSwitch">
         Already have an account?{" "}
@@ -285,7 +285,7 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
         </label>
         {error && <div className="authError">{error}</div>}
         <button className="authPrimaryBtn" type="submit" disabled={loading}>
-          {loading ? "Activating…" : "Activate account"}
+          {loading ? "Activating..." : "Activate account"}
         </button>
         <p className="authSwitch">
           <button type="button" onClick={() => { setView("login"); setError(""); }}>
@@ -322,7 +322,7 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
       {error && <div className="authError">{error}</div>}
       <button className="authPrimaryBtn" type="submit" disabled={loading}>
         <LogIn size={16} />
-        {loading ? "Signing in…" : "Sign in"}
+        {loading ? "Signing in..." : "Sign in"}
       </button>
       <p className="authSwitch">
         First time?{" "}
@@ -347,30 +347,41 @@ export function AuthScreen({ onAuth, onLegacyStaff }: Props) {
       {/* Left brand panel */}
       <div className="authBrandPanel">
         <div className="authBrandContent">
-          <div className="authBrandLogo">
-            <Heart size={32} strokeWidth={2.5} />
+          <div className="authBrandHeader">
+            <div className="authBrandLogo">
+              <PawPrint size={24} strokeWidth={2.5} />
+            </div>
+            <div className="authBrandWordmark">
+              <span className="authBrandWordmarkName">Central Veterinary</span>
+              <span className="authBrandWordmarkSub">Hospital</span>
+            </div>
           </div>
-          <p className="authBrandEyebrow">Central Veterinary Hospital</p>
           <h1 className="authBrandTitle">
             Care that<br />goes further
           </h1>
           <p className="authBrandTagline">
-            Appointments, check-ins, records, and real-time updates — all in one place for you and your pet.
+            Book visits, check in, and view records, all in one simple place for you and your pet.
           </p>
           <div className="authBrandFeatures">
             <div className="authBrandFeature">
               <span className="authBrandFeatureDot" />
-              Instant appointment booking
+              Book appointments anytime
             </div>
             <div className="authBrandFeature">
               <span className="authBrandFeatureDot" />
-              AI-assisted care navigation
+              Simple care guidance
             </div>
             <div className="authBrandFeature">
               <span className="authBrandFeatureDot" />
-              Secure records management
+              Secure pet records
             </div>
           </div>
+        </div>
+        <div className="authBrandFooter">
+          <span className="authBrandFooterMark">
+            <ShieldCheck size={14} strokeWidth={2.2} />
+          </span>
+          Private and secure. Your information stays protected.
         </div>
       </div>
 
@@ -404,6 +415,7 @@ export function AuthScreen({ onAuth, onLegacyStaff }: Props) {
             <StaffPortal onAuth={onAuth} onLegacyStaff={onLegacyStaff} />
           )}
         </div>
+        <p className="authFormFooter">Secure sign-in for Central Veterinary Hospital</p>
       </div>
     </div>
   );
