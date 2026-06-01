@@ -24,6 +24,8 @@ type Props = {
   session: AccountSession;
   onLogout: () => void;
   onOpenLegacyBoard: () => void;
+  // When embedded inside the admin dashboard tab, skip the standalone header/shell.
+  embedded?: boolean;
 };
 
 function CopyableOtp({ otp }: { otp: string }) {
@@ -46,7 +48,7 @@ function CopyableOtp({ otp }: { otp: string }) {
   );
 }
 
-export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) {
+export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard, embedded = false }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<TeamRole>("veterinarian");
@@ -80,30 +82,32 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard }: Props) 
   }
 
   return (
-    <div className="adminShell">
-      <header className="adminHeader">
-        <div className="adminHeaderLeft">
-          <ShieldCheck size={22} strokeWidth={1.8} />
-          <div>
-            <p className="adminHeaderEyebrow">Central Veterinary Hospital</p>
-            <h1 className="adminHeaderTitle">Admin Portal</h1>
+    <div className={embedded ? "adminShell adminShell--embedded" : "adminShell"}>
+      {!embedded && (
+        <header className="adminHeader">
+          <div className="adminHeaderLeft">
+            <ShieldCheck size={22} strokeWidth={1.8} />
+            <div>
+              <p className="adminHeaderEyebrow">Central Veterinary Hospital</p>
+              <h1 className="adminHeaderTitle">Admin Portal</h1>
+            </div>
           </div>
-        </div>
-        <div className="adminHeaderRight">
-          <span className="adminHeaderUser">{session.name}</span>
-          <button
-            className="plainButton adminBoardBtn"
-            onClick={onOpenLegacyBoard}
-            title="Open clinic task board"
-          >
-            <LayoutDashboard size={16} />
-            Task Board
-          </button>
-          <button className="iconButton" onClick={handleLogout} title="Sign out">
-            <LogOut size={16} />
-          </button>
-        </div>
-      </header>
+          <div className="adminHeaderRight">
+            <span className="adminHeaderUser">{session.name}</span>
+            <button
+              className="plainButton adminBoardBtn"
+              onClick={onOpenLegacyBoard}
+              title="Open clinic task board"
+            >
+              <LayoutDashboard size={16} />
+              Task Board
+            </button>
+            <button className="iconButton" onClick={handleLogout} title="Sign out">
+              <LogOut size={16} />
+            </button>
+          </div>
+        </header>
+      )}
 
       <main className="adminMain">
         <div className="adminGrid">

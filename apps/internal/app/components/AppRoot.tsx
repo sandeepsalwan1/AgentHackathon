@@ -2,28 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { getSession, logout, type AccountSession } from "../lib/accountStore";
-import { CreateVetPanel } from "./admin/CreateVetPanel";
+import { AdminDashboard } from "./admin/AdminDashboard";
 import { AuthScreen } from "./auth/AuthScreen";
 import { CustomerExperience } from "./customer/CustomerExperience";
 import { TaskBoard } from "./TaskBoard";
-import { VetDashboard } from "./vet/VetDashboard";
 
-// One app, three surfaces:
+// One app, clear surfaces:
 // - pet owners get the chat portal
-// - staff and vets share the clinic task board (the real work queue)
-// - admins get the team panel, with a button into the same board
+// - staff, VAs, and vets share the clinic task board (the simple, proven work queue)
+// - admins get the tabbed dashboard: tasks, AI assistant, and team accounts
 type View =
   | { kind: "loading" }
   | { kind: "auth" }
-  | { kind: "board" } // staff / VA on the shared task board
-  | { kind: "veterinarian"; session: AccountSession }
+  | { kind: "board" } // staff / VA / veterinarian on the shared task board
   | { kind: "customer"; session: AccountSession }
   | { kind: "admin"; session: AccountSession };
 
 function viewForSession(session: AccountSession): View {
   if (session.role === "customer") return { kind: "customer", session };
   if (session.role === "admin") return { kind: "admin", session };
-  if (session.role === "veterinarian") return { kind: "veterinarian", session };
+  // staff, VA, and veterinarian all work from the shared task board
   return { kind: "board" };
 }
 
@@ -71,20 +69,16 @@ export function AppRoot() {
     return <TaskBoard />;
   }
 
-  if (view.kind === "veterinarian") {
-    return <VetDashboard session={view.session} onLogout={handleLogout} />;
-  }
-
   if (view.kind === "customer") {
     return <CustomerExperience session={view.session} onLogout={handleLogout} />;
   }
 
   if (view.kind === "admin") {
     return (
-      <CreateVetPanel
+      <AdminDashboard
         session={view.session}
         onLogout={handleLogout}
-        onOpenLegacyBoard={handleOpenBoard}
+        onOpenBoard={handleOpenBoard}
       />
     );
   }

@@ -256,6 +256,46 @@ button {
   white-space: nowrap;
 }
 
+.agentEmailResults {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.agentEmailResults div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  border: 1px solid #9dcfad;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 8px 10px;
+}
+
+.agentEmailResults span {
+  min-width: 0;
+  overflow: hidden;
+  color: #102d1f;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentEmailResults strong {
+  color: #0d5f35;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.agentEmailResults em {
+  grid-column: 1 / -1;
+  color: var(--red);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .publicNav {
   width: min(780px, 100%);
   min-width: 0;
@@ -4857,4 +4897,48 @@ textarea:focus {
   font-size: 11px;
   font-weight: 600;
   vertical-align: middle;
+}
+
+/* Admin dashboard tab strip */
+.adminDashTabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 24px 0;
+  background: var(--surface, #fff);
+}
+.adminDashTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.adminDashTab:hover {
+  color: #0f172a;
+}
+.adminDashTab--active {
+  color: #0f172a;
+  border-bottom-color: #2563eb;
+}
+.adminDashTabBadge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.adminShell--embedded {
+  min-height: 0;
+  background: transparent;
+}
+.adminAssistantWrap {
+  height: calc(100vh - 132px);
+  padding: 16px 24px 24px;
 }
