@@ -61,3 +61,7 @@ Smoke checks:
 - Internal dashboard API saw the task, moved it to `due`, then `completed`.
 - Activity log returned events.
 - Resend smoke email in `test` mode returned `sent`.
+
+Known lint state:
+
+- 2026-06-01: `npm run lint` still fails in `apps/internal/app/components/vet/VetDashboard.tsx` on React `set-state-in-effect`; this is pre-existing UI code and out of scope for the backend/agent sprint. Existing unused-icon warnings remain in UI components.

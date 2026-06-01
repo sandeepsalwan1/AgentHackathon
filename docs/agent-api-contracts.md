@@ -17,7 +17,10 @@ Agent workflow routes return:
 - `approval`: approval created when relevant
 - `report`: report created when relevant
 - `workflowEvents`: timeline events
+- `toolCalls`: redacted tool-call traces
 - `runId`: persisted agent run id
+- `traceId`: trace id also returned as `x-vetagent-trace-id`
+- `durationMs`: server-side workflow duration
 
 ## Public routes
 
@@ -29,7 +32,7 @@ Agent workflow routes return:
 - `POST /api/agent/call`: transcript to task/approval.
 - `POST /api/agent/external`: generic external-agent router.
 - `POST /api/requests`: legacy public request form; creates a task.
-- `GET /api/mock/clinic`: mock clients, pets, appointments, slots, followups, invoices, messages, calls, services, pricing observations.
+- `GET /api/mock/clinic`: mock clients, pets, appointments, slots, followups, invoices, messages, calls, services, pricing observations, and Antech-shaped mock lab data.
 
 Example public payload:
 
@@ -61,7 +64,7 @@ Internal routes require the existing actor payload and passcode rules:
 - `POST /api/agent/daily-ops`: daily ops digest.
 - `POST /api/agent/pricing`: pricing report/task; uses Apify only when configured and requested with `live: true`.
 - `POST /api/agent/invoice`: invoice review report/task.
-- `GET /api/agent/runs/[id]`: run and timeline.
+- `GET /api/agent/runs/[id]`: run, workflow events, tool calls, approvals, reports, and linked task/report/approval ids.
 - `GET /api/approvals?role=admin&name=...`: pending approvals.
 - `PATCH /api/approvals/[id]`: approve/reject.
 - `GET /api/reports/pricing`: pricing reports.
@@ -71,14 +74,17 @@ Internal routes require the existing actor payload and passcode rules:
 ## Safety behavior
 
 - Sick-pet messages create urgent tasks; no diagnosis.
-- Records transfer creates approval; no silent send.
+- Records transfer creates local `local_records_policy` audit plus approval; no silent send.
 - Invoice review creates report/task; no invoice mutation.
 - Pricing review creates report/task; no repricing.
 - Google ADK/E2B/Apify are optional live tools. Deterministic mock behavior keeps demo routes working without live tools. Google ADK TypeScript is the target live agent runtime behind `AGENT_RUNTIME=google-adk`; use `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini, or Vertex env for Google Cloud. The app reads `APIFY_API_TOKEN`; the Apify CLI skill reads `APIFY_TOKEN`.
+- Internal lab review uses mock `antech_mock` catalog/orders/results, creates staff review tasks for final/abnormal results, and never discloses medical advice automatically.
 
 ## Scenario Proof
 
 - `npm run smoke:local`: fast local health and speed proof for demo routes.
-- `npm run scenarios:local`: Person 3 scenario harness against local routes.
+- `npm run scenarios:local`: semantic scenario harness against local routes.
+- `npm run verify:agents`: fallback-safe proof appender; expects a reachable app.
+- `npm run verify:agents:google`: requires Google credentials and an app started with `AGENT_RUNTIME=google-adk`.
 - `npm run smoke:e2b`: E2B credential/sandbox smoke.
 - `npm run scenarios:e2b`: E2B scenario harness for public `SCENARIO_BASE_URL`; localhost falls back to local after E2B readiness.

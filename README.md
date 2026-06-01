@@ -16,7 +16,9 @@ Local commands:
 - `npm run db:migrate`
 - `npm run dev`
 - `npm run smoke:local` while the dev server is running to verify local pages, core agent routes, and response-time budgets.
-- `npm run scenarios:local` while the dev server is running to exercise the Person 3 scenario set against local routes.
+- `npm run scenarios:local` while the dev server is running to exercise semantic agent scenarios against local routes.
+- `npm run verify:agents` while a local server is running to append fallback-safe proof to `docs/proof/mainCompleteAllAgents-proof.md`.
+- `npm run verify:agents:google` while a server started with `AGENT_RUNTIME=google-adk` is running to require live Google ADK credentials and proof.
 - `npm run smoke:e2b` to verify the configured E2B key can start a sandbox.
 - `npm run scenarios:e2b` to run the scenario harness through E2B when `SCENARIO_BASE_URL` is a public URL; localhost falls back to local scenarios after an E2B readiness check.
 
@@ -26,6 +28,8 @@ Agent runtime:
 - Target live runtime: Google Agent Development Kit for TypeScript (`AGENT_RUNTIME=google-adk`).
 - Open-source ADK package: `@google/adk` in the agents workspace, from `google/adk-js` under Apache-2.0. Provenance lives in `opensrc/google-adk/`.
 - Google ADK env: `GEMINI_API_KEY` or `GOOGLE_API_KEY`; for Vertex, also configure `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`.
+- Missing Google credentials with `AGENT_RUNTIME=google-adk` falls back to the shared registry and records a `runtime_fallback` event.
+- Agent responses include `runId`, `traceId`, `durationMs`, `workflowEvents`, and redacted `toolCalls`; `GET /api/agent/runs/[id]` returns persisted run detail and linked effects.
 - E2B is for sandboxed proof/evals, not the normal check-in/booking request path.
 
 Render + Supabase:

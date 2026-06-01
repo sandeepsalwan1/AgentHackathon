@@ -20,7 +20,7 @@ Supabase setup:
 - Render-compatible pooler host: `aws-1-us-east-1.pooler.supabase.com`.
 - Pooler username: `postgres.xydoircvankwomaqaxcw`.
 - The repo disables prepared statements for Supabase transaction-pooler compatibility.
-- Migrations `001` through `015` are applied.
+- Migrations `001` through `021` are expected; `021_agent_observability.sql` adds run trace/tool-call observability and mock lab tables.
 
 Render setup:
 
@@ -42,6 +42,7 @@ Required Render env:
 - Tool/proof env: `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
 - Internal auth/env: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
 - Cron only: `INTERNAL_BASE_URL`, `CRON_SECRET`.
+- No external records-transfer audit env is required; records transfer uses local approval/audit only.
 
 Smoke:
 
@@ -49,10 +50,10 @@ Smoke:
 2. Run `npm run db:migrate`.
 3. Run `npm run typecheck`.
 4. Run `npm run build`.
-5. Deploy Render service from `render.yaml`.
-6. Open `/arrival` on `vetagent-internal` and check in a mock appointment.
-7. Submit a public request on `/request`.
-8. Confirm both appear in `/staff`.
+5. Start local or deployed app with `AGENT_RUNTIME=google-adk` when proving live ADK; use `AGENT_RUNTIME=mock` for fallback/demo proof.
+6. Run `LOCAL_BASE_URL=http://localhost:3000 npm run verify:agents` for fallback-safe proof.
+7. Run `LOCAL_BASE_URL=http://localhost:3000 npm run verify:agents:google` when Google credentials exist.
+8. For deployed proof: `SCENARIO_BASE_URL=https://vetagent-internal.onrender.com npm run scenarios:e2b`.
 9. Hit `/api/notifications/overdue` with `Authorization: Bearer $CRON_SECRET`.
 
 Opsera:
