@@ -567,7 +567,7 @@ export function VetDashboard({ session, onLogout }: Props) {
           onClick={() => { setActiveTab("queue"); setSelectedOwner(null); }}
           type="button"
         >
-          Today&apos;s Queue
+          Dashboard
         </button>
         <button
           className={`vetTab${activeTab === "clients" ? " vetTab--active" : ""}`}
@@ -622,7 +622,7 @@ export function VetDashboard({ session, onLogout }: Props) {
             >
               <h2>
                 <ClipboardList size={18} />
-                Today&apos;s Queue
+                Dashboard
                 {newTaskCount > 0 && (
                   <span className="vetNewTaskBadge">+{newTaskCount} new</span>
                 )}
