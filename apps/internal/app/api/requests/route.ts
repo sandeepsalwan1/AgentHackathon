@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createTask, getSql, MissingDatabaseUrlError } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { appendOpseraNote, auditRecordsTransfer, buildRecordsTransferPacket } from "../_opsera";
 import { logError, logInfo, logWarn } from "../_shared";
 
 const hits = new Map<string, number[]>();
@@ -167,6 +168,12 @@ function validateFields(value: z.infer<typeof requestSchema>) {
   return errors;
 }
 
+function priorityForOpsera(auditStatus: "approved" | "flagged" | "blocked" | undefined) {
+  if (auditStatus === "blocked") return "high";
+  if (auditStatus === "flagged") return "medium";
+  return "low";
+}
+
 export async function POST(request: Request) {
   const clientHash = hashValue(clientKey(request));
   let requestHash = hashValue("empty");
@@ -205,22 +212,46 @@ export async function POST(request: Request) {
       await recordGuard(clientHash, requestHash, "validation_failed");
       return NextResponse.json({ error: "Please fix the highlighted fields.", fieldErrors }, { status: 400 });
     }
+    const opseraDecision =
+      parsed.data.requestType === "records_request"
+        ? await auditRecordsTransfer(
+            buildRecordsTransferPacket({
+              clientId: parsed.data.clarityId,
+              clientName: parsed.data.clientName,
+              clientPhone: parsed.data.clientPhone,
+              clientDateOfBirth: parsed.data.clientDateOfBirth,
+              petName: parsed.data.petName,
+              petWeight: parsed.data.petWeight,
+              lastVisit: parsed.data.lastVisit,
+              request: parsed.data.request,
+              requestedBy: parsed.data.clientName,
+              metadata: {
+                source: "client_form"
+              }
+            })
+          )
+        : null;
     const task = await createTask(
       {
         ...parsed.data,
         hospitalName: process.env.HOSPITAL_NAME || "Central Veterinary Hospital",
         source: "client_form",
         status: "pending_review",
-        priority: "low",
+        priority: priorityForOpsera(opseraDecision?.status),
         requestType: parsed.data.requestType,
         dueDate: new Date().toISOString().slice(0, 10),
-        dueTime: "19:00"
+        dueTime: "19:00",
+        notes: appendOpseraNote(null, opseraDecision)
       },
       { name: parsed.data.clientName, role: "staff" }
     );
     await recordGuard(clientHash, requestHash, "accepted");
-    logInfo("client_request_accepted", { ...logIds(), taskId: task.id });
-    return NextResponse.json({ ok: true, id: task.id }, { status: 201 });
+    logInfo("client_request_accepted", {
+      ...logIds(),
+      taskId: task.id,
+      opseraStatus: opseraDecision?.status
+    });
+    return NextResponse.json({ ok: true, id: task.id, opsera: opseraDecision }, { status: 201 });
   } catch (error) {
     if (error instanceof MissingDatabaseUrlError) {
       return NextResponse.json(

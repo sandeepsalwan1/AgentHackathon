@@ -11,6 +11,7 @@ import {
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { appendOpseraNote, auditRecordsTransfer, buildRecordsTransferPacket } from "../_opsera";
 import { createStatusForActor, sourceForActor } from "../../lib/taskWorkflow";
 import {
   authenticateActor,
@@ -84,6 +85,15 @@ function localDateString(
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function priorityForOpsera(
+  auditStatus: "approved" | "flagged" | "blocked" | undefined,
+  requestedPriority: "low" | "medium" | "high"
+) {
+  if (auditStatus === "blocked") return "high";
+  if (auditStatus === "flagged" && requestedPriority === "low") return "medium";
+  return requestedPriority;
 }
 
 async function internalCreateGuard(args: {
@@ -202,12 +212,35 @@ export async function POST(request: Request) {
       requestedStatus: taskResult.data.status,
       assignedTo
     });
+    const opseraDecision =
+      taskResult.data.requestType === "records_request"
+        ? await auditRecordsTransfer(
+            buildRecordsTransferPacket({
+              clientId: taskResult.data.clarityId,
+              clientName: taskResult.data.clientName,
+              clientPhone: taskResult.data.clientPhone,
+              clientDateOfBirth: taskResult.data.clientDateOfBirth,
+              petName: taskResult.data.petName,
+              petWeight: taskResult.data.petWeight,
+              lastVisit: taskResult.data.lastVisit,
+              request: taskResult.data.request,
+              requestedBy: actor.name,
+              metadata: {
+                source,
+                actorRole: actor.role,
+                requestedStatus: status
+              }
+            })
+          )
+        : null;
 
     const input: CreateTaskInput = {
       ...taskResult.data,
       assignedTo,
       source,
-      status
+      status: opseraDecision?.status === "blocked" ? "pending_review" : status,
+      priority: priorityForOpsera(opseraDecision?.status, taskResult.data.priority),
+      notes: appendOpseraNote(taskResult.data.notes, opseraDecision)
     };
 
     const guardError = await internalCreateGuard({
@@ -229,9 +262,13 @@ export async function POST(request: Request) {
       actorRole: actor.role,
       source: task.source,
       status: task.status,
-      priority: task.priority
+      priority: task.priority,
+      opseraStatus: opseraDecision?.status
     });
-    return NextResponse.json({ task: sanitizeTaskForActor(task, actor.role) }, { status: 201 });
+    return NextResponse.json(
+      { task: sanitizeTaskForActor(task, actor.role), opsera: opseraDecision },
+      { status: 201 }
+    );
   } catch (error) {
     return dbError(error, { route: "tasks.create" });
   }
