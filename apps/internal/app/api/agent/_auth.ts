@@ -88,7 +88,7 @@ function publicAgentValidationError(body: Record<string, unknown>) {
   if (clientName.length < 2) return "Enter your name.";
   if (phoneDigits(body).length < 7) return "Enter a real phone number.";
   if (petName.length < 2) return "Enter your pet's name.";
-  if (requestText.length < 8) return "Describe the request.";
+  if (requestText.trim().length < 1) return "Describe the request.";
   return null;
 }
 

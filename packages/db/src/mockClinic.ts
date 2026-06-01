@@ -503,9 +503,10 @@ export async function findArrivalAppointment(input: {
     from mock_appointments appointment
     join mock_clients client on client.id = appointment.client_id
     join mock_pets pet on pet.id = appointment.pet_id
-    where appointment.appointment_date = current_date
+    where appointment.appointment_date >= current_date
     order by
       case when appointment.status = 'arrived' then 1 else 0 end,
+      appointment.appointment_date asc,
       appointment.appointment_time asc
   `;
 

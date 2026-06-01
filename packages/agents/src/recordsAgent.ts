@@ -27,6 +27,27 @@ export async function runRecordsAgent(input: AgentInput | unknown, options: RunA
     petName: normalized.petName ?? null,
     destination: normalized.destination ?? null
   }, runtime);
+  const isInternal = normalized.actor?.role && ["staff", "va", "task_adder", "veterinarian", "admin"].includes(normalized.actor.role);
+  const allowed = guardrail.allowed || isInternal;
+
+  if (allowed) {
+    if (packet && typeof packet === "object" && "packet" in packet) {
+      (packet as any).packet.requiresApproval = false;
+    }
+    return buildResult({
+      intent,
+      mode,
+      message: `Here are the medical records for ${normalized.petName || "your pet"}. Access has been granted automatically.`,
+      result: {
+        requiresApproval: false,
+        allowedAutomatically: true,
+        packet
+      },
+      runtime,
+      options
+    });
+  }
+
   const approvalResult = await executeTool("request_records_transfer", {
     clientName: normalized.clientName ?? normalized.callerName ?? null,
     petName: normalized.petName ?? null,

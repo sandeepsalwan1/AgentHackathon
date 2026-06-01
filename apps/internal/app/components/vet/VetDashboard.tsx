@@ -67,6 +67,7 @@ type Approval = {
   title: string;
   summary: string;
   createdAt: string;
+  requestedAction?: Record<string, any>;
 };
 
 function uid() {
@@ -673,7 +674,50 @@ export function VetDashboard({ session, onLogout }: Props) {
                           })}
                         </span>
                       </div>
-                      <div className="vetTaskRowRequest">{a.summary}</div>
+                      <div className="vetTaskRowRequest">
+                        <div>{a.summary}</div>
+                        {a.requestedAction && typeof a.requestedAction === "object" && (
+                          <div
+                            className="vetApprovalMetadata"
+                            style={{
+                              marginTop: "8px",
+                              padding: "6px 8px",
+                              borderRadius: "4px",
+                              backgroundColor: "var(--surface-hover)",
+                              fontSize: "12px",
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "12px",
+                              borderLeft: "2px solid var(--blue)"
+                            }}
+                          >
+                            {((a.requestedAction as any).petName || (a.requestedAction as any).pet_name) && (
+                              <div>
+                                <span style={{ color: "var(--muted)" }}>Pet:</span>{" "}
+                                <strong style={{ color: "var(--text)" }}>
+                                  {String((a.requestedAction as any).petName || (a.requestedAction as any).pet_name)}
+                                </strong>
+                              </div>
+                            )}
+                            {((a.requestedAction as any).clientName || (a.requestedAction as any).client_name) && (
+                              <div>
+                                <span style={{ color: "var(--muted)" }}>Owner:</span>{" "}
+                                <strong style={{ color: "var(--text)" }}>
+                                  {String((a.requestedAction as any).clientName || (a.requestedAction as any).client_name)}
+                                </strong>
+                              </div>
+                            )}
+                            {(a.requestedAction as any).destination && (
+                              <div>
+                                <span style={{ color: "var(--muted)" }}>Destination:</span>{" "}
+                                <strong style={{ color: "var(--text)" }}>
+                                  {String((a.requestedAction as any).destination)}
+                                </strong>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <div className="vetApprovalActions">
                         <button
                           className="vetApproveBtn"

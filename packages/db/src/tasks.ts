@@ -140,6 +140,18 @@ const eventColumns = `
   created_at
 `;
 
+function formatDateText(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function formatDateOnlyText(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
 function normalizeTask(row: TaskRow): Task {
   return {
     id: row.id,
@@ -149,33 +161,33 @@ function normalizeTask(row: TaskRow): Task {
     clientName: row.client_name,
     clarityId: row.clarity_id,
     clientPhone: row.client_phone,
-    clientDateOfBirth: row.client_date_of_birth,
+    clientDateOfBirth: row.client_date_of_birth ? formatDateOnlyText(row.client_date_of_birth) : null,
     petName: row.pet_name,
     petWeight: row.pet_weight,
-    lastVisit: row.last_visit,
+    lastVisit: row.last_visit ? formatDateOnlyText(row.last_visit) : null,
     request: row.request,
     requestType: row.request_type,
     notes: row.notes,
     assignedTo: row.assigned_to,
     assignedByRole: row.assigned_by_role,
     priority: row.priority,
-    dueDate: row.due_date,
+    dueDate: formatDateOnlyText(row.due_date)!,
     dueTime: row.due_time,
     createdByName: row.created_by_name,
     createdByRole: row.created_by_role,
     updatedByName: row.updated_by_name,
     completedByName: row.completed_by_name,
     completedByRole: row.completed_by_role,
-    completedAt: row.completed_at,
+    completedAt: row.completed_at ? formatDateText(row.completed_at) : null,
     invalidReason: row.invalid_reason,
-    archivedAt: row.archived_at,
+    archivedAt: row.archived_at ? formatDateText(row.archived_at) : null,
     archivedByName: row.archived_by_name,
     archivedByRole: row.archived_by_role,
-    escalatedAt: row.escalated_at,
+    escalatedAt: row.escalated_at ? formatDateText(row.escalated_at) : null,
     escalatedByName: row.escalated_by_name,
     escalatedByRole: row.escalated_by_role,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    createdAt: formatDateText(row.created_at)!,
+    updatedAt: formatDateText(row.updated_at)!
   };
 }
 
@@ -252,7 +264,10 @@ function toInsert(input: CreateTaskInput, actor: Actor) {
     due_time: timeOrDefault(input.dueTime),
     created_by_name: actor.name,
     created_by_role: actor.role,
-    updated_by_name: actor.name
+    updated_by_name: actor.name,
+    completed_by_name: input.status === "completed" ? actor.name : null,
+    completed_by_role: input.status === "completed" ? actor.role : null,
+    completed_at: input.status === "completed" ? new Date().toISOString() : null
   };
 }
 

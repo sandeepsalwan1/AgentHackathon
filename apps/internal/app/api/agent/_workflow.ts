@@ -18,6 +18,8 @@ import {
   markAppointmentArrived,
   findArrivalAppointment,
   updateAgentRun,
+  transitionTask,
+  getSql,
   type Actor,
   type AgentReport,
   type Approval,
@@ -92,6 +94,28 @@ function classifyIntent(input: WorkflowInput) {
   return "unknown";
 }
 
+async function detectRecordsIntent(input: WorkflowInput, intent: string): Promise<string> {
+  if (intent === "unknown" || intent === "call" || intent === "daily_ops") {
+    const text = textFromInput(input).toLowerCase();
+    if (/(arriv|outside|check.?in|waiting|here for|book|schedule|appointment|reschedule|pickup|pick up|ready|medication|food|order|sick|breathing|cough|vomit|diarrhea|emergency|hurt|pain|help|follow.?up|vaccine|recheck|refill|due|invoice|bill|charge|payment|refund|price|pricing|competitor|market|underpriced)/i.test(text)) {
+      return intent;
+    }
+
+    const petName = stringValue(input, "petName");
+    if (petName && text.includes(petName.toLowerCase())) {
+      return "records";
+    }
+
+    const clinic = await listMockClinic();
+    const words = text.split(/\s+/).map(w => w.replace(/[^a-zA-Z]/g, "").toLowerCase());
+    const matchedPet = clinic.pets.find((p) => words.includes(p.name.toLowerCase()));
+    if (matchedPet) {
+      return "records";
+    }
+  }
+  return intent;
+}
+
 async function finishRun(
   runId: string,
   output: Omit<WorkflowResult, "runId" | "workflowEvents">
@@ -116,7 +140,7 @@ async function createWorkflowTask(input: {
   request: string;
   requestType?: "prescription" | "labs_xrays" | "records_request" | "scheduling" | "patient_update";
   priority?: "low" | "medium" | "high";
-  status?: "pending_review" | "due" | "pending";
+  status?: "pending_review" | "due" | "pending" | "completed";
   notes?: string | null;
 }) {
   return createTask(
@@ -372,12 +396,133 @@ export async function runFollowup(input: WorkflowInput): Promise<WorkflowResult>
   });
 }
 
-export async function runRecords(input: WorkflowInput): Promise<WorkflowResult> {
-  const run = await startRun("external", "records", input);
+export async function runRecords(input: WorkflowInput, agentType: "internal" | "external" = "external"): Promise<WorkflowResult> {
+  const run = await startRun(agentType, "records", input);
+  const text = textFromInput(input).toLowerCase();
+  const destination = stringValue(input, "destination");
+  const isTransfer = Boolean(destination) || /(transfer|send|forward|email|mail|another hospital|other clinic|clinic)/i.test(text);
+
+  const petName = stringValue(input, "petName") || null;
+  const clientName = stringValue(input, "clientName") || stringValue(input, "name") || null;
+  const clientPhone = stringValue(input, "clientPhone") || stringValue(input, "phone") || null;
+
+  const clinic = await listMockClinic();
+  const phoneDigits = (clientPhone || "").replace(/[^0-9]/g, "");
+
+  // Find client
+  const client = clinic.clients.find((c) => {
+    const nameOk = clientName ? c.fullName.toLowerCase().includes(clientName.toLowerCase()) : false;
+    const phoneOk = phoneDigits ? c.phone.replace(/[^0-9]/g, "").endsWith(phoneDigits.slice(-7)) : false;
+    return nameOk || phoneOk;
+  }) ?? null;
+
+  // Find pet
+  let pet = null;
+  let targetPetName = petName;
+  if (!targetPetName) {
+    const words = text.split(/\s+/).map(w => w.replace(/[^a-zA-Z]/g, "").toLowerCase());
+    const matchedPet = clinic.pets.find((p) => words.includes(p.name.toLowerCase()));
+    if (matchedPet) {
+      pet = matchedPet;
+      targetPetName = pet.name;
+    }
+  } else {
+    pet = clinic.pets.find((p) => {
+      const nameOk = p.name.toLowerCase() === targetPetName!.toLowerCase();
+      const clientOk = client ? p.clientId === client.id : true;
+      return nameOk && clientOk;
+    }) ?? clinic.pets.find((p) => p.name.toLowerCase() === targetPetName!.toLowerCase()) ?? null;
+  }
+
+  if (!pet && targetPetName && agentType === "external") {
+    pet = {
+      id: "mock-pet-dynamic",
+      clientId: "mock-client-dynamic",
+      name: targetPetName,
+      species: "Dog",
+      breed: "Mixed Breed",
+      ageYears: 2,
+      weight: "35 lb",
+      alerts: null
+    };
+  }
+
+  if (agentType === "internal" || !isTransfer) {
+    const task = await createWorkflowTask({
+      clientName: clientName || (client ? client.fullName : null),
+      clientPhone,
+      petName: targetPetName,
+      request: `Records access request: ${textFromInput(input) || "Retrieve medical records."}`,
+      requestType: "records_request",
+      priority: "low",
+      status: "completed",
+      notes: `Records accessed automatically by ${agentType === "internal" ? "staff member" : "pet owner"}.`
+    });
+
+    await createWorkflowEvent({
+      runId: run.id,
+      workflowType: "records",
+      eventType: "records_accessed",
+      title: "Records accessed automatically",
+      detail: `Access granted for ${targetPetName || "pet"} records.`,
+      metadata: { taskId: task.id }
+    });
+
+    let recordMessage = "";
+    if (pet) {
+      recordMessage = `Here are the medical records for **${pet.name}**:\n\n`;
+      recordMessage += `### Pet Profile\n`;
+      recordMessage += `- **Species:** ${pet.species}\n`;
+      recordMessage += `- **Breed:** ${pet.breed || "N/A"}\n`;
+      recordMessage += `- **Age:** ${pet.ageYears || "Unknown"} years old\n`;
+      recordMessage += `- **Weight:** ${pet.weight || "Unknown"}\n`;
+      if (pet.alerts) {
+        recordMessage += `- **Alerts:** ⚠️ ${pet.alerts}\n`;
+      }
+
+      const appointments = clinic.appointments.filter((a) => a.petId === pet.id);
+      if (appointments.length > 0) {
+        recordMessage += `\n### Recent Medical Visits\n`;
+        appointments.forEach((a) => {
+          const dateText = typeof a.appointmentDate === "string" ? a.appointmentDate.slice(0, 10) : String(a.appointmentDate);
+          recordMessage += `- **${dateText}**: ${a.appointmentType} with Dr. ${a.doctor}${a.notes ? ` (Notes: *${a.notes}*)` : ""}\n`;
+        });
+      }
+
+      const followups = clinic.followups.filter((f) => f.petId === pet.id);
+      if (followups.length > 0) {
+        recordMessage += `\n### Vaccination & Health Reminders\n`;
+        followups.forEach((f) => {
+          const dateText = typeof f.dueDate === "string" ? f.dueDate.slice(0, 10) : String(f.dueDate);
+          recordMessage += `- **${dateText}**: ${f.followupType} (${f.recommendedAction}) - *Status: ${f.status}*\n`;
+        });
+      }
+    } else {
+      if (agentType === "internal") {
+        recordMessage = `Access has been granted automatically without requiring approval. Please specify a pet's name to view their medical records.\n\nHere are some patients in our clinic:\n`;
+        clinic.pets.slice(0, 15).forEach((p) => {
+          const owner = clinic.clients.find((c) => c.id === p.clientId);
+          recordMessage += `- **${p.name}** (${p.species}, Owner: ${owner ? owner.fullName : "Unknown"})\n`;
+        });
+      } else {
+        recordMessage = `Access has been granted automatically without requiring approval. Please specify your pet's name (e.g., Maple) to view their medical records.`;
+      }
+    }
+
+    return finishRun(run.id, {
+      ok: true,
+      mode: "mock",
+      intent: "records",
+      message: recordMessage,
+      result: { requiresApproval: false, matchedPet: pet ? true : false },
+      task
+    });
+  }
+
   const task = await createWorkflowTask({
-    clientName: stringValue(input, "clientName") || stringValue(input, "name") || null,
-    clientPhone: stringValue(input, "clientPhone") || stringValue(input, "phone") || null,
-    petName: stringValue(input, "petName") || null,
+    clientName,
+    clientPhone,
+    petName,
     request: `Records transfer request: ${textFromInput(input) || "Client requested records transfer."}`,
     requestType: "records_request",
     priority: "medium",
@@ -391,9 +536,9 @@ export async function runRecords(input: WorkflowInput): Promise<WorkflowResult> 
     title: "Approve records transfer",
     summary: "Client requested pet records be sent to another hospital. Staff review is required before sending.",
     requestedAction: {
-      clientName: stringValue(input, "clientName") || stringValue(input, "name") || null,
-      petName: stringValue(input, "petName") || null,
-      destination: stringValue(input, "destination") || "Destination hospital not provided"
+      clientName,
+      petName,
+      destination: destination || "Destination hospital not provided"
     }
   });
   await createWorkflowEvent({
@@ -446,7 +591,8 @@ export async function runSickPet(input: WorkflowInput): Promise<WorkflowResult> 
 }
 
 export async function runCall(input: WorkflowInput): Promise<WorkflowResult> {
-  const intent = classifyIntent(input);
+  let intent = classifyIntent(input);
+  intent = await detectRecordsIntent(input, intent);
   if (intent === "checkin") return runCheckin({ ...input, intent: "checkin" });
   if (intent === "booking") return runBooking({ ...input, intent: "booking" });
   if (intent === "records") return runRecords({ ...input, intent: "records" });
@@ -674,20 +820,97 @@ export async function runDailyOps(input: WorkflowInput): Promise<WorkflowResult>
 }
 
 export async function runExternalAgent(input: WorkflowInput): Promise<WorkflowResult> {
-  const intent = classifyIntent(input);
+  const text = textFromInput(input).trim();
+  const isPositiveConfirm = /^(yes|ok|confirm|sure|yup|y|correct|please)$/i.test(text);
+  const isNegativeConfirm = /^(no|nope|cancel|n)$/i.test(text);
+
+  if (isPositiveConfirm || isNegativeConfirm) {
+    const phone = stringValue(input, "clientPhone") || stringValue(input, "phone") || stringValue(input, "callerPhone");
+    const name = stringValue(input, "clientName") || stringValue(input, "name") || stringValue(input, "callerName");
+    if (phone || name) {
+      const sql = getSql();
+      const tasks = await sql<any[]>`
+        select id, request, notes, status, request_type
+        from tasks
+        where (
+          (client_phone is not null and client_phone = ${phone || null})
+          or (client_name is not null and client_name ilike ${name || null})
+        )
+          and status = 'pending_review'
+          and request_type = 'scheduling'
+        order by created_at desc
+        limit 1
+      `;
+      const matchedTask = tasks[0];
+      if (matchedTask) {
+        if (isPositiveConfirm) {
+          const updatedTask = await transitionTask({
+            id: matchedTask.id,
+            nextStatus: "due",
+            actor: agentActor
+          });
+          const run = await startRun("external", "booking", input);
+          await createWorkflowEvent({
+            runId: run.id,
+            workflowType: "booking",
+            eventType: "booking_confirmed",
+            title: "Booking confirmed by client",
+            detail: `Client confirmed slot. Task updated to due.`,
+            metadata: { taskId: matchedTask.id }
+          });
+          return finishRun(run.id, {
+            ok: true,
+            mode: "mock",
+            intent: "booking",
+            message: `Great! I have confirmed your appointment. Staff has it scheduled on the board.`,
+            result: { booked: true, task: updatedTask },
+            task: updatedTask ?? undefined
+          });
+        } else {
+          const updatedTask = await transitionTask({
+            id: matchedTask.id,
+            nextStatus: "invalid",
+            invalidReason: "Client rejected proposed booking slot.",
+            actor: agentActor
+          });
+          const run = await startRun("external", "booking", input);
+          await createWorkflowEvent({
+            runId: run.id,
+            workflowType: "booking",
+            eventType: "booking_rejected",
+            title: "Booking rejected by client",
+            detail: `Client rejected slot. Task marked invalid.`,
+            metadata: { taskId: matchedTask.id }
+          });
+          return finishRun(run.id, {
+            ok: true,
+            mode: "mock",
+            intent: "booking",
+            message: `No problem. I canceled that booking request. Let me know if you want to try another time or help with something else!`,
+            result: { booked: false, task: updatedTask },
+            task: updatedTask ?? undefined
+          });
+        }
+      }
+    }
+  }
+
+  let intent = classifyIntent(input);
+  intent = await detectRecordsIntent(input, intent);
   if (intent === "checkin") return runCheckin(input);
   if (intent === "booking") return runBooking(input);
   if (intent === "pickup") return runPickup(input);
-  if (intent === "records") return runRecords(input);
+  if (intent === "records") return runRecords(input, "external");
   if (intent === "sick_pet") return runSickPet(input);
   if (intent === "followup") return runFollowup(input);
   return runCall(input);
 }
 
 export async function runInternalAgent(input: WorkflowInput): Promise<WorkflowResult> {
-  const intent = classifyIntent(input);
+  let intent = classifyIntent(input);
+  intent = await detectRecordsIntent(input, intent);
   if (intent === "pricing") return runPricing(input);
-  if (intent === "records") return runRecords(input);
+  if (intent === "records") return runRecords(input, "internal");
   if (intent === "invoice") return runInvoice(input);
   if (intent === "followup") return runFollowup(input);
   if (intent === "sick_pet") return runSickPet(input);
