@@ -9,13 +9,15 @@ export async function GET() {
     const tasks = await listTasks({ role: "veterinarian" });
 
     const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const toDateStr = (val: unknown) =>
+      val instanceof Date ? val.toISOString().slice(0, 10) : String(val).slice(0, 10);
 
     const stats = {
       dueToday: tasks.filter(
-        (t) => t.status === "due" && t.dueDate.slice(0, 10) <= today
+        (t) => t.status === "due" && toDateStr(t.dueDate) <= today
       ).length,
       dueTodayUrgent: tasks.filter(
-        (t) => t.status === "due" && t.dueDate.slice(0, 10) <= today && t.priority === "high"
+        (t) => t.status === "due" && toDateStr(t.dueDate) <= today && t.priority === "high"
       ).length,
       pendingReview: tasks.filter((t) => t.status === "pending_review").length,
       pendingReviewUrgent: tasks.filter(

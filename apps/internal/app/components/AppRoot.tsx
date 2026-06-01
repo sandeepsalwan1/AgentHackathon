@@ -6,6 +6,7 @@ import { CreateVetPanel } from "./admin/CreateVetPanel";
 import { AuthScreen } from "./auth/AuthScreen";
 import { CustomerExperience } from "./customer/CustomerExperience";
 import { TaskBoard } from "./TaskBoard";
+import { VetDashboard } from "./vet/VetDashboard";
 
 // One app, three surfaces:
 // - pet owners get the chat portal
@@ -14,14 +15,15 @@ import { TaskBoard } from "./TaskBoard";
 type View =
   | { kind: "loading" }
   | { kind: "auth" }
-  | { kind: "board" } // staff / vet / VA on the shared task board
+  | { kind: "board" } // staff / VA on the shared task board
+  | { kind: "veterinarian"; session: AccountSession }
   | { kind: "customer"; session: AccountSession }
   | { kind: "admin"; session: AccountSession };
 
 function viewForSession(session: AccountSession): View {
   if (session.role === "customer") return { kind: "customer", session };
   if (session.role === "admin") return { kind: "admin", session };
-  // staff + veterinarian both work from the shared task board
+  if (session.role === "veterinarian") return { kind: "veterinarian", session };
   return { kind: "board" };
 }
 
@@ -67,6 +69,10 @@ export function AppRoot() {
 
   if (view.kind === "board") {
     return <TaskBoard />;
+  }
+
+  if (view.kind === "veterinarian") {
+    return <VetDashboard session={view.session} onLogout={handleLogout} />;
   }
 
   if (view.kind === "customer") {
