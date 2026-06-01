@@ -544,9 +544,10 @@ export const tools = defineTools({
     }
   }),
   mark_arrived: defineTool({
-    description: "Prepare arrival update and staff task.",
+    description: "Prepare arrival update and staff task. Set waitComplaint when the client reports waiting too long.",
     parameters: z.object({
-      appointmentId: z.string()
+      appointmentId: z.string(),
+      waitComplaint: z.boolean().optional()
     }),
     execute: async (args, runtime) => {
       const appointment = runtime.data.appointments.find((candidate) => candidate.id === args.appointmentId) ?? null;
@@ -564,7 +565,7 @@ export const tools = defineTools({
       }
       const task = addEffect(runtime, makeTask({
         status: "due",
-        priority: appointment.waitMinutes >= 30 ? "high" : "medium",
+        priority: args.waitComplaint || appointment.waitMinutes >= 30 ? "high" : "medium",
         requestType: "scheduling",
         clientName: client.fullName,
         clientPhone: client.phone,
