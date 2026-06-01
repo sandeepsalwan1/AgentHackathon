@@ -228,5 +228,51 @@ export const mockClinicData: MockClinicData = {
       transcript: "Hi, I just parked outside with Biscuit for our appointment. Can you check us in?",
       intentHint: "checkin"
     }
+  ],
+  tasks: [],
+  approvals: [],
+  reports: [],
+  labCatalog: [
+    {
+      id: "labcat-cbc",
+      labVendor: "antech_mock",
+      testCode: "CBC",
+      testName: "Complete Blood Count",
+      specimenType: "whole_blood",
+      turnaroundHours: 24,
+      active: true,
+      raw: { vendorShape: "antech_style" }
+    }
+  ],
+  labOrders: [
+    {
+      id: "laborder-otis-cbc",
+      labVendor: "antech_mock",
+      externalOrderId: "ANT-MOCK-20260531-001",
+      clientId: "client-john",
+      petId: "pet-max",
+      patientName: "Max",
+      orderedBy: "Dr. Lee",
+      testCode: "CBC",
+      testName: "Complete Blood Count",
+      specimenType: "whole_blood",
+      orderedAt: "2026-05-31T15:00:00.000Z",
+      status: "final",
+      raw: { vendorShape: "antech_style" }
+    }
+  ],
+  labResults: [
+    {
+      id: "labresult-otis-cbc",
+      labOrderId: "laborder-otis-cbc",
+      labVendor: "antech_mock",
+      externalOrderId: "ANT-MOCK-20260531-001",
+      status: "final",
+      resultSummary: "Mock CBC finalized with elevated white blood cell count flag. Veterinarian review required before client disclosure.",
+      abnormalFlags: [{ analyte: "WBC", flag: "high", severity: "review" }],
+      reportUrl: "internal://mock-labs/ANT-MOCK-20260531-001/report",
+      raw: { vendorShape: "antech_style" },
+      resultedAt: "2026-05-31T15:45:00.000Z"
+    }
   ]
 };

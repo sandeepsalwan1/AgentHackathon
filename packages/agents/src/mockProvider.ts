@@ -24,6 +24,7 @@ const intentPatterns: Array<[AgentIntent, RegExp]> = [
   ["followup", /(follow.?up|vaccine|recheck|refill|due|booster)/i],
   ["invoice", /(invoice|bill|charge|payment|refund|surcharge)/i],
   ["pricing", /(price|pricing|competitor|market|underpriced|overpriced)/i],
+  ["labs", /(lab|result|bloodwork|blood work|cbc|chemistry|urinalysis|antech)/i],
   ["daily_ops", /(daily|summary|ops|priorit|what should|attention)/i]
 ];
 

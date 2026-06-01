@@ -7,6 +7,7 @@ export const agentIntentSchema = z.enum([
   "daily_ops",
   "followup",
   "invoice",
+  "labs",
   "pickup",
   "pricing",
   "records",
@@ -102,6 +103,9 @@ export type ToolCallTrace = {
   toolName: string;
   args: Record<string, unknown>;
   result: Record<string, unknown>;
+  status?: "ok" | "error";
+  error?: string | null;
+  durationMs?: number;
   createdAt: string;
 };
 
@@ -129,6 +133,8 @@ export type AgentWorkflowResult = {
 export type RunAgentOptions = {
   mode?: AgentMode;
   runId?: string;
+  traceId?: string;
+  routeIntent?: string;
   now?: Date;
   model?: string;
   clinicData?: MockClinicData;
@@ -211,6 +217,76 @@ export type PricingObservation = {
   url?: string;
 };
 
+export type MockTask = {
+  id: string;
+  status: string;
+  priority: TaskPriority;
+  requestType?: TaskRequestType;
+  clientName?: string | null;
+  petName?: string | null;
+  request: string;
+  notes?: string | null;
+  dueDate?: string | null;
+  dueTime?: string | null;
+};
+
+export type MockApproval = {
+  id: string;
+  status: string;
+  approvalType: string;
+  title: string;
+  summary: string;
+  taskId?: string | null;
+};
+
+export type MockReport = {
+  id: string;
+  reportType: string;
+  title: string;
+  summary: string;
+  taskId?: string | null;
+};
+
+export type MockLabCatalogItem = {
+  id: string;
+  labVendor: string;
+  testCode: string;
+  testName: string;
+  specimenType: string;
+  turnaroundHours: number;
+  active: boolean;
+  raw: Record<string, unknown>;
+};
+
+export type MockLabOrder = {
+  id: string;
+  labVendor: string;
+  externalOrderId: string;
+  clientId: string;
+  petId: string;
+  patientName: string;
+  orderedBy: string;
+  testCode: string;
+  testName: string;
+  specimenType: string;
+  orderedAt: string;
+  status: "ordered" | "in_progress" | "partial" | "final" | "cancelled";
+  raw: Record<string, unknown>;
+};
+
+export type MockLabResult = {
+  id: string;
+  labOrderId: string;
+  labVendor: string;
+  externalOrderId: string;
+  status: "ordered" | "in_progress" | "partial" | "final" | "cancelled";
+  resultSummary: string;
+  abnormalFlags: Record<string, unknown>[];
+  reportUrl: string | null;
+  raw: Record<string, unknown>;
+  resultedAt: string | null;
+};
+
 export type MockMessage = {
   id: string;
   clientId: string | null;
@@ -238,4 +314,10 @@ export type MockClinicData = {
   pricingObservations: PricingObservation[];
   messages: MockMessage[];
   calls: MockCallTranscript[];
+  tasks?: MockTask[];
+  approvals?: MockApproval[];
+  reports?: MockReport[];
+  labCatalog?: MockLabCatalogItem[];
+  labOrders?: MockLabOrder[];
+  labResults?: MockLabResult[];
 };

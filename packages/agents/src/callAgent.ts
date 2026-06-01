@@ -26,6 +26,40 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
   const runtime = createRuntime(normalized, intent, options);
   const transcript = normalized.transcript ?? getInputText(normalized);
   const triage = await executeTool("triage_call", { transcript }, runtime) as TriageResult;
+  if (triage.triage.intent === "checkin") {
+    const arrival = await executeTool("start_arrival", {
+      clientName: normalized.callerName ?? normalized.clientName,
+      clientPhone: normalized.callerPhone ?? normalized.clientPhone,
+      petName: normalized.petName
+    }, runtime) as {
+      client: unknown;
+      pet: { name?: string } | null;
+      appointment: { id: string; waitMinutes?: number } | null;
+    };
+    if (arrival.appointment) {
+      const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id }, runtime) as {
+        task: AgentTaskDraft | null;
+        alreadyArrived?: boolean;
+      };
+      const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime);
+      return buildResult({
+        intent: "checkin",
+        mode,
+        message: arrived.alreadyArrived
+          ? `${arrival.pet?.name ?? "Your pet"} is already checked in. Staff has your arrival on the board.`
+          : `You are checked in for ${arrival.pet?.name ?? "your pet"}. Staff has been notified.`,
+        result: {
+          classifiedIntent: "checkin",
+          matched: true,
+          alreadyArrived: Boolean(arrived.alreadyArrived),
+          waitStatus: wait
+        },
+        runtime,
+        options,
+        task: arrived.task ?? undefined
+      });
+    }
+  }
   const taskResult = await executeTool("create_task", {
     status: triage.triage.urgent ? "due" : "pending_review",
     priority: triage.triage.urgent ? "high" : "medium",

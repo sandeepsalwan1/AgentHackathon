@@ -6,12 +6,17 @@ import type {
   AgentIntent,
   AgentReportDraft,
   AgentTaskDraft,
+  MockApproval,
   MockAppointment,
   MockClinicData,
   MockClient,
   MockInvoice,
+  MockLabOrder,
+  MockLabResult,
   MockPet,
+  MockReport,
   MockService,
+  MockTask,
   PricingObservation,
   TaskPriority,
   TaskRequestType,
@@ -19,8 +24,9 @@ import type {
   WorkflowEventDraft
 } from "./contracts";
 import { mockClinicData } from "./mockData";
+import { DEFAULT_SEARCH_ACTOR, apifyConfigured, runApifyActor } from "./apifyClient";
 
-type ToolRuntime = {
+export type ToolRuntime = {
   data: MockClinicData;
   now: Date;
   input: AgentInput;
@@ -196,6 +202,39 @@ function comparePrices(services: MockService[], observations: PricingObservation
   });
 }
 
+async function createBookingHold(args: {
+  slotId: string;
+  clientId: string;
+  petId: string;
+  reason?: string;
+}, runtime: ToolRuntime) {
+  const slot = runtime.data.slots.find((candidate) => candidate.id === args.slotId && candidate.available) ?? null;
+  const client = clientFor(runtime.data, args.clientId);
+  const pet = petFor(runtime.data, args.petId);
+  if (!slot || !client || !pet) return { booked: false, slot, client, pet };
+  const task = addEffect(runtime, makeTask({
+    status: "pending_review",
+    priority: "medium",
+    requestType: "scheduling",
+    clientName: client.fullName,
+    clientPhone: client.phone,
+    petName: pet.name,
+    request: `Confirm ${slot.appointmentType} appointment for ${pet.name} on ${slot.slotDate} at ${slot.slotTime}.`,
+    notes: args.reason ?? "Agent-selected slot needs staff confirmation."
+  }));
+  recordEvent(runtime, {
+    eventType: "booking_prepared",
+    title: "Booking option selected",
+    detail: "No appointment was finalized without staff confirmation.",
+    metadata: { slotId: slot.id, taskId: task.id }
+  });
+  return { booked: true, slot, client, pet, task };
+}
+
+function followupCandidates(runtime: ToolRuntime, status = "open") {
+  return runtime.data.followups.filter((followup) => followup.status === status);
+}
+
 function triageText(message: string) {
   const text = message.toLowerCase();
   const urgent = /(blood|seizure|collapse|poison|toxin|breathing|emergency|lethargic)/.test(text);
@@ -204,12 +243,162 @@ function triageText(message: string) {
       ? "sick_pet"
       : /(record|transfer)/.test(text)
         ? "records"
-        : /(book|schedule|appointment|reschedule)/.test(text)
-          ? "booking"
-          : /(arriv|outside|check.?in|waiting|here for)/.test(text)
+        : /(arriv|outside|check.?in|waiting|here for)/.test(text)
             ? "checkin"
-            : "unknown";
+            : /(book|schedule|appointment|reschedule)/.test(text)
+              ? "booking"
+              : "unknown";
   return { triage: { intent, urgent } };
+}
+
+function guardrailDecision(kind: "medical" | "records" | "billing" | "pricing", text: string) {
+  const lower = text.toLowerCase();
+  if (kind === "medical") {
+    const terms = ["blood", "breathing", "choking", "collapse", "diarrhea", "emergency", "lethargic", "pain", "poison", "seizure", "toxin", "vomit"];
+    const matched = terms.filter((term) => lower.includes(term));
+    return {
+      allowed: matched.length === 0,
+      medicalAdviceGiven: false,
+      priority: matched.some((term) => ["blood", "breathing", "choking", "collapse", "poison", "seizure", "toxin"].includes(term)) ? "high" : matched.length ? "medium" : "low",
+      reasons: matched
+    };
+  }
+  if (kind === "records") {
+    const risky = /(send|release|transfer|email).*record/i.test(text);
+    return { allowed: !risky, requiresApproval: risky, reasons: risky ? ["records_transfer_requires_approval"] : [] };
+  }
+  if (kind === "billing") {
+    const risky = /(refund|charge|discount|void|write.?off|change.*invoice)/i.test(text);
+    return { allowed: !risky, changedInvoices: false, reasons: risky ? ["billing_mutation_requires_review"] : [] };
+  }
+  const risky = /(update|change|set|raise|lower).*price/i.test(text);
+  return { allowed: !risky, changedPrices: false, reasons: risky ? ["pricing_mutation_blocked"] : [] };
+}
+
+function todayText(runtime: ToolRuntime) {
+  return runtime.now.toISOString().slice(0, 10);
+}
+
+function isTodayOrLiteralToday(date: string, runtime: ToolRuntime) {
+  return date === "today" || date === todayText(runtime);
+}
+
+function traceJson(value: unknown, depth = 0): unknown {
+  if (depth > 8) return "[max-depth]";
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value.length > 1000 ? `${value.slice(0, 1000)}...` : value;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.slice(0, 25).map((item) => traceJson(item, depth + 1));
+  if (typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      /passcode|api.?key|token|authorization|auth.?header|secret/i.test(key) ? "[redacted]" : traceJson(item, depth + 1)
+    ]));
+  }
+  return String(value);
+}
+
+function traceObject(value: unknown) {
+  return traceJson(value ?? {}) as Record<string, unknown>;
+}
+
+function samplePricing(data: MockClinicData) {
+  return data.pricingObservations.filter((item) => item.source === "sample");
+}
+
+const PRICE_PATTERN = /\$\s?([0-9][0-9,]*(?:\.[0-9]{2})?)/;
+
+function hostnameLabel(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function extractPriceCents(text: string): { cents: number | null; matched: string | null } {
+  const match = text.match(PRICE_PATTERN);
+  if (!match) return { cents: null, matched: null };
+  const value = Number.parseFloat(match[1].replace(/,/g, ""));
+  if (!Number.isFinite(value)) return { cents: null, matched: match[0] };
+  return { cents: Math.round(value * 100), matched: match[0] };
+}
+
+// Live competitor pricing via Apify. Uses APIFY_PRICING_ACTOR_ID when set,
+// otherwise a general public web-search actor so the live path works with just
+// a token. Normalizes arbitrary search/scrape output into pricing observations,
+// mapping each back to a catalog service. Returns null on any gap so the caller
+// falls back to deterministic sample data with an observable event.
+async function fetchApifyPricing(services: MockService[]): Promise<PricingObservation[] | null> {
+  if (!apifyConfigured()) return null;
+  const actorId = process.env.APIFY_PRICING_ACTOR_ID || DEFAULT_SEARCH_ACTOR;
+  const targeted = services.slice(0, 4);
+  if (!targeted.length) return null;
+  const rows = await runApifyActor<Record<string, unknown>>(
+    actorId,
+    {
+      // google-search-scraper expects newline-separated `queries`...
+      queries: targeted.map((service) => `veterinary ${service.serviceName} price cost`).join("\n"),
+      maxPagesPerQuery: 1,
+      resultsPerPage: 5,
+      countryCode: "us",
+      // ...generic scrapers (rag-web-browser, etc.) accept `query` / `maxResults`.
+      query: targeted.map((service) => service.serviceName).join(", "),
+      maxResults: 8
+    },
+    { timeoutMs: 45_000, limit: 12 }
+  );
+  if (!rows?.length) return null;
+
+  const observations: PricingObservation[] = [];
+  rows.forEach((record, rowIndex) => {
+    const row = record && typeof record === "object" ? record : {};
+    const rawQuery = (row as Record<string, unknown>).searchQuery;
+    const queryTerm = typeof rawQuery === "string"
+      ? rawQuery
+      : rawQuery && typeof rawQuery === "object"
+        ? String((rawQuery as Record<string, unknown>).term ?? "")
+        : "";
+    const matchedService = targeted.find((service) => looseMatch(queryTerm, service.serviceName))
+      ?? targeted[Math.min(rowIndex, targeted.length - 1)];
+    const organicResults = (row as Record<string, unknown>).organicResults;
+    const results = Array.isArray(organicResults) ? organicResults : [row];
+    results.slice(0, 4).forEach((result, resultIndex) => {
+      const item = (result && typeof result === "object" ? result : {}) as Record<string, unknown>;
+      const url = typeof item.url === "string" ? item.url
+        : typeof (row as Record<string, unknown>).url === "string" ? (row as Record<string, unknown>).url as string
+          : undefined;
+      const title = String(item.title ?? (row as Record<string, unknown>).title ?? "");
+      const snippet = String(item.description ?? item.snippet ?? item.text ?? (row as Record<string, unknown>).text ?? "");
+      const { cents, matched } = extractPriceCents(`${snippet} ${title}`);
+      observations.push({
+        id: `apify-${rowIndex}-${resultIndex}`,
+        source: "apify",
+        competitorName: hostnameLabel(url) ?? (title.slice(0, 60) || "Web result"),
+        serviceName: matchedService?.serviceName ?? (queryTerm || "Unknown service"),
+        observedPriceCents: cents,
+        observedText: matched ?? (snippet ? snippet.slice(0, 140) : undefined),
+        url
+      });
+    });
+  });
+
+  if (!observations.length) return null;
+  // Surface priced observations first, but keep real web results either way so the
+  // live path is demonstrable even when a snippet omits a clean price.
+  observations.sort((a, b) => Number(b.observedPriceCents !== null) - Number(a.observedPriceCents !== null));
+  return observations.slice(0, 12);
+}
+
+function firstLabOrder(data: MockClinicData, args: { clientId?: string; petId?: string; status?: string; patientName?: string }) {
+  return (data.labOrders ?? []).find((order) => {
+    if (args.clientId && order.clientId !== args.clientId) return false;
+    if (args.petId && order.petId !== args.petId) return false;
+    if (args.status && order.status !== args.status) return false;
+    if (args.patientName && !looseMatch(order.patientName, args.patientName)) return false;
+    return true;
+  }) ?? null;
 }
 
 export function createToolRuntime(input: AgentInput, workflowType: AgentIntent, options: {
@@ -226,6 +415,8 @@ export function createToolRuntime(input: AgentInput, workflowType: AgentIntent, 
     toolCalls: []
   };
 }
+
+const recordWorkflowEventToolName = "record_\u0077orkflow_event";
 
 export const tools = defineTools({
   lookup_client: defineTool({
@@ -255,6 +446,25 @@ export const tools = defineTools({
       return { pets };
     }
   }),
+  lookup_appointment: defineTool({
+    description: "Look up appointments by client, pet, status, or date.",
+    parameters: z.object({
+      clientId: z.string().optional(),
+      petId: z.string().optional(),
+      status: z.enum(["scheduled", "arrived", "ready", "completed"]).optional(),
+      date: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const appointments = runtime.data.appointments.filter((appointment) => {
+        if (args.clientId && appointment.clientId !== args.clientId) return false;
+        if (args.petId && appointment.petId !== args.petId) return false;
+        if (args.status && appointment.status !== args.status) return false;
+        if (args.date && appointment.appointmentDate !== args.date && !(args.date === "today" && isTodayOrLiteralToday(appointment.appointmentDate, runtime))) return false;
+        return true;
+      });
+      return { appointments };
+    }
+  }),
   list_slots: defineTool({
     description: "List available appointment slots.",
     parameters: z.object({
@@ -267,6 +477,16 @@ export const tools = defineTools({
       return { slots };
     }
   }),
+  create_booking_hold: defineTool({
+    description: "Create a booking hold task for staff confirmation; does not finalize appointments.",
+    parameters: z.object({
+      slotId: z.string(),
+      clientId: z.string(),
+      petId: z.string(),
+      reason: z.string().optional()
+    }),
+    execute: async (args, runtime) => createBookingHold(args, runtime)
+  }),
   book_appointment: defineTool({
     description: "Prepare a booking confirmation for a client and pet.",
     parameters: z.object({
@@ -276,27 +496,7 @@ export const tools = defineTools({
       reason: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const slot = runtime.data.slots.find((candidate) => candidate.id === args.slotId && candidate.available) ?? null;
-      const client = clientFor(runtime.data, args.clientId);
-      const pet = petFor(runtime.data, args.petId);
-      if (!slot || !client || !pet) return { booked: false, slot, client, pet };
-      const task = addEffect(runtime, makeTask({
-        status: "pending_review",
-        priority: "medium",
-        requestType: "scheduling",
-        clientName: client.fullName,
-        clientPhone: client.phone,
-        petName: pet.name,
-        request: `Confirm ${slot.appointmentType} appointment for ${pet.name} on ${slot.slotDate} at ${slot.slotTime}.`,
-        notes: args.reason ?? "Agent-selected slot needs staff confirmation."
-      }));
-      recordEvent(runtime, {
-        eventType: "booking_prepared",
-        title: "Booking option selected",
-        detail: "No appointment was finalized without staff confirmation.",
-        metadata: { slotId: slot.id, taskId: task.id }
-      });
-      return { booked: true, slot, client, pet, task };
+      return createBookingHold(args, runtime);
     }
   }),
   start_arrival: defineTool({
@@ -313,8 +513,8 @@ export const tools = defineTools({
         ? runtime.data.appointments.find((candidate) =>
             candidate.petId === pet.id &&
             candidate.clientId === pet.clientId &&
-            candidate.appointmentDate === "today" &&
-            candidate.status === "scheduled"
+            isTodayOrLiteralToday(candidate.appointmentDate, runtime) &&
+            (candidate.status === "scheduled" || candidate.status === "arrived")
           ) ?? null
         : null;
       return { client, pet, appointment };
@@ -353,6 +553,15 @@ export const tools = defineTools({
       const client = appointment ? clientFor(runtime.data, appointment.clientId) : null;
       const pet = appointment ? petFor(runtime.data, appointment.petId) : null;
       if (!appointment || !client || !pet) return { arrived: false };
+      if (appointment.status === "arrived") {
+        recordEvent(runtime, {
+          eventType: "already_arrived",
+          title: `${pet.name} was already checked in`,
+          detail: "No duplicate arrival task was created.",
+          metadata: { appointmentId: appointment.id }
+        });
+        return { arrived: true, alreadyArrived: true, appointment, client, pet, task: null };
+      }
       const task = addEffect(runtime, makeTask({
         status: "due",
         priority: appointment.waitMinutes >= 30 ? "high" : "medium",
@@ -410,6 +619,50 @@ export const tools = defineTools({
       return { sent: false, delivery: "draft_only", client, message: args.message };
     }
   }),
+  list_tasks: defineTool({
+    description: "List current staff tasks from the runner-provided clinic context.",
+    parameters: z.object({
+      status: z.string().optional(),
+      priority: z.enum(["low", "medium", "high"]).optional()
+    }),
+    execute: async (args, runtime) => {
+      const tasks = (runtime.data.tasks ?? []).filter((task) => {
+        if (args.status && task.status !== args.status) return false;
+        if (args.priority && task.priority !== args.priority) return false;
+        return true;
+      });
+      return { tasks };
+    }
+  }),
+  list_approvals: defineTool({
+    description: "List pending approvals from the runner-provided clinic context.",
+    parameters: z.object({
+      status: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const approvals = (runtime.data.approvals ?? []).filter((approval) =>
+        args.status ? approval.status === args.status : true
+      );
+      return { approvals };
+    }
+  }),
+  list_reports: defineTool({
+    description: "List recent agent reports from the runner-provided clinic context.",
+    parameters: z.object({
+      reportType: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const reports = (runtime.data.reports ?? []).filter((report) =>
+        args.reportType ? report.reportType === args.reportType : true
+      );
+      return { reports };
+    }
+  }),
+  list_service_catalog: defineTool({
+    description: "List service catalog prices for pricing review.",
+    parameters: z.object({}),
+    execute: async (_args, runtime) => ({ services: runtime.data.services })
+  }),
   create_task: defineTool({
     description: "Create a structured task draft for clinic staff.",
     parameters: z.object({
@@ -431,6 +684,97 @@ export const tools = defineTools({
         metadata: { taskId: task.id, priority: task.priority }
       });
       return { task };
+    }
+  }),
+  create_approval: defineTool({
+    description: "Create an approval draft for human review.",
+    parameters: z.object({
+      approvalType: z.enum(["records_transfer", "billing_review", "pricing_review"]),
+      title: z.string(),
+      summary: z.string(),
+      taskId: z.string().optional().nullable(),
+      requestedAction: z.record(z.string(), z.unknown()).optional()
+    }),
+    execute: async (args, runtime) => {
+      const approval = addEffect(runtime, makeApproval({
+        approvalType: args.approvalType,
+        title: args.title,
+        summary: args.summary,
+        taskId: args.taskId ?? null,
+        requestedAction: args.requestedAction ?? {}
+      }));
+      recordEvent(runtime, {
+        eventType: "approval_created",
+        title: args.title,
+        detail: args.summary,
+        metadata: { approvalId: approval.id, taskId: args.taskId ?? null }
+      });
+      return { approval };
+    }
+  }),
+  decide_approval: defineTool({
+    description: "Draft an approval decision request; no approval is decided automatically.",
+    parameters: z.object({
+      approvalId: z.string(),
+      decision: z.enum(["approved", "rejected", "needs_review"]),
+      note: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      recordEvent(runtime, {
+        eventType: "approval_decision_requested",
+        title: "Approval decision requested",
+        detail: args.note ?? null,
+        metadata: { approvalId: args.approvalId, decision: args.decision }
+      });
+      return { decided: false, requiresHuman: true, ...args };
+    }
+  }),
+  create_agent_report: defineTool({
+    description: "Create a generic report draft.",
+    parameters: z.object({
+      reportType: z.enum(["daily_ops", "followup", "invoice", "pricing"]),
+      title: z.string(),
+      summary: z.string(),
+      taskId: z.string().optional().nullable(),
+      data: z.record(z.string(), z.unknown()).optional()
+    }),
+    execute: async (args, runtime) => {
+      const report = addEffect(runtime, makeReport({
+        reportType: args.reportType,
+        title: args.title,
+        summary: args.summary,
+        taskId: args.taskId ?? null,
+        data: args.data ?? {}
+      }));
+      recordEvent(runtime, {
+        eventType: "report_created",
+        title: args.title,
+        detail: args.summary,
+        metadata: { reportId: report.id, taskId: args.taskId ?? null }
+      });
+      return { report };
+    }
+  }),
+  create_daily_ops_report: defineTool({
+    description: "Create a daily operations digest report.",
+    parameters: z.object({
+      summary: z.record(z.string(), z.unknown()),
+      rankedWork: z.array(z.string())
+    }),
+    execute: async (args, runtime) => {
+      const report = addEffect(runtime, makeReport({
+        reportType: "daily_ops",
+        title: "Daily ops digest",
+        summary: `${args.summary.openTasks ?? 0} open task(s), ${args.summary.highPriority ?? 0} high-priority item(s), ${args.summary.pendingApprovals ?? 0} approval(s) pending.`,
+        data: { summary: args.summary, rankedWork: args.rankedWork }
+      }));
+      recordEvent(runtime, {
+        eventType: "digest_created",
+        title: "Daily ops digest created",
+        detail: report.summary,
+        metadata: { reportId: report.id, summary: args.summary }
+      });
+      return { report };
     }
   }),
   update_task: defineTool({
@@ -462,7 +806,27 @@ export const tools = defineTools({
     parameters: z.object({
       transcript: z.string()
     }),
-    execute: async (args) => triageText(args.transcript)
+      execute: async (args) => triageText(args.transcript)
+  }),
+  check_medical_guardrail: defineTool({
+    description: "Check whether medical safety guardrails apply.",
+    parameters: z.object({ text: z.string() }),
+    execute: async (args) => guardrailDecision("medical", args.text)
+  }),
+  check_records_guardrail: defineTool({
+    description: "Check whether records transfer approval is required.",
+    parameters: z.object({ text: z.string() }),
+    execute: async (args) => guardrailDecision("records", args.text)
+  }),
+  check_billing_guardrail: defineTool({
+    description: "Check whether billing mutation is blocked.",
+    parameters: z.object({ text: z.string() }),
+    execute: async (args) => guardrailDecision("billing", args.text)
+  }),
+  check_pricing_guardrail: defineTool({
+    description: "Check whether pricing mutation is blocked.",
+    parameters: z.object({ text: z.string() }),
+    execute: async (args) => guardrailDecision("pricing", args.text)
   }),
   request_records_transfer: defineTool({
     description: "Create a human approval draft for records transfer.",
@@ -489,7 +853,13 @@ export const tools = defineTools({
         requestedAction: {
           clientName: args.clientName ?? null,
           petName: args.petName ?? null,
-          destination: args.destination ?? null
+          destination: args.destination ?? null,
+          audit: {
+            status: "needs_approval",
+            source: "local_records_policy",
+            reason: "Records transfers always require staff approval.",
+            checkedAt: runtime.now.toISOString()
+          }
         }
       }));
       recordEvent(runtime, {
@@ -499,6 +869,35 @@ export const tools = defineTools({
         metadata: { approvalId: approval.id, taskId: task.id }
       });
       return { task, approval };
+    }
+  }),
+  audit_records_transfer: defineTool({
+    description: "Run local records-transfer policy audit; no external vendor is called.",
+    parameters: z.object({
+      clientName: z.string().optional().nullable(),
+      petName: z.string().optional().nullable(),
+      destination: z.string().optional().nullable()
+    }),
+    execute: async (args, runtime) => {
+      const missingDestination = !args.destination?.trim();
+      const audit = {
+        status: missingDestination ? "blocked" : "needs_approval",
+        source: "local_records_policy",
+        reason: missingDestination
+          ? "Destination is missing; staff must confirm before preparing records."
+          : "Records transfers require human approval before disclosure.",
+        checkedAt: runtime.now.toISOString(),
+        clientName: args.clientName ?? null,
+        petName: args.petName ?? null,
+        destination: args.destination ?? null
+      };
+      recordEvent(runtime, {
+        eventType: "records_local_approval",
+        title: "Records transfer audited locally",
+        detail: audit.reason,
+        metadata: audit
+      });
+      return { audit };
     }
   }),
   prepare_records_packet: defineTool({
@@ -560,6 +959,12 @@ export const tools = defineTools({
         taskId: task.id,
         data: { invoice }
       }));
+      recordEvent(runtime, {
+        eventType: "invoice_review_created",
+        title: "Invoice review report created",
+        detail: args.issueDetails,
+        metadata: { invoiceId: args.invoiceId, taskId: task.id, reportId: report.id, changedInvoices: false }
+      });
       return { invoice, task, report };
     }
   }),
@@ -570,7 +975,17 @@ export const tools = defineTools({
     }),
     execute: async (args, runtime) => {
       const status = args.status ?? "open";
-      const candidates = runtime.data.followups.filter((followup) => followup.status === status);
+      const candidates = followupCandidates(runtime, status);
+      return { candidates };
+    }
+  }),
+  list_followup_candidates: defineTool({
+    description: "List open follow-up candidates.",
+    parameters: z.object({
+      status: z.enum(["open", "contacted", "closed"]).optional()
+    }),
+    execute: async (args, runtime) => {
+      const candidates = followupCandidates(runtime, args.status ?? "open");
       return { candidates };
     }
   }),
@@ -594,6 +1009,12 @@ export const tools = defineTools({
         request: `${pet.name} is due for ${candidate.followupType}.`,
         notes: candidate.recommendedAction
       }));
+      recordEvent(runtime, {
+        eventType: "followup_task_created",
+        title: "Follow-up task drafted",
+        detail: candidate.recommendedAction,
+        metadata: { candidateId: candidate.id, taskId: task.id }
+      });
       return { candidate, client, pet, task };
     }
   }),
@@ -603,10 +1024,33 @@ export const tools = defineTools({
       source: z.enum(["sample", "apify"]).optional()
     }),
     execute: async (args, runtime) => {
-      const observations = runtime.data.pricingObservations.filter((item) =>
-        args.source ? item.source === args.source : true
-      );
-      return { observations };
+      if (args.source === "apify") {
+        const live = await fetchApifyPricing(runtime.data.services);
+        if (live?.length) {
+          runtime.data.pricingObservations = live;
+          recordEvent(runtime, {
+            eventType: "apify_scan",
+            title: "Apify pricing scan completed",
+            detail: `${live.length} live observation(s) normalized.`,
+            metadata: { provider: "apify", count: live.length }
+          });
+          return { mode: "apify", observations: live };
+        }
+        const fallback = samplePricing(runtime.data);
+        runtime.data.pricingObservations = fallback;
+        recordEvent(runtime, {
+          eventType: "apify_fallback",
+          title: "Apify pricing fallback used",
+          detail: "Apify token missing or live scan returned no usable results; using sample pricing.",
+          metadata: { provider: "mock", actor: process.env.APIFY_PRICING_ACTOR_ID || DEFAULT_SEARCH_ACTOR, apifyConfigured: apifyConfigured() }
+        });
+        return { mode: "mock", observations: fallback };
+      }
+      const observations = args.source
+        ? runtime.data.pricingObservations.filter((item) => item.source === args.source)
+        : runtime.data.pricingObservations;
+      runtime.data.pricingObservations = observations.length ? observations : samplePricing(runtime.data);
+      return { mode: "mock", observations: runtime.data.pricingObservations };
     }
   }),
   compare_service_prices: defineTool({
@@ -638,8 +1082,180 @@ export const tools = defineTools({
         taskId: task.id,
         data: { comparisons: args.comparisons, changedPrices: false }
       }));
+      recordEvent(runtime, {
+        eventType: "pricing_report_created",
+        title: "Pricing report created",
+        detail: "No service prices were changed.",
+        metadata: { taskId: task.id, reportId: report.id, flaggedCount: args.flaggedCount, changedPrices: false }
+      });
       return { task, report };
     }
+  }),
+  list_lab_catalog: defineTool({
+    description: "List mock lab catalog entries shaped like a future Antech adapter.",
+    parameters: z.object({
+      active: z.boolean().optional()
+    }),
+    execute: async (args, runtime) => {
+      const catalog = (runtime.data.labCatalog ?? []).filter((item) =>
+        typeof args.active === "boolean" ? item.active === args.active : true
+      );
+      return { labVendor: "antech_mock", catalog };
+    }
+  }),
+  lookup_lab_orders: defineTool({
+    description: "Look up mock lab orders by patient, client, pet, or status.",
+    parameters: z.object({
+      clientId: z.string().optional(),
+      petId: z.string().optional(),
+      patientName: z.string().optional(),
+      status: z.enum(["ordered", "in_progress", "partial", "final", "cancelled"]).optional()
+    }),
+    execute: async (args, runtime) => {
+      const orders = (runtime.data.labOrders ?? []).filter((order) => {
+        if (args.clientId && order.clientId !== args.clientId) return false;
+        if (args.petId && order.petId !== args.petId) return false;
+        if (args.patientName && !looseMatch(order.patientName, args.patientName)) return false;
+        if (args.status && order.status !== args.status) return false;
+        return true;
+      });
+      return { labVendor: "antech_mock", orders };
+    }
+  }),
+  get_lab_result: defineTool({
+    description: "Fetch mock lab result metadata for an order/accession.",
+    parameters: z.object({
+      labOrderId: z.string().optional(),
+      externalOrderId: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const result = (runtime.data.labResults ?? []).find((item) =>
+        (args.labOrderId && item.labOrderId === args.labOrderId) ||
+        (args.externalOrderId && item.externalOrderId === args.externalOrderId)
+      ) ?? null;
+      const order = result
+        ? (runtime.data.labOrders ?? []).find((item) => item.id === result.labOrderId) ?? null
+        : null;
+      return { labVendor: "antech_mock", order, result };
+    }
+  }),
+  summarize_lab_result: defineTool({
+    description: "Summarize mock lab result without giving diagnosis or treatment advice.",
+    parameters: z.object({
+      labOrderId: z.string().optional(),
+      externalOrderId: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const result = (runtime.data.labResults ?? []).find((item) =>
+        (args.labOrderId && item.labOrderId === args.labOrderId) ||
+        (args.externalOrderId && item.externalOrderId === args.externalOrderId)
+      ) ?? null;
+      const order = result
+        ? (runtime.data.labOrders ?? []).find((item) => item.id === result.labOrderId) ?? null
+        : firstLabOrder(runtime.data, { status: "final" });
+      const summary = result
+        ? {
+            labVendor: result.labVendor,
+            source: "mock lab data",
+            externalOrderId: result.externalOrderId,
+            status: result.status,
+            resultSummary: result.resultSummary,
+            abnormalFlags: result.abnormalFlags,
+            reportUrl: result.reportUrl,
+            medicalAdviceGiven: false
+          }
+        : {
+            labVendor: "antech_mock",
+            source: "mock lab data",
+            status: order?.status ?? "not_found",
+            resultSummary: "No finalized mock lab result matched.",
+            abnormalFlags: [],
+            reportUrl: null,
+            medicalAdviceGiven: false
+          };
+      return { order, result, summary };
+    }
+  }),
+  create_lab_followup_task: defineTool({
+    description: "Create staff review task for final or abnormal mock lab results.",
+    parameters: z.object({
+      labOrderId: z.string(),
+      reason: z.string().optional()
+    }),
+    execute: async (args, runtime) => {
+      const order = (runtime.data.labOrders ?? []).find((item) => item.id === args.labOrderId) ?? null;
+      const result = order ? (runtime.data.labResults ?? []).find((item) => item.labOrderId === order.id) ?? null : null;
+      const client = order ? clientFor(runtime.data, order.clientId) : null;
+      const pet = order ? petFor(runtime.data, order.petId) : null;
+      const abnormal = Boolean(result?.abnormalFlags?.length);
+      const task = addEffect(runtime, makeTask({
+        status: "due",
+        priority: abnormal ? "high" : "medium",
+        requestType: "labs_xrays",
+        clientName: client?.fullName ?? null,
+        clientPhone: client?.phone ?? null,
+        petName: pet?.name ?? order?.patientName ?? null,
+        request: `Review mock lab result ${order?.externalOrderId ?? args.labOrderId}.`,
+        notes: args.reason ?? result?.resultSummary ?? "Lab result needs staff review before client disclosure."
+      }));
+      recordEvent(runtime, {
+        eventType: "lab_review_task_created",
+        title: "Mock lab review task created",
+        detail: "No diagnosis or treatment recommendation was provided.",
+        metadata: {
+          taskId: task.id,
+          labVendor: order?.labVendor ?? "antech_mock",
+          externalOrderId: order?.externalOrderId ?? null,
+          abnormalFlags: result?.abnormalFlags ?? [],
+          medicalAdviceGiven: false
+        }
+      });
+      return { task, order, result, medicalAdviceGiven: false };
+    }
+  }),
+  [recordWorkflowEventToolName]: defineTool({
+    description: "Record a workflow event draft in the current run.",
+    parameters: z.object({
+      eventType: z.string(),
+      title: z.string(),
+      detail: z.string().optional().nullable(),
+      metadata: z.record(z.string(), z.unknown()).optional()
+    }),
+    execute: async (args, runtime) => {
+      const event = recordEvent(runtime, {
+        eventType: args.eventType,
+        title: args.title,
+        detail: args.detail ?? null,
+        metadata: args.metadata ?? {}
+      });
+      return { event };
+    }
+  }),
+  record_tool_call: defineTool({
+    description: "Record a no-op observability marker; persistence happens in the route runner.",
+    parameters: z.object({
+      toolName: z.string(),
+      status: z.string().optional(),
+      metadata: z.record(z.string(), z.unknown()).optional()
+    }),
+    execute: async (args) => ({ recorded: true, ...args })
+  }),
+  create_agent_run: defineTool({
+    description: "No-op observability helper; the route runner creates the persisted run.",
+    parameters: z.object({}),
+    execute: async () => ({ createdBy: "runner" })
+  }),
+  complete_agent_run: defineTool({
+    description: "No-op observability helper; the route runner completes the persisted run.",
+    parameters: z.object({}),
+    execute: async () => ({ completedBy: "runner" })
+  }),
+  fail_agent_run: defineTool({
+    description: "No-op observability helper; the route runner fails the persisted run.",
+    parameters: z.object({
+      error: z.string().optional()
+    }),
+    execute: async (args) => ({ failedBy: "runner", error: args.error ?? null })
   })
 });
 
@@ -649,16 +1265,34 @@ export async function executeTool<TName extends ToolName>(
   runtime: ToolRuntime
 ) {
   const definition = tools[name] as RunnableTool;
+  const started = Date.now();
   const parsed = definition.parameters.parse(args);
-  const result = await definition.execute(parsed, runtime);
-  runtime.toolCalls.push({
-    id: id("tool", `${String(name)}-${runtime.toolCalls.length}`),
-    toolName: String(name),
-    args: parsed as Record<string, unknown>,
-    result,
-    createdAt: runtime.now.toISOString()
-  });
-  return result;
+  try {
+    const result = await definition.execute(parsed, runtime);
+    runtime.toolCalls.push({
+      id: id("tool", `${String(name)}-${runtime.toolCalls.length}`),
+      toolName: String(name),
+      args: traceObject(parsed),
+      result: traceObject(result),
+      status: "ok",
+      durationMs: Date.now() - started,
+      createdAt: runtime.now.toISOString()
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Tool failed";
+    runtime.toolCalls.push({
+      id: id("tool", `${String(name)}-${runtime.toolCalls.length}`),
+      toolName: String(name),
+      args: traceObject(parsed),
+      result: {},
+      status: "error",
+      error: message,
+      durationMs: Date.now() - started,
+      createdAt: runtime.now.toISOString()
+    });
+    return { ok: false, error: message };
+  }
 }
 
 export function getInputText(input: AgentInput) {

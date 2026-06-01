@@ -23,13 +23,15 @@ type PriceComparison = {
 export async function runPricingAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
   const intent = "pricing";
-  const mode = normalized.live ? "apify" : resolveMode(options);
+  const requestedMode = resolveMode(options);
   const runtime = createRuntime(normalized, intent, options);
   const guardrail = checkPricingGuardrail(getInputText(normalized));
 
-  await executeTool("run_competitor_scan", {
+  await executeTool("list_service_catalog", {}, runtime);
+  const scan = await executeTool("run_competitor_scan", {
     source: normalized.live ? "apify" : "sample"
-  }, runtime);
+  }, runtime) as { mode?: "mock" | "apify" };
+  const mode = scan.mode === "apify" ? "apify" : requestedMode === "google-adk" ? "google-adk" : "mock";
   const comparisonResult = await executeTool("compare_service_prices", {}, runtime) as {
     comparisons: PriceComparison[];
   };

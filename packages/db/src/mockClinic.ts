@@ -106,6 +106,46 @@ export type PricingObservation = {
   createdAt: string;
 };
 
+export type MockLabCatalogItem = {
+  id: string;
+  labVendor: string;
+  testCode: string;
+  testName: string;
+  specimenType: string;
+  turnaroundHours: number;
+  active: boolean;
+  raw: Record<string, unknown>;
+};
+
+export type MockLabOrder = {
+  id: string;
+  labVendor: string;
+  externalOrderId: string;
+  clientId: string;
+  petId: string;
+  patientName: string;
+  orderedBy: string;
+  testCode: string;
+  testName: string;
+  specimenType: string;
+  orderedAt: string;
+  status: string;
+  raw: Record<string, unknown>;
+};
+
+export type MockLabResult = {
+  id: string;
+  labOrderId: string;
+  labVendor: string;
+  externalOrderId: string;
+  status: string;
+  resultSummary: string;
+  abnormalFlags: Record<string, unknown>[];
+  reportUrl: string | null;
+  raw: Record<string, unknown>;
+  resultedAt: string | null;
+};
+
 type ClientRow = {
   id: string;
   full_name: string;
@@ -212,6 +252,46 @@ type PricingObservationRow = {
   created_at: string;
 };
 
+type LabCatalogRow = {
+  id: string;
+  lab_vendor: string;
+  test_code: string;
+  test_name: string;
+  specimen_type: string;
+  turnaround_hours: number;
+  active: boolean;
+  raw: Record<string, unknown>;
+};
+
+type LabOrderRow = {
+  id: string;
+  lab_vendor: string;
+  external_order_id: string;
+  client_id: string;
+  pet_id: string;
+  patient_name: string;
+  ordered_by: string;
+  test_code: string;
+  test_name: string;
+  specimen_type: string;
+  ordered_at: string;
+  status: string;
+  raw: Record<string, unknown>;
+};
+
+type LabResultRow = {
+  id: string;
+  lab_order_id: string;
+  lab_vendor: string;
+  external_order_id: string;
+  status: string;
+  result_summary: string;
+  abnormal_flags: Record<string, unknown>[];
+  report_url: string | null;
+  raw: Record<string, unknown>;
+  resulted_at: string | null;
+};
+
 type MockClinicRow = {
   clients: ClientRow[];
   pets: PetRow[];
@@ -223,6 +303,9 @@ type MockClinicRow = {
   call_transcripts: CallRow[];
   services: ServiceRow[];
   pricing_observations: PricingObservationRow[];
+  lab_catalog: LabCatalogRow[];
+  lab_orders: LabOrderRow[];
+  lab_results: LabResultRow[];
 };
 
 function normalizeClient(row: ClientRow): MockClient {
@@ -356,6 +439,52 @@ function normalizePricingObservation(row: PricingObservationRow): PricingObserva
   };
 }
 
+function normalizeLabCatalogItem(row: LabCatalogRow): MockLabCatalogItem {
+  return {
+    id: row.id,
+    labVendor: row.lab_vendor,
+    testCode: row.test_code,
+    testName: row.test_name,
+    specimenType: row.specimen_type,
+    turnaroundHours: row.turnaround_hours,
+    active: row.active,
+    raw: row.raw ?? {}
+  };
+}
+
+function normalizeLabOrder(row: LabOrderRow): MockLabOrder {
+  return {
+    id: row.id,
+    labVendor: row.lab_vendor,
+    externalOrderId: row.external_order_id,
+    clientId: row.client_id,
+    petId: row.pet_id,
+    patientName: row.patient_name,
+    orderedBy: row.ordered_by,
+    testCode: row.test_code,
+    testName: row.test_name,
+    specimenType: row.specimen_type,
+    orderedAt: row.ordered_at,
+    status: row.status,
+    raw: row.raw ?? {}
+  };
+}
+
+function normalizeLabResult(row: LabResultRow): MockLabResult {
+  return {
+    id: row.id,
+    labOrderId: row.lab_order_id,
+    labVendor: row.lab_vendor,
+    externalOrderId: row.external_order_id,
+    status: row.status,
+    resultSummary: row.result_summary,
+    abnormalFlags: row.abnormal_flags ?? [],
+    reportUrl: row.report_url,
+    raw: row.raw ?? {},
+    resultedAt: row.resulted_at
+  };
+}
+
 function jsonInput(value: Record<string, unknown>) {
   return value as never;
 }
@@ -452,7 +581,31 @@ export async function listMockClinic() {
           order by created_at desc
           limit 50
         ) item
-      ), '[]'::jsonb) as pricing_observations
+      ), '[]'::jsonb) as pricing_observations,
+      coalesce((
+        select jsonb_agg(row_to_json(item))
+        from (
+          select id, lab_vendor, test_code, test_name, specimen_type, turnaround_hours, active, raw
+          from mock_lab_catalog
+          order by test_name asc
+        ) item
+      ), '[]'::jsonb) as lab_catalog,
+      coalesce((
+        select jsonb_agg(row_to_json(item))
+        from (
+          select id, lab_vendor, external_order_id, client_id, pet_id, patient_name, ordered_by, test_code, test_name, specimen_type, ordered_at, status, raw
+          from mock_lab_orders
+          order by ordered_at desc
+        ) item
+      ), '[]'::jsonb) as lab_orders,
+      coalesce((
+        select jsonb_agg(row_to_json(item))
+        from (
+          select id, lab_order_id, lab_vendor, external_order_id, status, result_summary, abnormal_flags, report_url, raw, resulted_at
+          from mock_lab_results
+          order by resulted_at desc nulls last, created_at desc
+        ) item
+      ), '[]'::jsonb) as lab_results
   `;
 
   return {
@@ -465,7 +618,10 @@ export async function listMockClinic() {
     messages: clinic.messages.map(normalizeMessage),
     callTranscripts: clinic.call_transcripts.map(normalizeCall),
     services: clinic.services.map(normalizeService),
-    pricingObservations: clinic.pricing_observations.map(normalizePricingObservation)
+    pricingObservations: clinic.pricing_observations.map(normalizePricingObservation),
+    labCatalog: clinic.lab_catalog.map(normalizeLabCatalogItem),
+    labOrders: clinic.lab_orders.map(normalizeLabOrder),
+    labResults: clinic.lab_results.map(normalizeLabResult)
   };
 }
 

@@ -3,7 +3,11 @@ import type {
   AgentReportDraft,
   AgentTaskDraft,
   AgentWorkflowResult,
+  MockApproval,
+  MockFollowup,
   MockInvoice,
+  MockReport,
+  MockTask,
   RunAgentOptions
 } from "./contracts";
 import { checkBillingGuardrail, checkMedicalGuardrail } from "./guardrails";
@@ -23,7 +27,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
   const normalized = normalizeAgentInput(input);
   const intent = classifyIntent(normalized, "daily_ops");
   if (intent === "pricing") return runPricingAgent(normalized, options);
-  if (intent === "records") return runRecordsAgent(normalized, options);
+  if (intent === "records") return runRecordsAgent(normalized, { ...options, audience: "internal" });
   if (intent === "followup") return runFollowupAgent(normalized, options);
 
   const mode = resolveMode(options);
@@ -80,43 +84,81 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
     });
   }
 
-  const openTasks = 3;
-  const highPriority = runtime.data.messages.filter((message) => message.urgency === "high").length;
-  const pendingFollowups = runtime.data.followups.filter((followup) => followup.status === "open").length;
+  if (intent === "labs") {
+    await executeTool("list_lab_catalog", { active: true }, runtime);
+    const clientPet = runtime.data.pets.find((pet) =>
+      normalized.petName ? pet.name.toLowerCase().includes(normalized.petName.toLowerCase()) : false
+    );
+    const ordersResult = await executeTool("lookup_lab_orders", {
+      petId: clientPet?.id,
+      patientName: normalized.petName,
+      status: "final"
+    }, runtime) as { orders: Array<{ id: string; externalOrderId: string; labVendor: string; patientName: string }> };
+    const order = ordersResult.orders[0] ?? runtime.data.labOrders?.find((item) => item.status === "final") ?? null;
+    const result = order
+      ? await executeTool("get_lab_result", { labOrderId: order.id }, runtime) as { result: { abnormalFlags?: unknown[] } | null }
+      : { result: null };
+    const summary = order
+      ? await executeTool("summarize_lab_result", { labOrderId: order.id }, runtime) as { summary: Record<string, unknown> }
+      : { summary: { labVendor: "antech_mock", source: "mock lab data", status: "not_found", medicalAdviceGiven: false } };
+    const followup = order
+      ? await executeTool("create_lab_followup_task", {
+          labOrderId: order.id,
+          reason: result.result?.abnormalFlags?.length
+            ? "Final mock lab result has abnormal flags; veterinarian review required."
+            : "Final mock lab result requires staff review before client disclosure."
+        }, runtime) as { task: AgentTaskDraft }
+      : null;
+    return buildResult({
+      intent,
+      mode,
+      message: "Mock lab data checked. I created a staff review task before any client disclosure.",
+      result: {
+        labVendor: "antech_mock",
+        source: "mock lab data",
+        order,
+        summary: summary.summary,
+        medicalAdviceGiven: false
+      },
+      runtime,
+      options,
+      task: followup?.task
+    });
+  }
+
+  const tasksResult = await executeTool("list_tasks", {}, runtime) as { tasks: MockTask[] };
+  const approvalsResult = await executeTool("list_approvals", { status: "pending" }, runtime) as { approvals: MockApproval[] };
+  const followupsResult = await executeTool("list_followup_candidates", { status: "open" }, runtime) as { candidates: MockFollowup[] };
+  const reportsResult = await executeTool("list_reports", {}, runtime) as { reports: MockReport[] };
   const invoiceReviews = runtime.data.invoices.filter((invoice) => invoice.flags.length > 0).length;
+  const openTasks = tasksResult.tasks.filter((task) => task.status !== "completed" && task.status !== "archived").length || runtime.data.messages.length;
+  const highPriority = tasksResult.tasks.filter((task) => task.priority === "high").length ||
+    runtime.data.messages.filter((message) => message.urgency === "high").length;
+  const pendingFollowups = followupsResult.candidates.length;
   const summary = {
     openTasks,
     highPriority,
-    pendingApprovals: 1,
+    pendingApprovals: approvalsResult.approvals.length,
     openFollowups: pendingFollowups,
     invoiceReviews,
-    pricingItems: runtime.data.pricingObservations.length
+    pricingItems: runtime.data.pricingObservations.length,
+    recentReports: reportsResult.reports.length
   };
-  const report: AgentReportDraft = {
-    id: "report-daily-ops",
-    kind: "report",
-    reportType: "daily_ops",
-    title: "Daily ops digest",
-    summary: `${openTasks} open task(s), ${highPriority} urgent message(s), ${pendingFollowups} follow-up candidate(s).`,
-    data: {
-      summary,
-      rankedWork: [
-        "Review urgent sick-pet messages first.",
-        "Confirm pending records-transfer approval.",
-        "Work invoice review before end of day.",
-        "Schedule open follow-up candidates."
-      ]
-    }
-  };
-  runtime.effects.push(report);
+  const rankedWork = [
+    highPriority ? "Review high-priority sick-pet or wait complaints first." : "No high-priority task spike in current context.",
+    approvalsResult.approvals.length ? "Review pending approvals before sending records." : "No pending approval backlog found.",
+    invoiceReviews ? "Review flagged invoices before client billing replies." : "No flagged invoice review backlog found.",
+    pendingFollowups ? "Schedule open follow-up candidates." : "No open follow-up candidates found."
+  ];
+  const reportResult = await executeTool("create_daily_ops_report", { summary, rankedWork }, runtime) as { report: AgentReportDraft };
 
   return buildResult({
     intent: "daily_ops",
     mode,
-    message: report.summary,
-    result: report.data,
+    message: reportResult.report.summary,
+    result: reportResult.report.data,
     runtime,
     options,
-    report
+    report: reportResult.report
   });
 }

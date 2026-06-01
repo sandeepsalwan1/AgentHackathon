@@ -27,10 +27,14 @@ export {
 export {
   createAgentReport,
   createAgentRun,
+  createAgentToolCall,
   createApproval,
   createWorkflowEvent,
   decideApproval,
+  failAgentRun,
   getAgentRun,
+  getAgentRunWithTimeline,
+  listAgentToolCalls,
   listAgentReports,
   listApprovals,
   listWorkflowEvents,
@@ -39,6 +43,8 @@ export {
 export type {
   AgentReport,
   AgentRun,
+  AgentRunTimeline,
+  AgentToolCall,
   Approval,
   WorkflowEvent
 } from "./agents";
@@ -59,6 +65,9 @@ export type {
   MockClient,
   MockFollowup,
   MockInvoice,
+  MockLabCatalogItem,
+  MockLabOrder,
+  MockLabResult,
   MockMessage,
   MockPet,
   MockService,

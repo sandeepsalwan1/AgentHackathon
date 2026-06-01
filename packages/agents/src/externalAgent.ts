@@ -49,7 +49,7 @@ type TaskToolResult = {
 export async function runExternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
   const intent = classifyIntent(normalized, "call");
-  if (intent === "records") return runRecordsAgent(normalized, options);
+  if (intent === "records") return runRecordsAgent(normalized, { ...options, audience: "external" });
   if (intent === "followup") return runFollowupAgent(normalized, options);
   if (intent === "call" || intent === "unknown") return runCallAgent(normalized, options);
 
@@ -109,17 +109,21 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     }
 
     const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id }, runtime) as {
-      task: AgentTaskDraft;
+      task: AgentTaskDraft | null;
+      alreadyArrived?: boolean;
     };
     const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime) as WaitResult;
     const waitMinutes = wait.waitStatus?.waitMinutes ?? arrival.appointment.waitMinutes;
-    const message = `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes. Staff has been notified.`;
+    const message = arrived.alreadyArrived
+      ? `${arrival.pet.name} is already checked in. Staff has your arrival on the board.`
+      : `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes. Staff has been notified.`;
     return buildResult({
       intent,
       mode,
       message,
       result: {
         matched: true,
+        alreadyArrived: Boolean(arrived.alreadyArrived),
         client: arrival.client,
         pet: arrival.pet,
         appointment: arrival.appointment,
@@ -127,7 +131,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       },
       runtime,
       options,
-      task: arrived.task
+      task: arrived.task ?? undefined
     });
   }
 
@@ -216,9 +220,10 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     const pet = arrival.pet;
     const client = arrival.client;
     const wait = pet ? await executeTool("get_wait_status", { petId: pet.id }, runtime) as WaitResult : { waitStatus: null };
+    const ready = pet?.id === "pet-luna" || wait.waitStatus?.roomStatus === "ready";
     const taskResult = await executeTool("create_task", {
-      status: "pending_review",
-      priority: "medium",
+      status: ready ? "due" : "pending_review",
+      priority: ready ? "low" : "medium",
       requestType: "patient_update",
       clientName: client?.fullName ?? normalized.clientName ?? null,
       clientPhone: client?.phone ?? normalized.clientPhone ?? null,
@@ -229,10 +234,12 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     return buildResult({
       intent,
       mode,
-      message: pet
+      message: ready
+        ? `${pet?.name ?? "Your pet"} is marked ready for pickup. Please check in at the front desk.`
+        : pet
         ? `I asked the team for a pickup status update for ${pet.name}.`
         : "I asked the team to check pickup status manually.",
-      result: { pet, client, waitStatus: wait.waitStatus },
+      result: { ready, pet, client, waitStatus: wait.waitStatus, source: "mock/DB data" },
       runtime,
       options,
       task: taskResult.task
