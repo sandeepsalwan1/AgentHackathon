@@ -622,7 +622,7 @@ export function VetDashboard({ session, onLogout }: Props) {
             >
               <h2>
                 <ClipboardList size={18} />
-                Dashboard
+                Today&apos;s Queue
                 {newTaskCount > 0 && (
                   <span className="vetNewTaskBadge">+{newTaskCount} new</span>
                 )}
