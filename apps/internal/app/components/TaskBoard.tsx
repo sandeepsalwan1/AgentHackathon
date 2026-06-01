@@ -1593,6 +1593,12 @@ function EntryScreen({ onSave }: { onSave: (session: Session) => void }) {
             />
           </label>
         ) : null}
+        {role !== "staff" ? (
+          <div className="authDemoHint">
+            <span className="authDemoLabel">Demo passcodes:</span>
+            <code>Admin/VA 246810</code> <code>Vet 135790</code>
+          </div>
+        ) : null}
         {error ? <div className="alertLine">{error}</div> : null}
         <button className="primaryButton" type="submit" disabled={submitting}>
           <ShieldCheck size={18} />

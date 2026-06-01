@@ -3,6 +3,7 @@
 import { Eye, EyeOff, LogIn, PawPrint, ShieldCheck, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import {
+  getDemoAccounts,
   getDemoAdminCredentials,
   login,
   redeemOtp,
@@ -59,6 +60,7 @@ function CustomerLogin({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitch
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const demoCustomer = getDemoAccounts().find((account) => account.role === "customer")!;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -79,6 +81,10 @@ function CustomerLogin({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitch
     <form className="authForm" onSubmit={submit}>
       <h2 className="authFormTitle">Welcome back</h2>
       <p className="authFormSubtitle">Sign in to manage your pet&apos;s care</p>
+      <div className="authDemoHint">
+        <span className="authDemoLabel">Demo owner:</span>
+        <code>{demoCustomer.email}</code> / <code>{demoCustomer.password}</code>
+      </div>
       <label className="authLabel">
         Email
         <input
@@ -219,6 +225,8 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const demo = getDemoAdminCredentials();
+  const demoVet = getDemoAccounts().find((account) => account.role === "veterinarian")!;
+  const demoStaff = getDemoAccounts().find((account) => account.role === "staff")!;
 
   async function submitLogin(e: FormEvent) {
     e.preventDefault();
@@ -303,6 +311,14 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
       <div className="authDemoHint">
         <span className="authDemoLabel">Demo admin:</span>
         <code>{demo.email}</code> / <code>{demo.password}</code>
+      </div>
+      <div className="authDemoHint">
+        <span className="authDemoLabel">Demo vet:</span>
+        <code>{demoVet.email}</code> / <code>{demoVet.password}</code>
+      </div>
+      <div className="authDemoHint">
+        <span className="authDemoLabel">Demo staff:</span>
+        <code>{demoStaff.email}</code> / <code>{demoStaff.password}</code>
       </div>
       <label className="authLabel">
         Email

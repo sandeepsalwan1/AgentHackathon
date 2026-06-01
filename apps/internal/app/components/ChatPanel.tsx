@@ -14,6 +14,7 @@ export type ChatMessage = {
   content: string;
   status?: WorkflowStatus;
   timestamp: Date;
+  taskIds?: string[];
   approvalIds?: string[];
   report?: ReportSummary;
 };
@@ -222,6 +223,24 @@ export function ChatPanel({ messages, onSend, isLoading, placeholder, className 
                 dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
               />
               {msg.report && <ReportCard report={msg.report} />}
+              {msg.taskIds?.length ? (
+                <div className="chatMeta">
+                  <span className="agentChip agentChip--done">
+                    <CheckCircle2 size={12} />
+                    Task created
+                  </span>
+                  <span className="chatApprovalNote">{msg.taskIds.join(", ")}</span>
+                </div>
+              ) : null}
+              {msg.approvalIds?.length ? (
+                <div className="chatMeta">
+                  <span className="agentChip agentChip--approval">
+                    <ShieldAlert size={12} />
+                    Approval queued
+                  </span>
+                  <span className="chatApprovalNote">{msg.approvalIds.join(", ")}</span>
+                </div>
+              ) : null}
               {msg.status && msg.status !== "completed" && (
                 <div className="chatMeta">
                   <StatusChip status={msg.status} />

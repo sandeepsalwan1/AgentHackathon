@@ -15,6 +15,7 @@ export type Account = {
   email: string;
   phone?: string;
   petName?: string;
+  passcode?: string;
   passwordHash: string;
   mustResetPassword?: boolean;
   otp?: string;
@@ -28,13 +29,48 @@ export type AccountSession = {
   email: string;
   phone?: string;
   petName?: string;
+  passcode?: string;
   source: "account"; // discriminator — legacy passcode sessions lack this field
 };
 
 const ACCOUNTS_KEY = "central-vet-accounts";
 const SESSION_KEY = "central-vet-session";
 
-const DEMO_ADMIN = { email: "admin@centralvet.demo", password: "admin1234" };
+export const DEMO_PASSCODES = {
+  admin: "246810",
+  veterinarian: "135790"
+} as const;
+
+export const DEMO_ACCOUNTS = [
+  {
+    role: "customer" as const,
+    name: "Maya Parker",
+    email: "maya@example.com",
+    phone: "(415) 555-0134",
+    petName: "Biscuit",
+    password: "demo1234"
+  },
+  {
+    role: "staff" as const,
+    name: "Front Desk",
+    email: "staff@centralvet.demo",
+    password: "staff1234"
+  },
+  {
+    role: "veterinarian" as const,
+    name: "Dr. Shiv",
+    email: "vet@centralvet.demo",
+    password: "vet1234",
+    passcode: DEMO_PASSCODES.veterinarian
+  },
+  {
+    role: "admin" as const,
+    name: "Clinic Admin",
+    email: "admin@centralvet.demo",
+    password: "admin1234",
+    passcode: DEMO_PASSCODES.admin
+  }
+];
 
 // MOCK: base64 + salt. Replace with real hashing server-side.
 function mockHash(value: string): string {
@@ -68,26 +104,33 @@ function generateOtp(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
 }
 
-function seedAdmin(): void {
+function seedDemoAccounts(): void {
   const accounts = loadAccounts();
-  if (accounts.some((a) => a.role === "admin")) return;
-  persistAccounts([
-    ...accounts,
-    {
+  const existingEmails = new Set(accounts.map((account) => account.email));
+  const seeded = DEMO_ACCOUNTS
+    .filter((account) => !existingEmails.has(account.email))
+    .map((account) => ({
       id: uid(),
-      role: "admin",
-      name: "Clinic Admin",
-      email: DEMO_ADMIN.email,
-      passwordHash: mockHash(DEMO_ADMIN.password),
+      role: account.role,
+      name: account.name,
+      email: account.email,
+      phone: "phone" in account ? account.phone : undefined,
+      petName: "petName" in account ? account.petName : undefined,
+      passcode: "passcode" in account ? account.passcode : undefined,
+      passwordHash: mockHash(account.password),
       createdAt: new Date().toISOString(),
-    },
-  ]);
+    }));
+  if (seeded.length) persistAccounts([...accounts, ...seeded]);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function getDemoAdminCredentials() {
-  return DEMO_ADMIN;
+  return DEMO_ACCOUNTS.find((account) => account.role === "admin")!;
+}
+
+export function getDemoAccounts() {
+  return DEMO_ACCOUNTS;
 }
 
 export async function signupCustomer(params: {
@@ -97,7 +140,7 @@ export async function signupCustomer(params: {
   petName: string;
   password: string;
 }): Promise<Account> {
-  seedAdmin();
+  seedDemoAccounts();
   const accounts = loadAccounts();
   if (accounts.some((a) => a.email === params.email.toLowerCase())) {
     throw new Error("An account with this email already exists.");
@@ -117,7 +160,7 @@ export async function signupCustomer(params: {
 }
 
 export async function login(email: string, password: string): Promise<Account> {
-  seedAdmin();
+  seedDemoAccounts();
   const accounts = loadAccounts();
   const account = accounts.find((a) => a.email === email.toLowerCase().trim());
   if (!account) throw new Error("No account found with this email.");
@@ -198,6 +241,7 @@ export function saveSession(account: Account): AccountSession {
     email: account.email,
     phone: account.phone,
     petName: account.petName,
+    passcode: account.passcode,
     source: "account",
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));

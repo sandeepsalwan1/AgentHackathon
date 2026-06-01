@@ -82,7 +82,9 @@ export function CustomerExperience({ session, onLogout }: Props) {
           role: "assistant",
           content: response.message,
           status: response.status,
+          taskIds: response.taskIds,
           approvalIds: response.approvalIds,
+          report: response.report,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
