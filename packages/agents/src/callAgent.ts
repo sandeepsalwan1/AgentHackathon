@@ -37,7 +37,8 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
       appointment: { id: string; waitMinutes?: number } | null;
     };
     if (arrival.appointment) {
-      const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id }, runtime) as {
+      const waitComplaint = /wait|waiting|been here|long time|so long/i.test(transcript);
+      const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id, waitComplaint }, runtime) as {
         task: AgentTaskDraft | null;
         alreadyArrived?: boolean;
       };

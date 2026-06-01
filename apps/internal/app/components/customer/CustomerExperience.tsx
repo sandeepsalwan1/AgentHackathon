@@ -5,7 +5,9 @@ import {
   ClipboardList,
   FileText,
   LogOut,
+  Mail,
   PawPrint,
+  Phone,
   Pill,
   ShieldCheck,
   Stethoscope,
@@ -156,6 +158,34 @@ export function CustomerExperience({ session, onLogout }: Props) {
                       Caring for <strong>{session.petName}</strong>
                     </p>
                   )}
+                </div>
+              </div>
+              <div className="customerFacts">
+                <div className="customerFact">
+                  <span className="customerFactLabel">
+                    <PawPrint size={12} /> Pet
+                  </span>
+                  <span className="customerFactValue">{session.petName ?? "Not added yet"}</span>
+                </div>
+                <div className="customerFact">
+                  <span className="customerFactLabel">
+                    <ShieldCheck size={12} /> Owner
+                  </span>
+                  <span className="customerFactValue">{session.name}</span>
+                </div>
+                {session.phone && (
+                  <div className="customerFact">
+                    <span className="customerFactLabel">
+                      <Phone size={12} /> Phone
+                    </span>
+                    <span className="customerFactValue">{session.phone}</span>
+                  </div>
+                )}
+                <div className="customerFact">
+                  <span className="customerFactLabel">
+                    <Mail size={12} /> Email
+                  </span>
+                  <span className="customerFactValue">{session.email}</span>
                 </div>
               </div>
             </div>

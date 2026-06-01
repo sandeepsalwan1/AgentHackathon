@@ -148,7 +148,7 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
   return (
     <form className="authForm" onSubmit={submit}>
       <h2 className="authFormTitle">Create account</h2>
-      <p className="authFormSubtitle">Your pet deserves great care</p>
+      <p className="authFormSubtitle">Set up access for you and your pet</p>
       <label className="authLabel">
         Full name <span className="authRequired">*</span>
         <input
@@ -227,8 +227,8 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
     setError("");
     try {
       const account = await login(email, password);
-      if (account.role !== "veterinarian" && account.role !== "admin") {
-        throw new Error("This portal is for veterinarians and admins only.");
+      if (account.role === "customer") {
+        throw new Error("Use the Pet Owner tab to sign in.");
       }
       onAuth(saveSession(account));
     } catch (err) {
@@ -299,7 +299,7 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
   return (
     <form className="authForm" onSubmit={submitLogin}>
       <h2 className="authFormTitle">Clinic portal</h2>
-      <p className="authFormSubtitle">Veterinarians &amp; administrators</p>
+      <p className="authFormSubtitle">Staff, vets, and admins</p>
       <div className="authDemoHint">
         <span className="authDemoLabel">Demo admin:</span>
         <code>{demo.email}</code> / <code>{demo.password}</code>
@@ -332,7 +332,7 @@ function StaffPortal({ onAuth, onLegacyStaff }: { onAuth: Props["onAuth"]; onLeg
       </p>
       <div className="authDivider" />
       <button type="button" className="authGhostBtn" onClick={onLegacyStaff}>
-        Staff / VA sign-in (clinic board)
+        Open the clinic task board
       </button>
     </form>
   );

@@ -4508,3 +4508,73 @@ textarea:focus {
   max-height: 600px;
   overflow-y: auto;
 }
+
+/* Customer "hard facts" strip on the welcome card */
+.customerFacts {
+  display: grid;
+  gap: 10px;
+  min-width: 200px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.customerFact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.customerFactLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.customerFactValue {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+@media (max-width: 720px) {
+  .customerFacts { min-width: 0; width: 100%; }
+}
+
+/* Admin: vet vs staff account-type toggle */
+.adminRoleToggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  margin-bottom: 4px;
+}
+.adminRoleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.adminRoleBtn--active {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.adminRoleTag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}

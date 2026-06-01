@@ -6,16 +6,24 @@ import { CreateVetPanel } from "./admin/CreateVetPanel";
 import { AuthScreen } from "./auth/AuthScreen";
 import { CustomerExperience } from "./customer/CustomerExperience";
 import { TaskBoard } from "./TaskBoard";
-import { VetDashboard } from "./vet/VetDashboard";
 
+// One app, three surfaces:
+// - pet owners get the chat portal
+// - staff and vets share the clinic task board (the real work queue)
+// - admins get the team panel, with a button into the same board
 type View =
   | { kind: "loading" }
   | { kind: "auth" }
-  | { kind: "legacy" } // staff/VA with existing passcode board
+  | { kind: "board" } // staff / vet / VA on the shared task board
   | { kind: "customer"; session: AccountSession }
-  | { kind: "veterinarian"; session: AccountSession }
-  | { kind: "staff"; session: AccountSession }
   | { kind: "admin"; session: AccountSession };
+
+function viewForSession(session: AccountSession): View {
+  if (session.role === "customer") return { kind: "customer", session };
+  if (session.role === "admin") return { kind: "admin", session };
+  // staff + veterinarian both work from the shared task board
+  return { kind: "board" };
+}
 
 export function AppRoot() {
   const [view, setView] = useState<View>({ kind: "loading" });
@@ -23,26 +31,22 @@ export function AppRoot() {
   useEffect(() => {
     const id = window.setTimeout(() => {
       const session = getSession();
-      setView(session ? { kind: session.role, session } : { kind: "auth" });
+      setView(session ? viewForSession(session) : { kind: "auth" });
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
 
   function handleAuth(session: AccountSession) {
-    setView({ kind: session.role, session });
+    setView(viewForSession(session));
   }
 
-  function handleLegacyStaff() {
-    setView({ kind: "legacy" });
+  function handleOpenBoard() {
+    setView({ kind: "board" });
   }
 
   function handleLogout() {
     logout();
     setView({ kind: "auth" });
-  }
-
-  function handleOpenLegacyBoard() {
-    setView({ kind: "legacy" });
   }
 
   if (view.kind === "loading") {
@@ -58,10 +62,10 @@ export function AppRoot() {
   }
 
   if (view.kind === "auth") {
-    return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleLegacyStaff} />;
+    return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
   }
 
-  if (view.kind === "legacy") {
+  if (view.kind === "board") {
     return <TaskBoard />;
   }
 
@@ -69,21 +73,16 @@ export function AppRoot() {
     return <CustomerExperience session={view.session} onLogout={handleLogout} />;
   }
 
-  if (view.kind === "veterinarian" || view.kind === "staff") {
-    return <VetDashboard session={view.session} onLogout={handleLogout} />;
-  }
-
   if (view.kind === "admin") {
     return (
       <CreateVetPanel
         session={view.session}
         onLogout={handleLogout}
-        onOpenLegacyBoard={handleOpenLegacyBoard}
+        onOpenLegacyBoard={handleOpenBoard}
       />
     );
   }
 
-  // Fallback
   logout();
-  return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleLegacyStaff} />;
+  return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
 }

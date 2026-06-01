@@ -50,3 +50,5 @@ skills-lock.json
 .vibe/
 .windsurf/
 .zencoder/
+
+.claude/scheduled_tasks.lock

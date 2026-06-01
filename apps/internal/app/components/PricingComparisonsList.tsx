@@ -66,15 +66,15 @@ export function PricingComparisonsList({
               {comp.observation.serviceName}
             </span>
             <span className="pricingCompCol pricingCompCol--competitor">
-              {comp.observation.competitorName ?? "—"}
+              {comp.observation.competitorName ?? "Competitor"}
             </span>
             <span className="pricingCompCol pricingCompCol--ourPrice">
-              {ourPrice != null ? `$${(ourPrice / 100).toFixed(2)}` : "—"}
+              {ourPrice != null ? `$${(ourPrice / 100).toFixed(2)}` : "n/a"}
             </span>
             <span className="pricingCompCol pricingCompCol--theirPrice">
               {theirPrice != null
                 ? `$${(theirPrice / 100).toFixed(2)}`
-                : comp.observation.observedText ?? "—"}
+                : comp.observation.observedText ?? "n/a"}
             </span>
             <span className="pricingCompCol pricingCompCol--delta">
               {isNull ? (

@@ -108,7 +108,8 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       });
     }
 
-    const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id }, runtime) as {
+    const waitComplaint = /wait|waiting|been here|long time|so long/i.test(getInputText(normalized));
+    const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id, waitComplaint }, runtime) as {
       task: AgentTaskDraft | null;
       alreadyArrived?: boolean;
     };
