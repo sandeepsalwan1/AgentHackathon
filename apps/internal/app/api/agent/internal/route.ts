@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders } from "../../_shared";
+import { dbError } from "../../_shared";
 import { requireManagerFromBody } from "../_auth";
-import { runInternalAgent } from "../_workflow";
+import { executeVetAgentWorkflow } from "../_runner";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +8,7 @@ export async function POST(request: Request) {
   try {
     const auth = await requireManagerFromBody(request);
     if ("response" in auth) return auth.response;
-    const result = await runInternalAgent(auth.body);
-    return NextResponse.json(result, { headers: noStoreHeaders });
+    return executeVetAgentWorkflow({ agent: "internal", routeIntent: "internal", input: auth.body, actor: auth.actor, request });
   } catch (error) {
     return dbError(error, { route: "agent.internal" });
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders } from "../../_shared";
-import { runInternalAgent } from "../_workflow";
+import { dbError } from "../../_shared";
+import { executeVetAgentWorkflow } from "../_runner";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "message is required." }, { status: 400 });
     }
 
-    const result = await runInternalAgent({ message, name: vetName, intent });
-    return NextResponse.json(result, { headers: noStoreHeaders });
+    return executeVetAgentWorkflow({
+      agent: "internal",
+      routeIntent: "internal",
+      input: { message, request: message, name: vetName, ...(intent ? { intent } : {}) },
+      actor: { name: vetName, role: "veterinarian" },
+      request
+    });
   } catch (error) {
     return dbError(error, { route: "agent.vet-chat" });
   }

@@ -1,4 +1,4 @@
-import { getAgentRun, listWorkflowEvents } from "@central-vet/db";
+import { getAgentRunWithTimeline } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { authenticateActorFromQuery, canManage, dbError, noStoreHeaders } from "../../../_shared";
 
@@ -16,10 +16,9 @@ export async function GET(
       return NextResponse.json({ error: "Manager access required." }, { status: 403 });
     }
     const { id } = await context.params;
-    const run = await getAgentRun(id);
-    if (!run) return NextResponse.json({ error: "Run not found." }, { status: 404 });
-    const workflowEvents = await listWorkflowEvents({ runId: id });
-    return NextResponse.json({ ok: true, run, workflowEvents }, { headers: noStoreHeaders });
+    const detail = await getAgentRunWithTimeline(id);
+    if (!detail) return NextResponse.json({ error: "Run not found." }, { status: 404 });
+    return NextResponse.json({ ok: true, ...detail }, { headers: noStoreHeaders });
   } catch (error) {
     return dbError(error, { route: "agent.runs.get" });
   }

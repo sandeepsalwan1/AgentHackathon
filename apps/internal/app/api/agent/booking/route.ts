@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders } from "../../_shared";
+import { dbError } from "../../_shared";
 import { readPublicAgentBody } from "../_auth";
-import { runBooking } from "../_workflow";
+import { executeVetAgentWorkflow } from "../_runner";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +8,7 @@ export async function POST(request: Request) {
   try {
     const parsed = await readPublicAgentBody(request, "booking");
     if ("response" in parsed) return parsed.response;
-    const result = await runBooking(parsed.body);
-    return NextResponse.json(result, { headers: noStoreHeaders });
+    return executeVetAgentWorkflow({ agent: "external", routeIntent: "booking", input: parsed.body, request });
   } catch (error) {
     return dbError(error, { route: "agent.booking" });
   }

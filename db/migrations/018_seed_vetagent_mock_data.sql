@@ -52,11 +52,10 @@ on conflict (id) do update set
   appointment_time = excluded.appointment_time,
   appointment_type = excluded.appointment_type,
   doctor = excluded.doctor,
+  status = excluded.status,
   wait_minutes = excluded.wait_minutes,
-  room_status = case
-    when mock_appointments.status = 'arrived' then mock_appointments.room_status
-    else excluded.room_status
-  end,
+  room_status = excluded.room_status,
+  arrived_at = null,
   notes = excluded.notes,
   updated_at = now();
 
