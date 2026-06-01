@@ -120,7 +120,7 @@ export function RequestForm() {
           <div className="successBox">
             <CheckCircle2 size={34} />
             <h2>Request received</h2>
-            <p>Our clinic team will review it. For emergencies, call the hospital directly.</p>
+            <p>It is on the clinic dashboard. For emergencies, call the hospital directly.</p>
             <button type="button" onClick={() => setDone(false)}>
               Submit another request
             </button>

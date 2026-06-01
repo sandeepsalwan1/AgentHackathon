@@ -676,7 +676,7 @@ export async function findArrivalAppointment(input: {
 
 export async function resetMockClinicState() {
   const sql = getSql();
-  const rows = await sql<{ id: string }[]>`
+  const appointmentRows = await sql<{ id: string }[]>`
     update mock_appointments
     set status = 'scheduled',
       room_status = 'waiting',
@@ -685,7 +685,29 @@ export async function resetMockClinicState() {
     where status = 'arrived' or arrived_at is not null
     returning id
   `;
-  return { resetAppointments: rows.length };
+  const bookedRows = await sql<{ id: string }[]>`
+    delete from mock_appointments
+    where id like 'appointment-slot-%'
+    returning id
+  `;
+  const slotRows = await sql<{ id: string }[]>`
+    update mock_slots
+    set available = true
+    where available = false
+    returning id
+  `;
+  const followupRows = await sql<{ id: string }[]>`
+    update mock_followups
+    set status = 'open'
+    where status <> 'open'
+    returning id
+  `;
+  return {
+    resetAppointments: appointmentRows.length,
+    resetBookedAppointments: bookedRows.length,
+    resetSlots: slotRows.length,
+    resetFollowups: followupRows.length
+  };
 }
 
 export async function markAppointmentArrived(id: string) {
@@ -701,6 +723,58 @@ export async function markAppointmentArrived(id: string) {
       updated_at = now()
     where id = ${id}
     returning id, client_id, pet_id, appointment_date, appointment_time, appointment_type, doctor, status, wait_minutes, room_status, arrived_at, notes
+  `;
+  return rows[0] ? normalizeAppointment(rows[0]) : null;
+}
+
+export async function bookMockAppointment(input: {
+  slotId: string;
+  clientId: string;
+  petId: string;
+  reason?: string | null;
+}) {
+  const sql = getSql();
+  const rows = await sql<AppointmentRow[]>`
+    with selected_slot as (
+      update mock_slots
+      set available = false
+      where id = ${input.slotId}
+        and available = true
+      returning id, slot_date, slot_time, doctor, appointment_type
+    ),
+    inserted as (
+      insert into mock_appointments (
+        id,
+        client_id,
+        pet_id,
+        appointment_date,
+        appointment_time,
+        appointment_type,
+        doctor,
+        status,
+        wait_minutes,
+        room_status,
+        notes
+      )
+      select
+        ${`appointment-${input.slotId}-${input.petId}`},
+        ${input.clientId},
+        ${input.petId},
+        slot_date,
+        slot_time,
+        appointment_type,
+        doctor,
+        'scheduled',
+        0,
+        'waiting',
+        ${input.reason ?? "Booked by VetAgent"}
+      from selected_slot
+      on conflict (id) do update
+        set status = excluded.status,
+          updated_at = now()
+      returning id, client_id, pet_id, appointment_date, appointment_time, appointment_type, doctor, status, wait_minutes, room_status, arrived_at, notes
+    )
+    select * from inserted
   `;
   return rows[0] ? normalizeAppointment(rows[0]) : null;
 }
@@ -736,6 +810,17 @@ export async function listOpenFollowups() {
     order by due_date asc
   `;
   return rows.map(normalizeFollowup);
+}
+
+export async function markFollowupContacted(id: string) {
+  const sql = getSql();
+  const rows = await sql<FollowupRow[]>`
+    update mock_followups
+    set status = 'contacted'
+    where id = ${id}
+    returning id, client_id, pet_id, followup_type, due_date, recommended_action, status
+  `;
+  return rows[0] ? normalizeFollowup(rows[0]) : null;
 }
 
 export async function listReviewInvoices() {

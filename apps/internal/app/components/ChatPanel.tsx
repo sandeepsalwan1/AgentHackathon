@@ -227,7 +227,7 @@ export function ChatPanel({ messages, onSend, isLoading, placeholder, className 
                 <div className="chatMeta">
                   <span className="agentChip agentChip--done">
                     <CheckCircle2 size={12} />
-                    Task created
+                    Dashboard action
                   </span>
                   <span className="chatApprovalNote">{msg.taskIds.join(", ")}</span>
                 </div>
@@ -236,7 +236,7 @@ export function ChatPanel({ messages, onSend, isLoading, placeholder, className 
                 <div className="chatMeta">
                   <span className="agentChip agentChip--approval">
                     <ShieldAlert size={12} />
-                    Approval queued
+                    Checkpoint queued
                   </span>
                   <span className="chatApprovalNote">{msg.approvalIds.join(", ")}</span>
                 </div>
@@ -246,7 +246,7 @@ export function ChatPanel({ messages, onSend, isLoading, placeholder, className 
                   <StatusChip status={msg.status} />
                   {msg.status === "needs_approval" && (
                     <span className="chatApprovalNote">
-                      A staff member will review and confirm this action.
+                      Automation checkpoint pending.
                     </span>
                   )}
                 </div>

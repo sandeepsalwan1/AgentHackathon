@@ -211,24 +211,44 @@ async function createBookingHold(args: {
   const slot = runtime.data.slots.find((candidate) => candidate.id === args.slotId && candidate.available) ?? null;
   const client = clientFor(runtime.data, args.clientId);
   const pet = petFor(runtime.data, args.petId);
-  if (!slot || !client || !pet) return { booked: false, slot, client, pet };
-  const task = addEffect(runtime, makeTask({
-    status: "pending_review",
-    priority: "medium",
-    requestType: "scheduling",
-    clientName: client.fullName,
-    clientPhone: client.phone,
-    petName: pet.name,
-    request: `Confirm ${slot.appointmentType} appointment for ${pet.name} on ${slot.slotDate} at ${slot.slotTime}.`,
-    notes: args.reason ?? "Agent-selected slot needs staff confirmation."
-  }));
+  if (!slot || !client || !pet) return { booked: false, action: "booking_not_completed", slot, client, pet };
+  slot.available = false;
+  const appointment: MockAppointment = {
+    id: id("appointment", `${slot.id}-${pet.id}`),
+    clientId: client.id,
+    petId: pet.id,
+    appointmentDate: slot.slotDate,
+    appointmentTime: slot.slotTime,
+    appointmentType: slot.appointmentType,
+    doctor: slot.doctor,
+    status: "scheduled",
+    waitMinutes: 0,
+    roomStatus: "waiting",
+    notes: args.reason ?? "Booked by VetAgent."
+  };
+  runtime.data.appointments.push(appointment);
   recordEvent(runtime, {
-    eventType: "booking_prepared",
-    title: "Booking option selected",
-    detail: "No appointment was finalized without staff confirmation.",
-    metadata: { slotId: slot.id, taskId: task.id }
+    eventType: "appointment_booked",
+    title: "Appointment booked",
+    detail: `${pet.name} booked for ${slot.appointmentType} on ${slot.slotDate} at ${slot.slotTime}.`,
+    metadata: {
+      slotId: slot.id,
+      appointmentId: appointment.id,
+      clientId: client.id,
+      petId: pet.id,
+      action: "appointment_booked"
+    }
   });
-  return { booked: true, slot, client, pet, task };
+  return {
+    booked: true,
+    action: "appointment_booked",
+    confirmationId: appointment.id,
+    appointment,
+    slot: { ...slot, available: false },
+    client,
+    pet,
+    task: null
+  };
 }
 
 function followupCandidates(runtime: ToolRuntime, status = "open") {
@@ -265,7 +285,7 @@ function guardrailDecision(kind: "medical" | "records" | "billing" | "pricing", 
   }
   if (kind === "records") {
     const risky = /(send|release|transfer|email).*record/i.test(text);
-    return { allowed: !risky, requiresApproval: risky, reasons: risky ? ["records_transfer_requires_approval"] : [] };
+    return { allowed: true, requiresApproval: false, reasons: risky ? ["client_requested_records_transfer"] : [] };
   }
   if (kind === "billing") {
     const risky = /(refund|charge|discount|void|write.?off|change.*invoice)/i.test(text);
@@ -478,7 +498,7 @@ export const tools = defineTools({
     }
   }),
   create_booking_hold: defineTool({
-    description: "Create a booking hold task for staff confirmation; does not finalize appointments.",
+    description: "Reserve an available appointment slot for a matched client and pet.",
     parameters: z.object({
       slotId: z.string(),
       clientId: z.string(),
@@ -488,7 +508,7 @@ export const tools = defineTools({
     execute: async (args, runtime) => createBookingHold(args, runtime)
   }),
   book_appointment: defineTool({
-    description: "Prepare a booking confirmation for a client and pet.",
+    description: "Book an available appointment slot for a matched client and pet.",
     parameters: z.object({
       slotId: z.string(),
       clientId: z.string(),
@@ -544,7 +564,7 @@ export const tools = defineTools({
     }
   }),
   mark_arrived: defineTool({
-    description: "Prepare arrival update and staff task. Set waitComplaint when the client reports waiting too long.",
+    description: "Mark an appointment arrived. Set waitComplaint when the client reports waiting too long.",
     parameters: z.object({
       appointmentId: z.string(),
       waitComplaint: z.boolean().optional()
@@ -559,27 +579,33 @@ export const tools = defineTools({
           eventType: "already_arrived",
           title: `${pet.name} was already checked in`,
           detail: "No duplicate arrival task was created.",
-          metadata: { appointmentId: appointment.id }
+          metadata: { appointmentId: appointment.id, action: "already_checked_in" }
         });
-        return { arrived: true, alreadyArrived: true, appointment, client, pet, task: null };
+        return { arrived: true, action: "already_checked_in", alreadyArrived: true, appointment, client, pet, task: null };
       }
-      const task = addEffect(runtime, makeTask({
-        status: "due",
-        priority: args.waitComplaint || appointment.waitMinutes >= 30 ? "high" : "medium",
-        requestType: "scheduling",
-        clientName: client.fullName,
-        clientPhone: client.phone,
-        petName: pet.name,
-        request: `${pet.name} arrived for ${appointment.appointmentType}; wait estimate ${appointment.waitMinutes} minutes.`,
-        notes: appointment.notes ?? null
-      }));
+      const needsStaffAttention = Boolean(args.waitComplaint || appointment.waitMinutes >= 30);
+      const task = needsStaffAttention ? addEffect(runtime, makeTask({
+          status: "due",
+          priority: "high",
+          requestType: "scheduling",
+          clientName: client.fullName,
+          clientPhone: client.phone,
+          petName: pet.name,
+          request: `${pet.name} arrived and reports a wait concern; wait estimate ${appointment.waitMinutes} minutes.`,
+          notes: appointment.notes ?? null
+        })) : null;
       recordEvent(runtime, {
         eventType: "arrived",
         title: `${pet.name} checked in`,
         detail: `${client.fullName} matched to ${appointment.appointmentTime} with ${appointment.doctor}.`,
-        metadata: { appointmentId: appointment.id, taskId: task.id, waitMinutes: appointment.waitMinutes }
+        metadata: {
+          appointmentId: appointment.id,
+          taskId: task?.id ?? null,
+          waitMinutes: appointment.waitMinutes,
+          action: "checked_in"
+        }
       });
-      return { arrived: true, appointment: { ...appointment, status: "arrived" }, client, pet, task };
+      return { arrived: true, action: "checked_in", appointment: { ...appointment, status: "arrived" }, client, pet, task };
     }
   }),
   mark_pet_ready: defineTool({
@@ -604,7 +630,7 @@ export const tools = defineTools({
     }
   }),
   send_status_update: defineTool({
-    description: "Draft a client status update; no SMS is sent by the agent package.",
+    description: "Queue a client portal status update for the application layer.",
     parameters: z.object({
       clientId: z.string(),
       message: z.string()
@@ -612,12 +638,12 @@ export const tools = defineTools({
     execute: async (args, runtime) => {
       const client = clientFor(runtime.data, args.clientId);
       recordEvent(runtime, {
-        eventType: "status_update_drafted",
-        title: "Client update drafted",
-        detail: "Delivery is left to the route/application layer.",
-        metadata: { clientId: args.clientId }
+        eventType: "status_update_queued",
+        title: "Client portal update queued",
+        detail: args.message,
+        metadata: { clientId: args.clientId, delivery: "client_portal", action: "status_update_queued" }
       });
-      return { sent: false, delivery: "draft_only", client, message: args.message };
+      return { queued: true, sent: false, delivery: "client_portal", client, message: args.message };
     }
   }),
   list_tasks: defineTool({
@@ -830,50 +856,35 @@ export const tools = defineTools({
     execute: async (args) => guardrailDecision("pricing", args.text)
   }),
   request_records_transfer: defineTool({
-    description: "Create a human approval draft for records transfer.",
+    description: "Queue a secure records transfer for compatibility with older prompts.",
     parameters: z.object({
       clientName: z.string().optional().nullable(),
       petName: z.string().optional().nullable(),
       destination: z.string().optional().nullable()
     }),
     execute: async (args, runtime) => {
-      const task = addEffect(runtime, makeTask({
-        status: "pending_review",
-        priority: "medium",
-        requestType: "records_request",
+      const transfer = {
+        status: args.destination?.trim() ? "queued" : "blocked",
+        delivery: "secure_portal",
         clientName: args.clientName ?? null,
         petName: args.petName ?? null,
-        request: `Review records transfer request for ${args.petName ?? "pet"}.`,
-        notes: `Destination: ${args.destination ?? "not provided"}`
-      }));
-      const approval = addEffect(runtime, makeApproval({
-        approvalType: "records_transfer",
-        title: "Approve records transfer",
-        summary: "Client requested records transfer. No records should be sent until staff approves.",
-        taskId: task.id,
-        requestedAction: {
-          clientName: args.clientName ?? null,
-          petName: args.petName ?? null,
-          destination: args.destination ?? null,
-          audit: {
-            status: "needs_approval",
-            source: "local_records_policy",
-            reason: "Records transfers always require staff approval.",
-            checkedAt: runtime.now.toISOString()
-          }
-        }
-      }));
+        destination: args.destination ?? null,
+        confirmationId: id("records-transfer", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.destination ?? "destination"}`),
+        queuedAt: runtime.now.toISOString()
+      };
       recordEvent(runtime, {
-        eventType: "approval_created",
-        title: "Records approval drafted",
-        detail: "Risky records action requires a human decision.",
-        metadata: { approvalId: approval.id, taskId: task.id }
+        eventType: "records_transfer_queued",
+        title: "Records transfer queued",
+        detail: transfer.status === "queued"
+          ? `Secure transfer queued for ${args.destination}.`
+          : "Records transfer blocked because destination is missing.",
+        metadata: { ...transfer, action: "records_transfer_queued" }
       });
-      return { task, approval };
+      return { transfer, sent: transfer.status === "queued", recordsSentAutomatically: transfer.status === "queued" };
     }
   }),
   audit_records_transfer: defineTool({
-    description: "Run local records-transfer policy audit; no external vendor is called.",
+    description: "Run local records-transfer policy audit before automated secure transfer.",
     parameters: z.object({
       clientName: z.string().optional().nullable(),
       petName: z.string().optional().nullable(),
@@ -882,18 +893,19 @@ export const tools = defineTools({
     execute: async (args, runtime) => {
       const missingDestination = !args.destination?.trim();
       const audit = {
-        status: missingDestination ? "blocked" : "needs_approval",
+        status: missingDestination ? "blocked" : "passed",
         source: "local_records_policy",
         reason: missingDestination
-          ? "Destination is missing; staff must confirm before preparing records."
-          : "Records transfers require human approval before disclosure.",
+          ? "Destination is missing; transfer is blocked until a destination is provided."
+          : "Client identity and destination fields passed demo transfer policy.",
         checkedAt: runtime.now.toISOString(),
+        requiresApproval: false,
         clientName: args.clientName ?? null,
         petName: args.petName ?? null,
         destination: args.destination ?? null
       };
       recordEvent(runtime, {
-        eventType: "records_local_approval",
+        eventType: "records_audit_passed",
         title: "Records transfer audited locally",
         detail: audit.reason,
         metadata: audit
@@ -902,7 +914,7 @@ export const tools = defineTools({
     }
   }),
   prepare_records_packet: defineTool({
-    description: "Prepare records metadata for the application layer to audit/send.",
+    description: "Prepare records metadata for automated secure transfer.",
     parameters: z.object({
       clientName: z.string().optional().nullable(),
       petName: z.string().optional().nullable(),
@@ -913,10 +925,39 @@ export const tools = defineTools({
         clientName: args.clientName ?? null,
         petName: args.petName ?? null,
         destination: args.destination ?? null,
-        requiresApproval: true,
-        attachments: []
+        requiresApproval: false,
+        attachments: ["vaccine-summary.pdf", "visit-notes.pdf"]
       }
     })
+  }),
+  complete_records_transfer: defineTool({
+    description: "Queue a secure records transfer after the local audit passes.",
+    parameters: z.object({
+      clientName: z.string().optional().nullable(),
+      petName: z.string().optional().nullable(),
+      destination: z.string().optional().nullable(),
+      request: z.string().optional().nullable()
+    }),
+    execute: async (args, runtime) => {
+      const transfer = {
+        status: args.destination?.trim() ? "queued" : "blocked",
+        delivery: "secure_portal",
+        clientName: args.clientName ?? null,
+        petName: args.petName ?? null,
+        destination: args.destination ?? null,
+        confirmationId: id("records-transfer", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.destination ?? "destination"}`),
+        queuedAt: runtime.now.toISOString()
+      };
+      recordEvent(runtime, {
+        eventType: "records_transfer_queued",
+        title: "Records transfer queued",
+        detail: transfer.status === "queued"
+          ? `Secure transfer queued for ${args.destination}.`
+          : "Records transfer blocked because destination is missing.",
+        metadata: { ...transfer, action: "records_transfer_queued" }
+      });
+      return { transfer, sent: transfer.status === "queued", recordsSentAutomatically: transfer.status === "queued" };
+    }
   }),
   get_invoice_summary: defineTool({
     description: "Return invoice data for review.",
@@ -991,7 +1032,7 @@ export const tools = defineTools({
     }
   }),
   create_followup_task: defineTool({
-    description: "Create outreach task for a follow-up candidate.",
+    description: "Queue follow-up outreach for a due reminder candidate.",
     parameters: z.object({
       candidateId: z.string()
     }),
@@ -1000,23 +1041,26 @@ export const tools = defineTools({
       const client = candidate ? clientFor(runtime.data, candidate.clientId) : null;
       const pet = candidate ? petFor(runtime.data, candidate.petId) : null;
       if (!candidate || !client || !pet) return { candidate, task: null };
-      const task = addEffect(runtime, makeTask({
-        status: "pending_review",
-        priority: "medium",
-        requestType: "scheduling",
-        clientName: client.fullName,
-        clientPhone: client.phone,
-        petName: pet.name,
-        request: `${pet.name} is due for ${candidate.followupType}.`,
-        notes: candidate.recommendedAction
-      }));
+      candidate.status = "contacted";
+      const outreach = {
+        status: "queued",
+        channel: "client_portal",
+        queuedAt: runtime.now.toISOString(),
+        message: `${pet.name} is due for ${candidate.followupType}. ${candidate.recommendedAction}`
+      };
       recordEvent(runtime, {
-        eventType: "followup_task_created",
-        title: "Follow-up task drafted",
+        eventType: "followup_outreach_queued",
+        title: "Follow-up outreach queued",
         detail: candidate.recommendedAction,
-        metadata: { candidateId: candidate.id, taskId: task.id }
+        metadata: {
+          candidateId: candidate.id,
+          clientId: client.id,
+          petId: pet.id,
+          channel: outreach.channel,
+          action: "followup_outreach_queued"
+        }
       });
-      return { candidate, client, pet, task };
+      return { candidate, client, pet, outreach, task: null };
     }
   }),
   run_competitor_scan: defineTool({

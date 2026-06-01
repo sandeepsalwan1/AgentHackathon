@@ -50,6 +50,7 @@ export type {
 } from "./agents";
 export {
   createPricingObservation,
+  bookMockAppointment,
   findArrivalAppointment,
   listAvailableSlots,
   listMockClinic,
@@ -58,6 +59,7 @@ export {
   listReviewInvoices,
   listServiceCatalog,
   markAppointmentArrived,
+  markFollowupContacted,
   resetMockClinicState
 } from "./mockClinic";
 export type {

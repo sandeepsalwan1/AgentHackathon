@@ -39,7 +39,7 @@ const scenarios = [
       petName: "Luna",
       transcript: `Hi, this is Luis. I am outside for Luna's appointment and want to check in. Scenario ${runSalt}.`
     }),
-    expect: { intent: "checkin", task: true, minTools: 3, tools: ["triage_call", "mark_arrived", "get_wait_status"] }
+    expect: { intent: "checkin", minTools: 3, tools: ["triage_call", "mark_arrived", "get_wait_status"], result: { action: "checked_in" } }
   },
   {
     label: "arrival happy path",
@@ -50,7 +50,7 @@ const scenarios = [
       petName: "Biscuit",
       message: `I am outside for my appointment. Scenario ${runSalt}.`
     }),
-    expect: { intent: "checkin", task: true, minTools: 3, tools: ["start_arrival", "mark_arrived", "get_wait_status"], result: { matched: true } }
+    expect: { intent: "checkin", minTools: 3, tools: ["start_arrival", "mark_arrived", "get_wait_status"], result: { matched: true, action: "checked_in" } }
   },
   {
     label: "arrival already arrived",
@@ -95,7 +95,7 @@ const scenarios = [
       appointmentType: "Vaccines",
       message: `Can I book vaccines next week after 3 if anything is open? Scenario ${runSalt}.`
     }),
-    expect: { intent: "booking", task: true, minTools: 3, tools: ["start_arrival", "list_slots", "book_appointment"], resultNot: { booked: "finalized" } }
+    expect: { intent: "booking", minTools: 3, tools: ["start_arrival", "list_slots", "book_appointment"], result: { booked: true, action: "appointment_booked" }, resultPresent: ["appointment.id", "confirmationId"] }
   },
   {
     label: "booking ambiguous",
@@ -118,7 +118,7 @@ const scenarios = [
       petName: "Luna",
       message: `Is Luna ready for pickup yet? Scenario ${runSalt}.`
     }),
-    expect: { intent: "pickup", task: true, minTools: 2, tools: ["start_arrival", "get_wait_status", "create_task"], result: { ready: true, source: "mock/DB data" } }
+    expect: { intent: "pickup", minTools: 3, tools: ["start_arrival", "get_wait_status", "send_status_update"], result: { ready: true, action: "pickup_ready_confirmed", source: "mock/DB data" } }
   },
   {
     label: "pickup status unknown",
@@ -143,11 +143,9 @@ const scenarios = [
     }),
     expect: {
       intent: "records",
-      task: true,
-      approval: true,
       minTools: 3,
-      tools: ["prepare_records_packet", "audit_records_transfer", "request_records_transfer"],
-      result: { requiresApproval: true, "audit.audit.source": "local_records_policy" }
+      tools: ["prepare_records_packet", "audit_records_transfer", "complete_records_transfer"],
+      result: { requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy", "transfer.transfer.status": "queued" }
     }
   },
   {
@@ -163,13 +161,11 @@ const scenarios = [
     },
     expect: {
       intent: "records",
-      task: true,
-      approval: true,
       minTools: 3,
-      tools: ["prepare_records_packet", "audit_records_transfer", "request_records_transfer"],
-      messageIncludes: "internal review",
-      messageExcludes: "Records will not be sent until a person reviews it",
-      result: { audience: "internal", requiresApproval: true, "audit.audit.source": "local_records_policy" }
+      tools: ["prepare_records_packet", "audit_records_transfer", "complete_records_transfer"],
+      messageIncludes: "secure transfer",
+      messageExcludes: "approval",
+      result: { audience: "internal", requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy" }
     }
   },
   {
@@ -216,7 +212,7 @@ const scenarios = [
       petName: "Biscuit",
       message: `I got a vaccine reminder and want to know what is due. Scenario ${runSalt}.`
     }),
-    expect: { intent: "followup", task: true, report: true, minTools: 2, tools: ["find_followup_candidates", "create_followup_task"], resultPresent: ["candidate.id"] }
+    expect: { intent: "followup", report: true, minTools: 2, tools: ["find_followup_candidates", "create_followup_task"], result: { action: "followup_outreach_queued", "outreach.status": "queued" }, resultPresent: ["candidate.id"] }
   },
   {
     label: "daily ops",

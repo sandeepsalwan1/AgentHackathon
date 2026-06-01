@@ -47,8 +47,8 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
         intent: "checkin",
         mode,
         message: arrived.alreadyArrived
-          ? `${arrival.pet?.name ?? "Your pet"} is already checked in. Staff has your arrival on the board.`
-          : `You are checked in for ${arrival.pet?.name ?? "your pet"}. Staff has been notified.`,
+          ? `${arrival.pet?.name ?? "Your pet"} is already checked in. Your arrival is on the clinic board.`
+          : `You are checked in for ${arrival.pet?.name ?? "your pet"}. Your arrival is on the clinic board.`,
         result: {
           classifiedIntent: "checkin",
           matched: true,
@@ -68,7 +68,7 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
     clientName: normalized.callerName ?? normalized.clientName ?? null,
     clientPhone: normalized.callerPhone ?? normalized.clientPhone ?? null,
     petName: normalized.petName ?? null,
-    request: `Call transcript routed to staff: ${transcript || "No transcript provided."}`,
+    request: `Call transcript routed on clinic dashboard: ${transcript || "No transcript provided."}`,
     notes: `Classified as ${triage.triage.intent}.`
   }, runtime) as {
     task: AgentTaskDraft;
@@ -78,8 +78,8 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
     intent,
     mode,
     message: triage.triage.urgent
-      ? "I turned this call into a high-priority staff task."
-      : "I turned this call into a staff review task.",
+      ? "I escalated this call on the clinic dashboard."
+      : "I routed this call on the clinic dashboard.",
     result: {
       classifiedIntent: triage.triage.intent,
       urgent: triage.triage.urgent

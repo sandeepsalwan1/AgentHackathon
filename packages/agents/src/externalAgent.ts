@@ -36,6 +36,9 @@ type WaitResult = {
 
 type BookingToolResult = {
   booked: boolean;
+  action?: string;
+  confirmationId?: string;
+  appointment?: MockAppointment | null;
   slot?: { slotDate: string; slotTime: string; doctor: string; appointmentType: string } | null;
   client?: MockClient | null;
   pet?: MockPet | null;
@@ -44,6 +47,14 @@ type BookingToolResult = {
 
 type TaskToolResult = {
   task: AgentTaskDraft;
+};
+
+type StatusUpdateResult = {
+  queued?: boolean;
+  sent?: boolean;
+  delivery?: string;
+  client?: MockClient | null;
+  message?: string;
 };
 
 export async function runExternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
@@ -68,10 +79,10 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       request: `Urgent sick-pet triage needed: ${getInputText(normalized) || "Client reports pet illness."}`,
       notes: `Guardrail matched: ${guardrail.reasons.join(", ") || "medical concern"}`
     }, runtime) as TaskToolResult;
-    return buildResult({
-      intent,
-      mode,
-      message: guardrail.message ?? "I alerted the clinical team for urgent review.",
+      return buildResult({
+        intent,
+        mode,
+        message: guardrail.message ?? "I escalated this into the urgent triage queue.",
       result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons },
       runtime,
       options,
@@ -94,14 +105,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         clientName: normalized.clientName ?? normalized.callerName ?? null,
         clientPhone: normalized.clientPhone ?? normalized.callerPhone ?? null,
         petName: normalized.petName ?? null,
-        request: `Arrival check-in needs staff review: ${getInputText(normalized) || "Client says they are here."}`,
+        request: `Arrival check-in exception: ${getInputText(normalized) || "Client says they are here."}`,
         notes: "No matching appointment found in mock data."
       }, runtime) as TaskToolResult;
       return buildResult({
         intent,
         mode,
-        message: "I could not find a matching appointment. I notified the front desk so they can check this manually.",
-        result: { matched: false },
+        message: "I could not find a matching appointment, so I opened a scheduling exception with the clinic dashboard.",
+        result: { matched: false, action: "scheduling_exception_opened" },
         runtime,
         options,
         task: taskResult.task
@@ -112,18 +123,22 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id, waitComplaint }, runtime) as {
       task: AgentTaskDraft | null;
       alreadyArrived?: boolean;
+      action?: string;
     };
     const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime) as WaitResult;
     const waitMinutes = wait.waitStatus?.waitMinutes ?? arrival.appointment.waitMinutes;
     const message = arrived.alreadyArrived
-      ? `${arrival.pet.name} is already checked in. Staff has your arrival on the board.`
-      : `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes. Staff has been notified.`;
+      ? `${arrival.pet.name} is already checked in. Your arrival is on the clinic board.`
+      : waitComplaint
+        ? `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes, and I flagged the queue issue on the clinic board.`
+        : `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes.`;
     return buildResult({
       intent,
       mode,
       message,
       result: {
         matched: true,
+        action: arrived.action ?? (arrived.alreadyArrived ? "already_checked_in" : "checked_in"),
         alreadyArrived: Boolean(arrived.alreadyArrived),
         client: arrival.client,
         pet: arrival.pet,
@@ -154,14 +169,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         clientName: clientName ?? null,
         clientPhone: clientPhone ?? null,
         petName: normalized.petName ?? null,
-        request: `Booking request needs staff review: ${getInputText(normalized) || "Client requested an appointment."}`,
+        request: `Booking exception: ${getInputText(normalized) || "Client requested an appointment."}`,
         notes: "Agent needs client and pet confirmation."
       }, runtime) as TaskToolResult;
       return buildResult({
         intent,
         mode,
-        message: "I need the front desk to confirm the client and pet before booking. I created a review task.",
-        result: { booked: false, needsReview: true },
+        message: "I could not match the client and pet, so I opened a scheduling exception in the clinic dashboard.",
+        result: { booked: false, action: "scheduling_exception_opened", needsReview: false },
         runtime,
         options,
         task: taskResult.task
@@ -187,8 +202,8 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       return buildResult({
         intent,
         mode,
-        message: "I did not find a matching slot. Staff has been asked to follow up.",
-        result: { booked: false, slots: [] },
+        message: "I did not find an open matching slot, so I opened an overflow scheduling request.",
+        result: { booked: false, action: "overflow_scheduling_opened", slots: [] },
         runtime,
         options,
         task: taskResult.task
@@ -201,11 +216,22 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       petId: pet.id,
       reason: normalized.appointmentType ?? "Appointment request"
     }, runtime) as BookingToolResult;
+    const appointment = booking.appointment ?? null;
     return buildResult({
       intent,
       mode,
-      message: `I found ${selected.slotDate} at ${selected.slotTime} with ${selected.doctor}. Staff will confirm this appointment.`,
-      result: { booked: booking.booked, slot: booking.slot, client, pet },
+      message: appointment
+        ? `You're booked for ${appointment.appointmentType} on ${appointment.appointmentDate} at ${appointment.appointmentTime} with ${appointment.doctor}. Confirmation ${booking.confirmationId ?? appointment.id}.`
+        : "I could not finalize that appointment slot, so I opened an overflow scheduling request.",
+      result: {
+        booked: booking.booked,
+        action: booking.action ?? (booking.booked ? "appointment_booked" : "booking_not_completed"),
+        confirmationId: booking.confirmationId ?? appointment?.id ?? null,
+        appointment,
+        slot: booking.slot,
+        client,
+        pet
+      },
       runtime,
       options,
       task: booking.task ?? undefined
@@ -222,6 +248,32 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     const client = arrival.client;
     const wait = pet ? await executeTool("get_wait_status", { petId: pet.id }, runtime) as WaitResult : { waitStatus: null };
     const ready = pet?.id === "pet-luna" || wait.waitStatus?.roomStatus === "ready";
+    if (pet && client) {
+      const statusUpdate = ready
+        ? await executeTool("send_status_update", {
+            clientId: client.id,
+            message: `${pet.name} is ready for pickup. Please check in at the front desk.`
+          }, runtime) as StatusUpdateResult
+        : null;
+      return buildResult({
+        intent,
+        mode,
+        message: ready
+          ? `${pet.name} is marked ready for pickup. I queued the pickup note to the client portal.`
+          : `${pet.name} is not marked ready yet. Current status is ${wait.waitStatus?.roomStatus ?? "not active"}.`,
+        result: {
+          ready,
+          action: ready ? "pickup_ready_confirmed" : "pickup_status_checked",
+          pet,
+          client,
+          waitStatus: wait.waitStatus,
+          statusUpdate,
+          source: "mock/DB data"
+        },
+        runtime,
+        options
+      });
+    }
     const taskResult = await executeTool("create_task", {
       status: ready ? "due" : "pending_review",
       priority: ready ? "low" : "medium",
@@ -237,10 +289,8 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       mode,
       message: ready
         ? `${pet?.name ?? "Your pet"} is marked ready for pickup. Please check in at the front desk.`
-        : pet
-        ? `I asked the team for a pickup status update for ${pet.name}.`
         : "I asked the team to check pickup status manually.",
-      result: { ready, pet, client, waitStatus: wait.waitStatus, source: "mock/DB data" },
+      result: { ready, action: "pickup_manual_review", pet, client, waitStatus: wait.waitStatus, source: "mock/DB data" },
       runtime,
       options,
       task: taskResult.task

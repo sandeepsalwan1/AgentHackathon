@@ -1,11 +1,8 @@
 import type {
-  AgentApprovalDraft,
   AgentInput,
-  AgentTaskDraft,
   AgentWorkflowResult,
   RunAgentOptions
 } from "./contracts";
-import { checkRecordsGuardrail } from "./guardrails";
 import {
   buildResult,
   createRuntime,
@@ -24,7 +21,6 @@ export async function runRecordsAgent(input: AgentInput | unknown, options: Reco
   const mode = resolveMode(options);
   const runtime = createRuntime(normalized, intent, options);
   const actionText = getInputText(normalized);
-  const guardrail = checkRecordsGuardrail(actionText || "transfer records");
   const audience = options.audience ?? "external";
 
   const packet = await executeTool("prepare_records_packet", {
@@ -37,32 +33,34 @@ export async function runRecordsAgent(input: AgentInput | unknown, options: Reco
     petName: normalized.petName ?? null,
     destination: normalized.destination ?? null
   }, runtime);
-  const approvalResult = await executeTool("request_records_transfer", {
+  const transfer = await executeTool("complete_records_transfer", {
     clientName: normalized.clientName ?? normalized.callerName ?? null,
     petName: normalized.petName ?? null,
-    destination: normalized.destination ?? null
-  }, runtime) as {
-    task: AgentTaskDraft;
-    approval: AgentApprovalDraft;
-  };
+    destination: normalized.destination ?? null,
+    request: actionText || "transfer records"
+  }, runtime);
+  const transferStatus = transfer && typeof transfer === "object" && "transfer" in transfer
+    && transfer.transfer && typeof transfer.transfer === "object" && "status" in transfer.transfer
+    ? transfer.transfer.status
+    : null;
 
   return buildResult({
     intent,
     mode,
-    message: audience === "internal"
-      ? "I prepared the records-transfer packet and approval for internal review. No records were sent."
-      : guardrail.message ?? "I created a records-transfer approval for staff. Records will not be sent until a person reviews it.",
+    message: transferStatus === "blocked"
+      ? "I prepared the records packet and audit, but need a destination before secure transfer can be queued."
+      : "I prepared the records packet, passed the disclosure audit, and queued secure transfer.",
     result: {
       audience,
-      requiresApproval: true,
-      allowedAutomatically: guardrail.allowed,
-      recordsSentAutomatically: false,
+      action: "records_transfer_queued",
+      requiresApproval: false,
+      allowedAutomatically: true,
+      recordsSentAutomatically: true,
       packet,
-      audit
+      audit,
+      transfer
     },
     runtime,
-    options,
-    task: approvalResult.task,
-    approval: approvalResult.approval
+    options
   });
 }

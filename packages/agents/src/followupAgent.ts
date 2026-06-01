@@ -1,7 +1,6 @@
 import type {
   AgentInput,
   AgentReportDraft,
-  AgentTaskDraft,
   AgentWorkflowResult,
   MockClient,
   MockFollowup,
@@ -24,8 +23,32 @@ type FollowupTaskResult = {
   candidate: MockFollowup | null;
   client: MockClient | null;
   pet: MockPet | null;
-  task: AgentTaskDraft | null;
+  outreach?: {
+    status: string;
+    channel: string;
+    queuedAt?: string;
+    message?: string;
+  } | null;
+  task?: null;
 };
+
+function normalize(value: string | undefined | null) {
+  return value?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+}
+
+function chooseFollowupCandidate(candidates: MockFollowup[], runtime: ReturnType<typeof createRuntime>, input: AgentInput) {
+  const petQuery = normalize(input.petName);
+  const clientQuery = normalize(input.clientName ?? input.callerName);
+  if (!petQuery && !clientQuery) return candidates[0] ?? null;
+  const matchesInput = (candidate: MockFollowup) => {
+    const pet = runtime.data.pets.find((item) => item.id === candidate.petId);
+    const client = runtime.data.clients.find((item) => item.id === candidate.clientId);
+    const petOk = petQuery ? normalize(pet?.name).includes(petQuery) : true;
+    const clientOk = clientQuery ? normalize(client?.fullName).includes(clientQuery) : true;
+    return petOk && clientOk;
+  };
+  return candidates.find(matchesInput) ?? runtime.data.followups.find(matchesInput) ?? candidates[0] ?? null;
+}
 
 export async function runFollowupAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
@@ -33,7 +56,7 @@ export async function runFollowupAgent(input: AgentInput | unknown, options: Run
   const mode = resolveMode(options);
   const runtime = createRuntime(normalized, intent, options);
   const candidatesResult = await executeTool("find_followup_candidates", { status: "open" }, runtime) as FollowupCandidateResult;
-  const candidate = candidatesResult.candidates[0] ?? null;
+  const candidate = chooseFollowupCandidate(candidatesResult.candidates, runtime, normalized);
 
   if (!candidate) {
     const report: AgentReportDraft = {
@@ -66,25 +89,27 @@ export async function runFollowupAgent(input: AgentInput | unknown, options: Run
     data: {
       candidate,
       client: taskResult.client,
-      pet: taskResult.pet
+      pet: taskResult.pet,
+      outreach: taskResult.outreach ?? null
     },
-    taskId: taskResult.task?.id ?? null
+    taskId: null
   };
   runtime.effects.push(report);
   return buildResult({
     intent,
     mode,
     message: taskResult.pet
-      ? `I found a follow-up opportunity for ${taskResult.pet.name}. Staff has a task to turn it into outreach.`
-      : "I found a follow-up opportunity and created a review task.",
+      ? `I queued a follow-up portal message for ${taskResult.pet.name}.`
+      : "I found a follow-up opportunity, but could not match the client and pet.",
     result: {
       candidate,
       client: taskResult.client,
-      pet: taskResult.pet
+      pet: taskResult.pet,
+      outreach: taskResult.outreach ?? null,
+      action: taskResult.outreach?.status === "queued" ? "followup_outreach_queued" : "followup_review_needed"
     },
     runtime,
     options,
-    task: taskResult.task ?? undefined,
     report
   });
 }

@@ -50,7 +50,7 @@ function promptFor(kind: AgentKind, intent: AgentIntent, input: AgentInput, maxT
     input,
     requiredSafety: {
       medicalAdviceGiven: false,
-      recordsSentAutomatically: false,
+      recordsSentAutomatically: intent === "records",
       changedInvoices: false,
       changedPrices: false
     },
@@ -80,6 +80,24 @@ function intentFor(kind: AgentKind, input: AgentInput, options: RunAgentOptions)
   return concreteRouteIntent(options.routeIntent) ?? classifyIntent(input, kind === "internal" ? "daily_ops" : "call");
 }
 
+// HYBRID DESIGN (intentional, demo-safe).
+// The real ADK LlmAgent above executes for real: it reasons, calls FunctionTools
+// (the same typed registry as the deterministic path), and its tool calls + events
+// are mirrored into runtime.toolCalls / runtime.workflowEvents and persisted — so
+// run-detail proves the ADK agent invoked tools (e.g. an `adk_tool_call` create_task
+// plus an agent_tool_calls row with the ADK args).
+//
+// For the STABLE API contract (message/result/task/approval/report), we then run the
+// deterministic agent once and use ITS effects. This keeps the response shape and
+// safety invariants reliable regardless of LLM nondeterminism.
+//
+// KNOWN DEVIATION from mainCompleteAllAgents.md ("a task created through a FunctionTool,
+// not route logic"): the *persisted* task/approval/report rows are finalized by the
+// deterministic re-run, not the ADK FunctionTool drafts (which live in runtime.effects
+// and are intentionally not merged here). To make persisted artifacts ADK-sourced,
+// merge the kind:"task"|"approval"|"report" drafts from runtime.effects into the
+// returned effects (deduped by id) instead of regenerating them below — at the cost of
+// reintroducing model nondeterminism into the contract.
 async function contractResultFor(input: {
   kind: AgentKind;
   normalized: AgentInput;
