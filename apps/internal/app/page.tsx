@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { AppRoot } from "./components/AppRoot";
 
 export default function Page() {
-  redirect("/arrival");
+  return <AppRoot />;
 }
