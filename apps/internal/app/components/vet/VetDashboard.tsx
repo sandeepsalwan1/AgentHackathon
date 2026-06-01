@@ -19,14 +19,19 @@ import {
   PanelRightClose,
   PanelRightOpen,
   ReceiptText,
+  RefreshCw,
   Search,
   Stethoscope,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sendVetMessage, type ChatHistoryItem, type ReportSummary } from "../../lib/agentClient";
 import { logout, type AccountSession } from "../../lib/accountStore";
 import { ChatPanel, type ChatMessage } from "../ChatPanel";
+import { InvoiceList, type InvoiceData } from "../InvoiceList";
+import { DailyOpsSummaryView, type DailyOpsSummary } from "../DailyOpsSummaryView";
+import { ApprovalsList, FollowupsList, HighPriorityTaskList, PricingReportsList } from "../DailyOpsDetails";
+import { PricingComparisonsList, type PricingComparison } from "../PricingComparisonsList";
 
 type Props = {
   session: AccountSession;
@@ -128,7 +133,8 @@ function ReportItem({ report }: { report: ReportSummary }) {
     minute: "2-digit",
   });
 
-  const dataEntries = Object.entries(report.data).filter(([, v]) => v !== null && v !== undefined);
+  const SKIP_KEYS = new Set(["services", "flagged", "mode", "changedPrices"]);
+  const dataEntries = Object.entries(report.data).filter(([k, v]) => v !== null && v !== undefined && !SKIP_KEYS.has(k));
 
   return (
     <div className="vetReportItem">
@@ -146,16 +152,88 @@ function ReportItem({ report }: { report: ReportSummary }) {
       </div>
       {expanded && dataEntries.length > 0 && (
         <div className="vetReportData">
-          {dataEntries.map(([key, value]) => (
-            <div key={key} className="vetReportRow">
-              <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
-              <span className="vetReportValue">
-                {typeof value === "object"
-                  ? <pre className="vetReportJson">{JSON.stringify(value, null, 2)}</pre>
-                  : String(value)}
-              </span>
-            </div>
-          ))}
+          {dataEntries.map(([key, value]) => {
+            if (key === "invoices" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <InvoiceList invoices={value as InvoiceData[]} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "summary" && value && typeof value === "object" && !Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <DailyOpsSummaryView summary={value as DailyOpsSummary} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "approvals" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <ApprovalsList approvals={value} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "followups" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <FollowupsList followups={value} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "highPriority" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <HighPriorityTaskList tasks={value} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "pricingReports" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                  <div className="vetReportValue">
+                    <PricingReportsList reports={value} />
+                  </div>
+                </div>
+              );
+            }
+            if (key === "comparisons" && Array.isArray(value)) {
+              return (
+                <div key={key} className="reportCardRowFull">
+                  <span className="vetReportKey">Pricing comparisons</span>
+                  <div className="vetReportValue">
+                    <PricingComparisonsList comparisons={value as PricingComparison[]} />
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={key} className="vetReportRow">
+                <span className="vetReportKey">{key.replace(/_/g, " ")}</span>
+                <span className="vetReportValue">
+                  {typeof value === "object"
+                    ? <pre className="vetReportJson">{JSON.stringify(value, null, 2)}</pre>
+                    : String(value)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -163,20 +241,30 @@ function ReportItem({ report }: { report: ReportSummary }) {
 }
 
 function ReportsPanel({ reports }: { reports: ReportSummary[] }) {
+  const [expanded, setExpanded] = useState(true);
   return (
     <div className="vetTaskPanel">
-      <div className="vetTaskPanelHeader">
+      <div
+        className="vetTaskPanelHeader"
+        onClick={() => setExpanded((e) => !e)}
+        style={{ cursor: "pointer", userSelect: "none" }}
+      >
         <h2>
           <FileText size={18} />
           Recent Reports
         </h2>
-        <span className="vetTaskPanelCount">{reports.length}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span className="vetTaskPanelCount">{reports.length}</span>
+          {expanded ? <ChevronUp size={16} className="vetAccordionCaret" /> : <ChevronDown size={16} className="vetAccordionCaret" />}
+        </div>
       </div>
-      <div className="vetReportList">
-        {reports.map((r) => (
-          <ReportItem key={r.id} report={r} />
-        ))}
-      </div>
+      {expanded && (
+        <div className="vetReportList">
+          {reports.map((r) => (
+            <ReportItem key={r.id} report={r} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -199,53 +287,86 @@ export function VetDashboard({ session, onLogout }: Props) {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksRefreshing, setTasksRefreshing] = useState(false);
+  const [newTaskCount, setNewTaskCount] = useState(0);
 
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [savingApproval, setSavingApproval] = useState("");
   const [reports, setReports] = useState<ReportSummary[]>([]);
 
-  // Load tasks + stats
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetch("/api/agent/vet-tasks")
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((data: { ok: boolean; tasks: TaskRow[]; stats: Stats }) => {
-          if (data.ok) {
-            setTasks(data.tasks);
-            setStats(data.stats);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setTasksLoading(false));
-    }, 0);
-    return () => window.clearTimeout(id);
+  const [queueExpanded, setQueueExpanded] = useState(true);
+  const [approvalsExpanded, setApprovalsExpanded] = useState(true);
+
+  const lastTaskCount = useRef(0);
+
+  // ── Shared fetch functions ─────────────────────────────────────────────────
+
+  const fetchTasks = useCallback(async (isManual = false) => {
+    if (isManual) setTasksRefreshing(true);
+    try {
+      const res = await fetch("/api/agent/vet-tasks");
+      if (!res.ok) return;
+      const data: { ok: boolean; tasks: TaskRow[]; stats: Stats } = await res.json();
+      if (!data.ok) return;
+      const active = data.tasks.filter(
+        (t) => t.status !== "completed" && t.status !== "archived" && t.status !== "invalid"
+      );
+      // Show "new tasks" badge if the count grew since last fetch
+      if (lastTaskCount.current > 0 && active.length > lastTaskCount.current) {
+        setNewTaskCount(active.length - lastTaskCount.current);
+        setQueueExpanded(true); // auto-expand when new tasks arrive
+      }
+      lastTaskCount.current = active.length;
+      setTasks(data.tasks);
+      setStats(data.stats);
+    } catch {
+      /* silent */
+    } finally {
+      setTasksLoading(false);
+      if (isManual) setTasksRefreshing(false);
+    }
   }, []);
 
-  // Load pending approvals
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetch("/api/agent/vet-approvals")
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((data: { ok: boolean; approvals: Approval[] }) => {
-          if (data.ok) setApprovals(data.approvals);
-        })
-        .catch(() => {});
-    }, 0);
-    return () => window.clearTimeout(id);
+  const fetchApprovals = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agent/vet-approvals");
+      if (!res.ok) return;
+      const data: { ok: boolean; approvals: Approval[] } = await res.json();
+      if (data.ok) setApprovals(data.approvals);
+    } catch {
+      /* silent */
+    }
   }, []);
 
-  // Load recent reports
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetch("/api/agent/vet-reports")
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((data: { ok: boolean; reports: ReportSummary[] }) => {
-          if (data.ok) setReports(data.reports);
-        })
-        .catch(() => {});
-    }, 0);
-    return () => window.clearTimeout(id);
+  const fetchReports = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agent/vet-reports");
+      if (!res.ok) return;
+      const data: { ok: boolean; reports: ReportSummary[] } = await res.json();
+      if (data.ok) setReports(data.reports);
+    } catch {
+      /* silent */
+    }
   }, []);
+
+  // ── Initial load + polling every 20 seconds ────────────────────────────────
+
+  useEffect(() => {
+    fetchTasks();
+    fetchApprovals();
+    fetchReports();
+
+    const POLL_MS = 20_000;
+    const taskInterval = window.setInterval(() => fetchTasks(), POLL_MS);
+    const approvalInterval = window.setInterval(() => fetchApprovals(), POLL_MS);
+    const reportInterval = window.setInterval(() => fetchReports(), POLL_MS);
+
+    return () => {
+      window.clearInterval(taskInterval);
+      window.clearInterval(approvalInterval);
+      window.clearInterval(reportInterval);
+    };
+  }, [fetchTasks, fetchApprovals, fetchReports]);
 
   const handleSend = useCallback(
     async (text: string, intent?: string) => {
@@ -277,14 +398,12 @@ export function VetDashboard({ session, onLogout }: Props) {
             timestamp: new Date(),
           },
         ]);
-        // Refresh reports panel if a new report was created
+        // Always refresh tasks + approvals after the vet agent responds
+        // (it may have created tasks or approvals as part of the workflow)
+        void fetchTasks();
+        void fetchApprovals();
         if (response.report) {
-          fetch("/api/agent/vet-reports")
-            .then((r) => (r.ok ? r.json() : Promise.reject()))
-            .then((data: { ok: boolean; reports: ReportSummary[] }) => {
-              if (data.ok) setReports(data.reports);
-            })
-            .catch(() => {});
+          void fetchReports();
         }
       } catch {
         setMessages((prev) => [
@@ -301,7 +420,7 @@ export function VetDashboard({ session, onLogout }: Props) {
         setIsLoading(false);
       }
     },
-    [messages, session]
+    [messages, session, fetchTasks, fetchApprovals, fetchReports]
   );
 
   async function fireQuickAction(intent: string, label: string) {
@@ -467,29 +586,53 @@ export function VetDashboard({ session, onLogout }: Props) {
 
           {/* Task queue */}
           <div className="vetTaskPanel">
-            <div className="vetTaskPanelHeader">
+            <div
+              className="vetTaskPanelHeader"
+              onClick={() => { setQueueExpanded((e) => !e); setNewTaskCount(0); }}
+              style={{ cursor: "pointer", userSelect: "none" }}
+            >
               <h2>
                 <ClipboardList size={18} />
                 Today&apos;s Queue
+                {newTaskCount > 0 && (
+                  <span className="vetNewTaskBadge">+{newTaskCount} new</span>
+                )}
               </h2>
-              {!tasksLoading && (
-                <span className="vetTaskPanelCount">{activeTasks.length} tasks</span>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {!tasksLoading && (
+                  <span className="vetTaskPanelCount">{activeTasks.length} tasks</span>
+                )}
+                <span className="vetQueueLiveChip" title="Auto-refreshes every 20 seconds">
+                  <span className="vetQueueLiveDot" />
+                  Live
+                </span>
+                <button
+                  className={`vetRefreshBtn${tasksRefreshing ? " vetRefreshBtn--spinning" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setNewTaskCount(0); void fetchTasks(true); }}
+                  title="Refresh queue"
+                  type="button"
+                >
+                  <RefreshCw size={13} />
+                </button>
+                {queueExpanded ? <ChevronUp size={16} className="vetAccordionCaret" /> : <ChevronDown size={16} className="vetAccordionCaret" />}
+              </div>
             </div>
 
-            {tasksLoading ? (
-              <div className="vetTaskListLoading">
-                <Loader2 size={20} className="spinIcon" />
-                <span>Loading tasks…</span>
-              </div>
-            ) : activeTasks.length === 0 ? (
-              <p className="vetTaskPanelNote">No active tasks right now.</p>
-            ) : (
-              <div className="vetTaskList">
-                {activeTasks.map((task) => (
-                  <TaskItem key={task.id} task={task} />
-                ))}
-              </div>
+            {queueExpanded && (
+              tasksLoading ? (
+                <div className="vetTaskListLoading">
+                  <Loader2 size={20} className="spinIcon" />
+                  <span>Loading tasks…</span>
+                </div>
+              ) : activeTasks.length === 0 ? (
+                <p className="vetTaskPanelNote">No active tasks right now.</p>
+              ) : (
+                <div className="vetTaskList">
+                  {activeTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} />
+                  ))}
+                </div>
+              )
             )}
           </div>
 
@@ -501,53 +644,62 @@ export function VetDashboard({ session, onLogout }: Props) {
           {/* Pending approvals */}
           {approvals.length > 0 && (
             <div className="vetTaskPanel">
-              <div className="vetTaskPanelHeader">
+              <div
+                className="vetTaskPanelHeader"
+                onClick={() => setApprovalsExpanded((e) => !e)}
+                style={{ cursor: "pointer", userSelect: "none" }}
+              >
                 <h2>
                   <BellRing size={18} />
                   Pending Approvals
                 </h2>
-                <span className="vetTaskPanelCount">
-                  {approvals.length} item{approvals.length !== 1 ? "s" : ""}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="vetTaskPanelCount">
+                    {approvals.length} item{approvals.length !== 1 ? "s" : ""}
+                  </span>
+                  {approvalsExpanded ? <ChevronUp size={16} className="vetAccordionCaret" /> : <ChevronDown size={16} className="vetAccordionCaret" />}
+                </div>
               </div>
-              <div className="vetTaskList">
-                {approvals.map((a) => (
-                  <div key={a.id} className="vetTaskRow vetApprovalRow">
-                    <div className="vetTaskRowMain">
-                      <div className="vetTaskRowPet">{a.title}</div>
-                      <span className="vetTaskRowTime">
-                        {new Date(a.createdAt).toLocaleTimeString("en-US", {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
+              {approvalsExpanded && (
+                <div className="vetTaskList">
+                  {approvals.map((a) => (
+                    <div key={a.id} className="vetTaskRow vetApprovalRow">
+                      <div className="vetTaskRowMain">
+                        <div className="vetTaskRowPet">{a.title}</div>
+                        <span className="vetTaskRowTime">
+                          {new Date(a.createdAt).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className="vetTaskRowRequest">{a.summary}</div>
+                      <div className="vetApprovalActions">
+                        <button
+                          className="vetApproveBtn"
+                          disabled={Boolean(savingApproval)}
+                          onClick={() => void decideApproval(a.id, "approved")}
+                        >
+                          {savingApproval === a.id ? (
+                            <Loader2 size={13} className="spinIcon" />
+                          ) : (
+                            <Check size={13} />
+                          )}
+                          Approve
+                        </button>
+                        <button
+                          className="vetRejectBtn"
+                          disabled={Boolean(savingApproval)}
+                          onClick={() => void decideApproval(a.id, "rejected")}
+                        >
+                          <X size={13} />
+                          Reject
+                        </button>
+                      </div>
                     </div>
-                    <div className="vetTaskRowRequest">{a.summary}</div>
-                    <div className="vetApprovalActions">
-                      <button
-                        className="vetApproveBtn"
-                        disabled={Boolean(savingApproval)}
-                        onClick={() => void decideApproval(a.id, "approved")}
-                      >
-                        {savingApproval === a.id ? (
-                          <Loader2 size={13} className="spinIcon" />
-                        ) : (
-                          <Check size={13} />
-                        )}
-                        Approve
-                      </button>
-                      <button
-                        className="vetRejectBtn"
-                        disabled={Boolean(savingApproval)}
-                        onClick={() => void decideApproval(a.id, "rejected")}
-                      >
-                        <X size={13} />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

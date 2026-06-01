@@ -11,6 +11,7 @@ export type Account = {
   name: string;
   email: string;
   phone?: string;
+  petName?: string;
   passwordHash: string;
   mustResetPassword?: boolean;
   otp?: string;
@@ -23,6 +24,7 @@ export type AccountSession = {
   name: string;
   email: string;
   phone?: string;
+  petName?: string;
   source: "account"; // discriminator — legacy passcode sessions lack this field
 };
 
@@ -88,7 +90,8 @@ export function getDemoAdminCredentials() {
 export async function signupCustomer(params: {
   name: string;
   email: string;
-  phone?: string;
+  phone: string;
+  petName: string;
   password: string;
 }): Promise<Account> {
   seedAdmin();
@@ -101,7 +104,8 @@ export async function signupCustomer(params: {
     role: "customer",
     name: params.name.trim(),
     email: params.email.toLowerCase().trim(),
-    phone: params.phone?.trim(),
+    phone: params.phone.trim(),
+    petName: params.petName.trim(),
     passwordHash: mockHash(params.password),
     createdAt: new Date().toISOString(),
   };
@@ -187,6 +191,7 @@ export function saveSession(account: Account): AccountSession {
     name: account.name,
     email: account.email,
     phone: account.phone,
+    petName: account.petName,
     source: "account",
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));

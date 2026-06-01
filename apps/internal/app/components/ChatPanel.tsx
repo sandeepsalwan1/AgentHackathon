@@ -3,6 +3,10 @@
 import { AlertCircle, Bot, CheckCircle2, ChevronDown, ChevronUp, Clock, Send, ShieldAlert, User } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { ReportSummary, WorkflowStatus } from "../lib/agentClient";
+import { InvoiceList, type InvoiceData } from "./InvoiceList";
+import { DailyOpsSummaryView, type DailyOpsSummary } from "./DailyOpsSummaryView";
+import { ApprovalsList, FollowupsList, HighPriorityTaskList, PricingReportsList } from "./DailyOpsDetails";
+import { PricingComparisonsList, type PricingComparison } from "./PricingComparisonsList";
 
 export type ChatMessage = {
   id: string;
@@ -52,8 +56,9 @@ function ReportCard({ report }: { report: ReportSummary }) {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+  const SKIP_KEYS = new Set(["services", "flagged", "mode", "changedPrices"]);
   const dataEntries = Object.entries(report.data).filter(
-    ([, v]) => v !== null && v !== undefined
+    ([k, v]) => v !== null && v !== undefined && !SKIP_KEYS.has(k)
   );
 
   return (
@@ -77,18 +82,90 @@ function ReportCard({ report }: { report: ReportSummary }) {
           </button>
           {expanded && (
             <div className="reportCardData">
-              {dataEntries.map(([key, value]) => (
-                <div key={key} className="reportCardRow">
-                  <span className="reportCardKey">
-                    {key.replace(/_/g, " ")}
-                  </span>
-                  <span className="reportCardValue">
-                    {typeof value === "object"
-                      ? <pre className="reportCardJson">{JSON.stringify(value, null, 2)}</pre>
-                      : String(value)}
-                  </span>
-                </div>
-              ))}
+              {dataEntries.map(([key, value]) => {
+                if (key === "invoices" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <InvoiceList invoices={value as InvoiceData[]} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "summary" && value && typeof value === "object" && !Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <DailyOpsSummaryView summary={value as DailyOpsSummary} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "approvals" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <ApprovalsList approvals={value} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "followups" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <FollowupsList followups={value} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "highPriority" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <HighPriorityTaskList tasks={value} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "pricingReports" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">{key.replace(/_/g, " ")}</span>
+                      <div className="reportCardValue">
+                        <PricingReportsList reports={value} />
+                      </div>
+                    </div>
+                  );
+                }
+                if (key === "comparisons" && Array.isArray(value)) {
+                  return (
+                    <div key={key} className="reportCardRowFull">
+                      <span className="reportCardKey">Pricing comparisons</span>
+                      <div className="reportCardValue">
+                        <PricingComparisonsList comparisons={value as PricingComparison[]} />
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={key} className="reportCardRow">
+                    <span className="reportCardKey">
+                      {key.replace(/_/g, " ")}
+                    </span>
+                    <span className="reportCardValue">
+                      {typeof value === "object"
+                        ? <pre className="reportCardJson">{JSON.stringify(value, null, 2)}</pre>
+                        : String(value)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </>

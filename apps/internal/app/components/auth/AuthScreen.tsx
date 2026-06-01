@@ -113,6 +113,7 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [petName, setPetName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -120,6 +121,14 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (loading) return;
+    if (!phone.trim() || phone.replace(/\D/g, "").length < 7) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
+    if (!petName.trim() || petName.trim().length < 2) {
+      setError("Please enter your pet's name (at least 2 characters).");
+      return;
+    }
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
@@ -127,7 +136,7 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
     setLoading(true);
     setError("");
     try {
-      const account = await signupCustomer({ name, email, phone: phone || undefined, password });
+      const account = await signupCustomer({ name, email, phone, petName, password });
       onAuth(saveSession(account));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed.");
@@ -162,13 +171,24 @@ function CustomerSignup({ onAuth, onSwitch }: { onAuth: Props["onAuth"]; onSwitc
         />
       </label>
       <label className="authLabel">
-        Phone <span className="authMuted">(optional)</span>
+        Phone number <span className="authRequired">*</span>
         <input
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 000-0000"
           inputMode="tel"
+          required
+        />
+      </label>
+      <label className="authLabel">
+        Pet&apos;s name <span className="authRequired">*</span>
+        <input
+          type="text"
+          value={petName}
+          onChange={(e) => setPetName(e.target.value)}
+          placeholder="Buddy, Luna, Max…"
+          required
         />
       </label>
       <label className="authLabel">
