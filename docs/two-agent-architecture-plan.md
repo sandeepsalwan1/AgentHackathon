@@ -106,17 +106,16 @@ ExternalAgent
   audience: client
   auth: public/client session
   purpose: convert to booking, safe client operations
-  capabilities exposed as scoped tools:
+  capabilities implemented by prompt behavior plus scoped tools:
     booking
     records
     conversation
-    clinical safety
 
 InternalAgent
   audience: admin/manager
   auth: existing manager auth
   purpose: admin operations, reports, email, pricing, staff decisions
-  capabilities exposed as scoped tools:
+  capabilities implemented by prompt behavior plus scoped tools:
     email
     pricing
     conversation
@@ -137,12 +136,13 @@ Implement in phases:
 
 Do not add master/worker now. Do not add one global master over both agents. External and internal powers must stay separate.
 
-Terminology:
+Medical safety terminology:
 
-- `ClinicalSafetyCapability` means the sick-pet/emergency guardrail path.
-- It is not a page, tab, or separate user-facing product area.
-- Existing code/tool names may still say `triage` because clinics use that word for routing urgent medical messages.
-- User-facing copy should not expose the implementation name; say "clinical team", "urgent message", or "book a visit".
+- Medical safety is not a capability/tool the model chooses.
+- It is baked into the external prompt and enforced by code before/around model execution.
+- Use deterministic regex/scanning first; add a tiny classifier later only if needed.
+- Existing code/tool names may still say `triage` because clinics use that word for routing urgent messages, but the product concept is "medical safety guardrail".
+- User-facing copy should say "clinical team", "urgent message", or "book a visit".
 
 ## Hard Boundaries
 
@@ -197,12 +197,17 @@ External allowed tools:
 - `request_records_transfer`, only if audited and client-safe
 - `find_followup_candidates`
 - `send_followup_outreach`
+- `check_records_guardrail`
+- `record_tool_call`
+
+External preflight/helper code, not ADK-selected tools:
+
 - `triage_message`
 - `triage_call`
 - `check_medical_guardrail`
-- `check_records_guardrail`
-- `dispatch_clinical_triage`
-- `record_tool_call`
+- regex/scanner over client text
+- optional small classifier later
+- `dispatch_clinical_triage` only after the guardrail path decides an urgent clinical handoff is needed
 
 External denied tools:
 
@@ -220,7 +225,7 @@ Internal allowed tools:
 - billing: `get_invoice_summary`, `review_invoice_flags`, `flag_invoice_issue`, `check_billing_guardrail`
 - labs: `list_lab_catalog`, `lookup_lab_orders`, `get_lab_result`, `summarize_lab_result`, `prepare_lab_client_update`, `create_lab_followup_task`
 - records: `prepare_records_packet`, `audit_records_transfer`, `complete_records_transfer`, `check_records_guardrail`
-- ops/safety: `triage_message`, `triage_call`, `check_medical_guardrail`, `dispatch_clinical_triage`
+- ops/safety: use prompt rules plus deterministic medical scanner outside the LLM-selected tool list
 - follow-up: `find_followup_candidates`, `list_followup_candidates`, `send_followup_outreach`, `create_followup_task`
 
 Internal denied by default:
@@ -281,7 +286,6 @@ type CapabilityRouteDecision = {
     | "external_booking"
     | "external_records"
     | "external_conversation"
-    | "external_clinical_safety"
     | "internal_email"
     | "internal_pricing"
     | "internal_conversation"
@@ -718,37 +722,41 @@ Memory:
 - Store stable facts/preferences.
 - Do not store temporary concern/emotion as durable memory.
 
-### ExternalClinicalSafetyCapability
+### External Medical Safety Guardrail
 
-Type: guardrail/tool action.
+Type: prompt rule + deterministic scanner, not a capability tool.
 
 Purpose:
 
 - Sick-pet/emergency safety.
 - No diagnosis.
-- Dispatch clinical triage / recommend contacting hospital/emergency clinic as appropriate.
+- No treatment advice.
+- Route to clinical team / urgent message / booking path when needed.
 
 Where this lives:
 
-- It is not a page.
-- It is not a tab.
-- It is a capability inside the external agent.
-- It triggers when a client message contains sick-pet, urgent, emergency, or medical-advice content.
-- Current code uses the word `triage` in tools/events because that is the clinical routing term.
-- User-facing copy should say "clinical team", "urgent message", "hospital", or "book a visit"; avoid exposing implementation names.
+- Prompt: external agent is told never to answer veterinary medical questions.
+- Code preflight: scan client text before/around the ADK run.
+- Code postflight: verify final response did not contain medical advice.
+- Optional later: small classifier if regex misses too much.
+- It is not a page, tab, worker, or LLM-selected tool.
 
 Expected behavior:
 
 - Client says: "My pet is breathing weird, what should I do?"
-- Agent does:
-  - call `check_medical_guardrail`
-  - call `dispatch_clinical_triage`
-  - offer to help book/contact clinic
-  - record `medicalAdviceGiven: false`
-- Agent does not:
-  - diagnose
-  - give treatment steps
-  - imply a veterinarian reviewed it already
+- Guardrail code detects medical risk from text.
+- Agent response offers safe routing:
+  - "I cannot give medical advice here."
+  - "I can help book a visit or send this to the clinical team."
+- System may dispatch the clinical handoff outside the model-selected tool path.
+- Persist `medicalAdviceGiven: false`.
+
+Do not design this as:
+
+- ADK chooses `check_medical_guardrail`.
+- A client-visible "triage" feature.
+- A worker/sub-agent.
+- A medical Q&A bot.
 
 ## PMS / Real Integration Path
 
@@ -890,7 +898,7 @@ Commands:
 Add/keep scenario checks:
 
 - External booking can book matched client/pet.
-- External medical question does not answer medical advice and routes to clinical safety/booking.
+- External medical question does not answer medical advice; prompt/scanner routes to safe clinical handoff or booking.
 - External route cannot call pricing/email/task-report tools.
 - Internal route requires manager auth.
 - Internal pricing creates report/recommendation and no price mutation by default.
@@ -934,7 +942,7 @@ Phase 3: external agent + capabilities
 - Add external capability routing schema.
 - Add booking capability flow.
 - Add external conversation guardrail.
-- Add records/clinical-safety capabilities.
+- Add records capability and medical-safety prompt/scanner.
 - Verify no internal tool access.
 
 Phase 4: decisions + memory

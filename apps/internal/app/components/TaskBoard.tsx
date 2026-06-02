@@ -15,12 +15,11 @@ import {
   Settings,
   ShieldCheck,
   UserPlus,
-  UserX,
   Undo2,
   XCircle
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppRole, RecipientProfile, Task, TaskEvent, TaskPriority, TaskRequestType, TaskStatus } from "@central-vet/db";
+import type { AppRole, RecipientProfile, Task, TaskEvent, TaskStatus } from "@central-vet/db";
 import {
   canManage,
   canSeeEscalations,
@@ -29,13 +28,14 @@ import {
   taskBelongsInLane
 } from "../lib/taskWorkflow";
 import { TaskCard } from "./TaskCard";
+import { TaskForm, type TaskFormState } from "./TaskForm";
+import { blankVeterinarianProfile, ProfileSettings } from "./TaskBoardSettings";
 import {
   actorDisplay,
   compareTasks,
   defaultDueTime,
   doctorName,
   requestTypeLabel,
-  requestTypes,
   roleLabel,
   today
 } from "./taskBoardDisplay";
@@ -45,24 +45,6 @@ type Session = {
   role: AppRole;
   passcode?: string;
   profileId?: string | null;
-};
-
-type FormState = {
-  status: TaskStatus;
-  requestType: TaskRequestType;
-  clientName: string;
-  clarityId: string;
-  clientPhone: string;
-  clientDateOfBirth: string;
-  petName: string;
-  petWeight: string;
-  lastVisit: string;
-  request: string;
-  notes: string;
-  assignedTo: string;
-  priority: TaskPriority;
-  dueDate: string;
-  dueTime: string;
 };
 
 type Toast = {
@@ -84,18 +66,6 @@ const taskSyncKey = `${sessionKey}:task-sync`;
 const taskSyncChannelName = "central-vet-task-sync";
 const activeSyncIntervalMs = 8000;
 const activeSyncWindowMs = 12 * 60 * 1000;
-const blankVeterinarianProfile: RecipientProfile = {
-  profileId: "",
-  displayName: "Dr. ",
-  email: "",
-  phone: "",
-  passcode: "",
-  active: true,
-  emailOptIn: false,
-  smsOptIn: false,
-  escalationOptIn: false,
-  dailyPriorityOptIn: false
-};
 
 const laneDefs = [
   { key: "escalated", title: "Escalated", icon: BellRing },
@@ -108,7 +78,7 @@ const laneDefs = [
 
 type LaneKey = (typeof laneDefs)[number]["key"];
 
-function blankForm(): FormState {
+function blankForm(): TaskFormState {
   return {
     status: "due",
     requestType: "labs_xrays",
@@ -126,28 +96,6 @@ function blankForm(): FormState {
     dueDate: today(),
     dueTime: defaultDueTime
   };
-}
-
-function formatPhoneInput(value: string) {
-  if (value.includes("@")) return value;
-  const digits = value.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  const prefix = digits.length === 11 && digits.startsWith("1") ? "+1 " : "";
-  if (local.length === 0) return "";
-  if (local.length <= 3) return `${prefix}${local}`;
-  if (local.length <= 6) return `${prefix}(${local.slice(0, 3)}) ${local.slice(3)}`;
-  if (local.length <= 10) {
-    return `${prefix}(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-  }
-  return value;
-}
-
-function requiredLabel(text: string) {
-  return (
-    <span className="labelText">
-      {text} <span className="requiredStar">*</span>
-    </span>
-  );
 }
 
 function parseSavedSession(saved: string | null) {
@@ -259,7 +207,7 @@ export function TaskBoard() {
   const [formOpen, setFormOpen] = useState(false);
   const [formSaving, setFormSaving] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
-  const [form, setForm] = useState<FormState>(blankForm);
+  const [form, setForm] = useState<TaskFormState>(blankForm);
   const [invalidTask, setInvalidTask] = useState<Task | null>(null);
   const [invalidReason, setInvalidReason] = useState("");
   const [confetti, setConfetti] = useState(false);
@@ -1195,157 +1143,6 @@ function SessionNameTag({
   );
 }
 
-function ProfileSettings({
-  profile,
-  saving,
-  canEditAll,
-  currentProfileId,
-  onChange,
-  onDeactivate,
-  isNew = false
-}: {
-  profile: RecipientProfile;
-  saving: boolean;
-  canEditAll: boolean;
-  currentProfileId: string | null;
-  onChange: (profile: RecipientProfile) => void;
-  onDeactivate: (profile: RecipientProfile) => void;
-  isNew?: boolean;
-}) {
-  const [draft, setDraft] = useState(profile);
-  const ownProfile = draft.profileId === currentProfileId;
-  const canEdit = canEditAll || ownProfile || isNew;
-  const update = (patch: Partial<RecipientProfile>) => {
-    setDraft({ ...draft, ...patch });
-  };
-  const channelCount = Number(draft.emailOptIn) + Number(draft.smsOptIn);
-  const alertCount = Number(draft.escalationOptIn) + Number(draft.dailyPriorityOptIn);
-  const phoneDigits = draft.phone.replace(/\D/g, "");
-  const smsReady = phoneDigits.length === 10 || (phoneDigits.length === 11 && phoneDigits.startsWith("1"));
-
-  return (
-    <section className={`profileSettings ${!draft.active ? "inactiveProfile" : ""}`}>
-      <div className="profileHeader">
-        <div>
-          <strong>{draft.displayName || "New veterinarian"}</strong>
-          <small>
-            {draft.active ? "Active" : "Inactive"} · {channelCount}/2 channels · {alertCount}/2 alert types
-          </small>
-        </div>
-        <span>{draft.escalationOptIn ? "Escalation on" : "Escalation off"}</span>
-      </div>
-      <div className="settingsGrid">
-        <label>
-          Profile name
-          <input
-            value={draft.displayName}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ displayName: event.target.value })}
-            placeholder="Dr. Name"
-          />
-        </label>
-        {canEditAll || isNew ? (
-          <label>
-            Login passcode
-            <input
-              value={draft.passcode}
-              disabled={saving || !canEdit}
-              onChange={(event) => update({ passcode: event.target.value })}
-              placeholder="4+ digits"
-              inputMode="numeric"
-            />
-          </label>
-        ) : null}
-        <label>
-          Email
-          <input
-            value={draft.email}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ email: event.target.value })}
-            placeholder="email address"
-          />
-        </label>
-        <label>
-          Phone
-          <input
-            value={draft.phone}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ phone: event.target.value })}
-            placeholder="10-digit number"
-            inputMode="tel"
-          />
-          {draft.smsOptIn && !smsReady ? (
-            <span className="fieldHint">SMS needs a 10-digit number.</span>
-          ) : null}
-        </label>
-      </div>
-      <div className="profileSubhead">Delivery channels</div>
-      <div className="profileToggles">
-        <label className="toggleLine">
-          <input
-            type="checkbox"
-            checked={draft.emailOptIn}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ emailOptIn: event.target.checked })}
-          />
-          Email opt-in
-        </label>
-        <label className="toggleLine">
-          <input
-            type="checkbox"
-            checked={draft.smsOptIn}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ smsOptIn: event.target.checked })}
-          />
-          SMS opt-in
-        </label>
-      </div>
-      <div className="profileSubhead">Alert types</div>
-      <div className="profileToggles">
-        <label className="toggleLine">
-          <input
-            type="checkbox"
-            checked={draft.escalationOptIn}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ escalationOptIn: event.target.checked })}
-          />
-          Escalation alerts
-        </label>
-        <label className="toggleLine">
-          <input
-            type="checkbox"
-            checked={draft.dailyPriorityOptIn}
-            disabled={saving || !canEdit}
-            onChange={(event) => update({ dailyPriorityOptIn: event.target.checked })}
-          />
-          Daily medium/high alerts
-        </label>
-      </div>
-      <div className="profileActions">
-        <button
-          type="button"
-          className="plainButton compact"
-          disabled={saving || !canEdit || !draft.displayName.trim() || !draft.passcode.trim()}
-          onClick={() => void onChange(draft)}
-        >
-          Save settings
-        </button>
-        {canEditAll && !isNew && draft.active ? (
-          <button
-            type="button"
-            className="plainButton compact dangerText"
-            disabled={saving}
-            onClick={() => void onDeactivate(draft)}
-          >
-            <UserX size={16} />
-            Deactivate
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 function BootScreen() {
   return (
     <main className="entryShell">
@@ -1473,131 +1270,6 @@ function MiniConfetti() {
       {Array.from({ length: 8 }).map((_, index) => (
         <span key={index} />
       ))}
-    </div>
-  );
-}
-
-function TaskForm({
-  form,
-  setForm,
-  editing,
-  role,
-  saving,
-  onClose,
-  onSubmit
-}: {
-  form: FormState;
-  setForm: (next: FormState) => void;
-  editing: Task | null;
-  role: AppRole;
-  saving: boolean;
-  onClose: () => void;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  const update = (key: keyof FormState, value: string) =>
-    setForm({ ...form, [key]: value });
-
-  return (
-    <div className="modalBackdrop">
-      <form className="modal wideModal" onSubmit={onSubmit}>
-        <h2>{editing ? "Edit Task" : role === "staff" ? "Add Task" : "New Task"}</h2>
-        <fieldset className="requestTypePicker">
-          <legend>{requiredLabel("Request Type")}</legend>
-          {requestTypes.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              className={form.requestType === item.value ? "selected" : ""}
-              onClick={() => update("requestType", item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </fieldset>
-        <div className="formGrid">
-          <label>
-            {requiredLabel("Client Name")}
-            <input required value={form.clientName} onChange={(event) => update("clientName", event.target.value)} />
-          </label>
-          <label>
-            {requiredLabel("Phone")}
-            <input
-              required
-              value={form.clientPhone}
-              onChange={(event) => update("clientPhone", formatPhoneInput(event.target.value))}
-              inputMode="tel"
-            />
-          </label>
-          <label>
-            {requiredLabel("Pet's name")}
-            <input required value={form.petName} onChange={(event) => update("petName", event.target.value)} />
-          </label>
-          <label>
-            {requiredLabel("Priority")}
-            <select required value={form.priority} onChange={(event) => update("priority", event.target.value)}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-        </div>
-        <label>
-          {requiredLabel("Request")}
-          <textarea
-            value={form.request}
-            onChange={(event) => update("request", event.target.value)}
-            rows={5}
-            required
-            minLength={10}
-          />
-        </label>
-        <div className="formGrid optionalGrid">
-          <label>
-            Due date
-            <input type="date" value={form.dueDate} onChange={(event) => update("dueDate", event.target.value)} />
-          </label>
-          <label>
-            Due time
-            <input type="time" value={form.dueTime} onChange={(event) => update("dueTime", event.target.value)} />
-          </label>
-          <label>
-            Pet&apos;s date of birth
-            <input type="date" value={form.clientDateOfBirth} onChange={(event) => update("clientDateOfBirth", event.target.value)} />
-          </label>
-          <label>
-            Client ID
-            <input value={form.clarityId} onChange={(event) => update("clarityId", event.target.value)} />
-          </label>
-          <label>
-            Pet&apos;s weight
-            <input value={form.petWeight} onChange={(event) => update("petWeight", event.target.value)} />
-          </label>
-          <label>
-            Assigned to
-            <input value={form.assignedTo} onChange={(event) => update("assignedTo", event.target.value)} />
-          </label>
-          {role !== "staff" ? (
-            <label>
-              Status
-              <select value={form.status} onChange={(event) => update("status", event.target.value)}>
-                <option value="due">Due</option>
-                <option value="pending">Pending</option>
-                <option value="pending_review">Pending Review</option>
-              </select>
-            </label>
-          ) : null}
-        </div>
-        <div className="modalActions">
-          <button type="button" className="plainButton" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button type="submit" className="primaryButton" disabled={saving}>
-            {editing ? <Pencil size={17} /> : <Plus size={17} />}
-            {saving ? "Saving" : editing ? "Save" : role === "staff" ? "Add Task" : "Create"}
-          </button>
-        </div>
-        <p className="requiredNote"><span className="requiredStar">*</span> Required</p>
-      </form>
     </div>
   );
 }
