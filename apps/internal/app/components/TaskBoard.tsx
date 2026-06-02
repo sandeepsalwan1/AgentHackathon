@@ -4,12 +4,10 @@ import {
   AlertTriangle,
   Archive,
   BellRing,
-  Check,
   CheckCircle2,
   ClipboardList,
   Clock3,
   LogOut,
-  Pencil,
   Plus,
   RotateCcw,
   Settings,
@@ -29,7 +27,9 @@ import {
 } from "../lib/taskWorkflow";
 import { TaskCard } from "./TaskCard";
 import { TaskForm, type TaskFormState } from "./TaskForm";
+import { BootScreen, EntryScreen, MiniConfetti, SessionNameTag } from "./TaskBoardChrome";
 import { blankVeterinarianProfile, ProfileSettings } from "./TaskBoardSettings";
+import { isAuthError, readJson, sessionReadHeaders } from "./taskBoardClient";
 import {
   actorDisplay,
   compareTasks,
@@ -39,27 +39,12 @@ import {
   roleLabel,
   today
 } from "./taskBoardDisplay";
-
-type Session = {
-  name: string;
-  role: AppRole;
-  passcode?: string;
-  profileId?: string | null;
-};
+import type { TaskBoardSession as Session } from "./taskBoardTypes";
 
 type Toast = {
   text: string;
   taskId?: string;
 };
-
-class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
 
 const sessionKey = "central-vet-session";
 const taskSyncKey = `${sessionKey}:task-sync`;
@@ -115,14 +100,6 @@ function readStoredSession() {
   return parseSavedSession(window.localStorage.getItem(sessionKey));
 }
 
-function sessionReadHeaders(currentSession: Session) {
-  const headers: Record<string, string> = { "Cache-Control": "no-store" };
-  if (currentSession.passcode) {
-    headers["X-Central-Vet-Passcode"] = currentSession.passcode;
-  }
-  return headers;
-}
-
 function clearStoredTaskCaches() {
   if (typeof window === "undefined") return;
   const prefix = `${sessionKey}:tasks:`;
@@ -132,18 +109,6 @@ function clearStoredTaskCaches() {
       window.localStorage.removeItem(key);
     }
   }
-}
-
-async function readJson(response: Response) {
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new ApiError(data.error || data.detail || "Request failed.", response.status);
-  }
-  return data;
-}
-
-function isAuthError(error: unknown) {
-  return error instanceof ApiError && (error.status === 403 || error.status === 429);
 }
 
 function actorName(value: string | null, valueRole: AppRole | null, role: AppRole, oldName: string, nextName: string) {
@@ -1081,195 +1046,5 @@ export function TaskBoard() {
       ) : null}
       {confetti ? <MiniConfetti /> : null}
     </main>
-  );
-}
-
-function SessionNameTag({
-  session,
-  onSave
-}: {
-  session: Session;
-  onSave: (name: string) => boolean | Promise<boolean>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState(session.name);
-  const displayName = session.name.trim() || roleLabel(session.role);
-
-  if (editing) {
-    return (
-      <form
-        className="sessionNameEdit"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setSaving(true);
-          try {
-            if (await onSave(draft)) setEditing(false);
-          } finally {
-            setSaving(false);
-          }
-        }}
-      >
-        <input
-          aria-label="Current name"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          disabled={saving}
-          autoFocus
-          maxLength={36}
-        />
-        <button type="submit" title="Save name" aria-label="Save name" disabled={saving}>
-          <Check size={13} />
-        </button>
-      </form>
-    );
-  }
-
-  return (
-    <span className="sessionNameTag">
-      <span title={displayName}>{displayName}</span>
-      <button
-        type="button"
-        onClick={() => {
-          setDraft(session.name);
-          setEditing(true);
-        }}
-        title="Edit name"
-        aria-label="Edit name"
-      >
-        <Pencil size={11} />
-      </button>
-    </span>
-  );
-}
-
-function BootScreen() {
-  return (
-    <main className="entryShell">
-      <section className="entryPanel bootPanel">
-        <p className="eyebrow">Central Veterinary Hospital</p>
-        <h1>Clinic Tasks</h1>
-        <div className="bootLine">Opening board</div>
-        <div className="bootBar" aria-hidden="true" />
-      </section>
-    </main>
-  );
-}
-
-function EntryScreen({ onSave }: { onSave: (session: Session) => void }) {
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<AppRole>("staff");
-  const [passcode, setPasscode] = useState("");
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (submitting) return;
-    if (role !== "veterinarian" && !name.trim()) {
-      setError("Enter your name.");
-      return;
-    }
-    if (role !== "staff" && !passcode.trim()) {
-      setError("Enter passcode.");
-      return;
-    }
-
-    const nextSession = {
-      name: name.trim(),
-      role,
-      passcode: role === "staff" ? undefined : passcode.trim(),
-      profileId: null
-    };
-
-    setSubmitting(true);
-    setError("");
-    try {
-      const data = await readJson(
-        await fetch("/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actor: nextSession })
-        })
-      );
-      onSave({
-        ...nextSession,
-        name: data.actor?.name ?? nextSession.name,
-        role: data.actor?.role ?? nextSession.role,
-        profileId: data.actor?.profileId ?? nextSession.profileId
-      });
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Wrong passcode.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <main className="entryShell">
-      <form className="entryPanel" onSubmit={submit}>
-        <p className="eyebrow">Central Veterinary Hospital</p>
-        <h1>Clinic Tasks</h1>
-        <label>
-          {role === "veterinarian" ? "Name (optional)" : "Name"}
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            autoFocus
-            placeholder={role === "veterinarian" ? "Auto-fills from passcode" : "Your name"}
-          />
-        </label>
-        <div className="rolePicker">
-          {[
-            ["staff", "Staff"],
-            ["va", "VA"],
-            ["veterinarian", "Veterinarian"],
-            ["admin", "Admin"]
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={role === value ? "selected" : ""}
-              onClick={() => setRole(value as AppRole)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {role !== "staff" ? (
-          <label>
-            Passcode
-            <input
-              value={passcode}
-              onChange={(event) => setPasscode(event.target.value.trim())}
-              type="password"
-              inputMode="numeric"
-              placeholder="Passcode"
-            />
-          </label>
-        ) : null}
-        {role !== "staff" ? (
-          <div className="authDemoHint">
-            <span className="authDemoLabel">Demo passcodes:</span>
-            <code>Admin/VA 246810</code> <code>Vet 135790</code>
-          </div>
-        ) : null}
-        {error ? <div className="alertLine">{error}</div> : null}
-        <button className="primaryButton" type="submit" disabled={submitting}>
-          <ShieldCheck size={18} />
-          {submitting ? "Checking" : "Enter"}
-        </button>
-      </form>
-    </main>
-  );
-}
-
-function MiniConfetti() {
-  return (
-    <div className="miniConfetti" aria-hidden="true">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <span key={index} />
-      ))}
-    </div>
   );
 }
