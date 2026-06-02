@@ -36,7 +36,7 @@ Deploy shape:
 - Public agent ingress lives in `apps/internal/app/api/agent/_publicAgentGuard.ts`; `_auth.ts` is only actor/passcode manager auth.
 - Agent runner locality: `_runner.ts` orchestrates runs, `_clinicData.ts` owns the agent clinic data projection, `_effectPersistence.ts` owns agent effect persistence, and `_operationalMutations.ts` owns state-changing tool-call persistence.
 - Agent tools live in `packages/agents/src/toolGroups`; `packages/agents/src/tools.ts` only composes groups and records tool-call traces.
-- Task board projection display and ordering policy lives in `taskBoardDisplay.ts`; `TaskCard.tsx` owns repeated task card rendering.
+- Task board locality: `TaskBoard.tsx` owns task state orchestration; `TaskCard.tsx`, `TaskForm.tsx`, `TaskBoardSettings.tsx`, and `TaskBoardChrome.tsx` own repeated UI; `taskBoardDisplay.ts` owns display and ordering policy; `taskBoardClient.ts` owns client response/auth helpers.
 - The legacy `vetagent-client` Render service was deleted on 2026-05-31.
 
 Notification behavior:

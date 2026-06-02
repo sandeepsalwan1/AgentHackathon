@@ -2,7 +2,7 @@
 
 import { Pencil, Plus } from "lucide-react";
 import type { AppRole, Task, TaskPriority, TaskRequestType, TaskStatus } from "@central-vet/db";
-import type { FormEvent } from "react";
+import type { FormEvent, InputHTMLAttributes } from "react";
 import { requestTypes } from "./taskBoardDisplay";
 
 export type TaskFormState = {
@@ -55,6 +55,35 @@ function requiredLabel(text: string) {
   );
 }
 
+function TaskTextField({
+  label,
+  value,
+  onChange,
+  required = false,
+  inputMode,
+  type
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"];
+  type?: InputHTMLAttributes<HTMLInputElement>["type"];
+}) {
+  return (
+    <label>
+      {required ? requiredLabel(label) : label}
+      <input
+        type={type}
+        required={required}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode={inputMode}
+      />
+    </label>
+  );
+}
+
 export function TaskForm({
   form,
   setForm,
@@ -85,23 +114,9 @@ export function TaskForm({
           ))}
         </fieldset>
         <div className="formGrid">
-          <label>
-            {requiredLabel("Client Name")}
-            <input required value={form.clientName} onChange={(event) => update("clientName", event.target.value)} />
-          </label>
-          <label>
-            {requiredLabel("Phone")}
-            <input
-              required
-              value={form.clientPhone}
-              onChange={(event) => update("clientPhone", formatPhoneInput(event.target.value))}
-              inputMode="tel"
-            />
-          </label>
-          <label>
-            {requiredLabel("Pet's name")}
-            <input required value={form.petName} onChange={(event) => update("petName", event.target.value)} />
-          </label>
+          <TaskTextField label="Client Name" required value={form.clientName} onChange={(value) => update("clientName", value)} />
+          <TaskTextField label="Phone" required value={form.clientPhone} onChange={(value) => update("clientPhone", formatPhoneInput(value))} inputMode="tel" />
+          <TaskTextField label="Pet's name" required value={form.petName} onChange={(value) => update("petName", value)} />
           <label>
             {requiredLabel("Priority")}
             <select required value={form.priority} onChange={(event) => update("priority", event.target.value)}>
@@ -122,30 +137,12 @@ export function TaskForm({
           />
         </label>
         <div className="formGrid optionalGrid">
-          <label>
-            Due date
-            <input type="date" value={form.dueDate} onChange={(event) => update("dueDate", event.target.value)} />
-          </label>
-          <label>
-            Due time
-            <input type="time" value={form.dueTime} onChange={(event) => update("dueTime", event.target.value)} />
-          </label>
-          <label>
-            Pet&apos;s date of birth
-            <input type="date" value={form.clientDateOfBirth} onChange={(event) => update("clientDateOfBirth", event.target.value)} />
-          </label>
-          <label>
-            Client ID
-            <input value={form.clarityId} onChange={(event) => update("clarityId", event.target.value)} />
-          </label>
-          <label>
-            Pet&apos;s weight
-            <input value={form.petWeight} onChange={(event) => update("petWeight", event.target.value)} />
-          </label>
-          <label>
-            Assigned to
-            <input value={form.assignedTo} onChange={(event) => update("assignedTo", event.target.value)} />
-          </label>
+          <TaskTextField label="Due date" type="date" value={form.dueDate} onChange={(value) => update("dueDate", value)} />
+          <TaskTextField label="Due time" type="time" value={form.dueTime} onChange={(value) => update("dueTime", value)} />
+          <TaskTextField label="Pet's date of birth" type="date" value={form.clientDateOfBirth} onChange={(value) => update("clientDateOfBirth", value)} />
+          <TaskTextField label="Client ID" value={form.clarityId} onChange={(value) => update("clarityId", value)} />
+          <TaskTextField label="Pet's weight" value={form.petWeight} onChange={(value) => update("petWeight", value)} />
+          <TaskTextField label="Assigned to" value={form.assignedTo} onChange={(value) => update("assignedTo", value)} />
           {role !== "staff" ? (
             <label>
               Status
