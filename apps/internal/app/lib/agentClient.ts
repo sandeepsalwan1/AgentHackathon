@@ -4,7 +4,7 @@
 
 export type WorkflowStatus = "running" | "needs_approval" | "completed" | "failed";
 
-export type WorkflowEventDTO = {
+type WorkflowEventDTO = {
   id: string;
   eventType: string;
   toolName?: string;

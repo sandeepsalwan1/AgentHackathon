@@ -42,7 +42,7 @@ Required Render env:
 - Tool/proof env: `E2B_API_KEY`, `APIFY_API_TOKEN`, optional `APIFY_PRICING_ACTOR_ID`.
 - Internal auth/env: `VET_ADMIN_PASSCODE`, `VET_APP_ADMIN_PASSCODE`, `VET_VETERINARIAN_PASSCODE`, `CRON_SECRET`, notification envs.
 - Cron only: `INTERNAL_BASE_URL`, `CRON_SECRET`.
-- No external records-transfer audit env is required; records transfer uses local approval/audit only.
+- No external records-transfer audit env is required; records transfer uses local audit plus mock secure-transfer submission.
 
 Smoke:
 
@@ -66,5 +66,5 @@ Opsera:
 Security note:
 
 - Supabase currently reports RLS disabled on existing server-side tables.
-- Do not enable RLS without policies during the hackathon; it would block current server-side flows if done incorrectly.
+- Do not enable RLS without policies during initial development; it would block current server-side flows if done incorrectly.
 - Later remediation should add policies and then enable RLS for public tables.

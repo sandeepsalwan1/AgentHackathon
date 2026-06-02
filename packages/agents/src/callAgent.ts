@@ -1,6 +1,5 @@
 import type {
   AgentInput,
-  AgentTaskDraft,
   AgentWorkflowResult,
   RunAgentOptions
 } from "./contracts";
@@ -39,7 +38,6 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
     if (arrival.appointment) {
       const waitComplaint = /wait|waiting|been here|long time|so long/i.test(transcript);
       const arrived = await executeTool("mark_arrived", { appointmentId: arrival.appointment.id, waitComplaint }, runtime) as {
-        task: AgentTaskDraft | null;
         alreadyArrived?: boolean;
       };
       const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime);
@@ -52,40 +50,52 @@ export async function runCallAgent(input: AgentInput | unknown, options: RunAgen
         result: {
           classifiedIntent: "checkin",
           matched: true,
+          action: "checked_in",
           alreadyArrived: Boolean(arrived.alreadyArrived),
           waitStatus: wait
         },
         runtime,
-        options,
-        task: arrived.task ?? undefined
+        options
       });
     }
   }
-  const taskResult = await executeTool("create_task", {
-    status: triage.triage.urgent ? "due" : "pending_review",
-    priority: triage.triage.urgent ? "high" : "medium",
-    requestType: triage.triage.intent === "booking" ? "scheduling" : "patient_update",
-    clientName: normalized.callerName ?? normalized.clientName ?? null,
-    clientPhone: normalized.callerPhone ?? normalized.clientPhone ?? null,
-    petName: normalized.petName ?? null,
-    request: `Call transcript routed on clinic dashboard: ${transcript || "No transcript provided."}`,
-    notes: `Classified as ${triage.triage.intent}.`
-  }, runtime) as {
-    task: AgentTaskDraft;
-  };
+  const action = triage.triage.urgent || triage.triage.intent === "sick_pet"
+    ? await executeTool("dispatch_clinical_triage", {
+        priority: triage.triage.urgent ? "high" : "medium",
+        clientName: normalized.callerName ?? normalized.clientName ?? null,
+        clientPhone: normalized.callerPhone ?? normalized.clientPhone ?? null,
+        petName: normalized.petName ?? null,
+        message: transcript || "No transcript provided.",
+        reasons: [triage.triage.intent]
+      }, runtime)
+    : triage.triage.intent === "booking"
+      ? await executeTool("capture_booking_request", {
+          clientName: normalized.callerName ?? normalized.clientName ?? null,
+          clientPhone: normalized.callerPhone ?? normalized.clientPhone ?? null,
+          petName: normalized.petName ?? null,
+          request: transcript || "No transcript provided."
+        }, runtime)
+      : await executeTool("send_clinic_inbox_message", {
+          subject: "Client call captured",
+          priority: "medium",
+          clientName: normalized.callerName ?? normalized.clientName ?? null,
+          clientPhone: normalized.callerPhone ?? normalized.clientPhone ?? null,
+          petName: normalized.petName ?? null,
+          message: transcript || "No transcript provided."
+        }, runtime);
 
   return buildResult({
     intent,
     mode,
     message: triage.triage.urgent
-      ? "I escalated this call on the clinic dashboard."
-      : "I routed this call on the clinic dashboard.",
+      ? "I sent this call to the clinical triage mock integration."
+      : "I captured this call through a mock clinic integration.",
     result: {
       classifiedIntent: triage.triage.intent,
-      urgent: triage.triage.urgent
+      urgent: triage.triage.urgent,
+      action
     },
     runtime,
-    options,
-    task: taskResult.task
+    options
   });
 }

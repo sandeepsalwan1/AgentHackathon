@@ -45,12 +45,7 @@ type BookingToolResult = {
   task?: AgentTaskDraft | null;
 };
 
-type TaskToolResult = {
-  task: AgentTaskDraft;
-};
-
 type StatusUpdateResult = {
-  queued?: boolean;
   sent?: boolean;
   delivery?: string;
   client?: MockClient | null;
@@ -69,24 +64,21 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
 
   if (intent === "sick_pet") {
     const guardrail = checkMedicalGuardrail(normalized);
-    const taskResult = await executeTool("create_task", {
-      status: "due",
+    const triage = await executeTool("dispatch_clinical_triage", {
       priority: guardrail.priority,
-      requestType: "patient_update",
       clientName: normalized.clientName ?? normalized.callerName ?? null,
       clientPhone: normalized.clientPhone ?? normalized.callerPhone ?? null,
       petName: normalized.petName ?? null,
-      request: `Urgent sick-pet triage needed: ${getInputText(normalized) || "Client reports pet illness."}`,
-      notes: `Guardrail matched: ${guardrail.reasons.join(", ") || "medical concern"}`
-    }, runtime) as TaskToolResult;
+      message: getInputText(normalized) || "Client reports pet illness.",
+      reasons: guardrail.reasons
+    }, runtime);
       return buildResult({
         intent,
         mode,
-        message: guardrail.message ?? "I escalated this into the urgent triage queue.",
-      result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons },
+        message: guardrail.message ?? "I sent this to the clinical triage channel.",
+      result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons, triage },
       runtime,
-      options,
-      task: taskResult.task
+      options
     });
   }
 
@@ -98,24 +90,19 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     }, runtime) as ArrivalResult;
 
     if (!arrival.appointment || !arrival.client || !arrival.pet) {
-      const taskResult = await executeTool("create_task", {
-        status: "pending_review",
-        priority: /wait|waiting/i.test(getInputText(normalized)) ? "high" : "medium",
-        requestType: "scheduling",
+      const exception = await executeTool("capture_arrival_exception", {
         clientName: normalized.clientName ?? normalized.callerName ?? null,
         clientPhone: normalized.clientPhone ?? normalized.callerPhone ?? null,
         petName: normalized.petName ?? null,
-        request: `Arrival check-in exception: ${getInputText(normalized) || "Client says they are here."}`,
-        notes: "No matching appointment found in mock data."
-      }, runtime) as TaskToolResult;
+        request: getInputText(normalized) || "Client says they are here."
+      }, runtime);
       return buildResult({
         intent,
         mode,
-        message: "I could not find a matching appointment, so I opened a scheduling exception with the clinic dashboard.",
-        result: { matched: false, action: "scheduling_exception_opened" },
+        message: "I could not find a matching appointment, so I captured an arrival exception in the front-desk mock integration.",
+        result: { matched: false, action: "arrival_exception_captured", exception },
         runtime,
-        options,
-        task: taskResult.task
+        options
       });
     }
 
@@ -124,6 +111,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       task: AgentTaskDraft | null;
       alreadyArrived?: boolean;
       action?: string;
+      alert?: Record<string, unknown> | null;
     };
     const wait = await executeTool("get_wait_status", { appointmentId: arrival.appointment.id }, runtime) as WaitResult;
     const waitMinutes = wait.waitStatus?.waitMinutes ?? arrival.appointment.waitMinutes;
@@ -162,24 +150,20 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     const client = arrival.client;
     const pet = arrival.pet;
     if (!client || !pet) {
-      const taskResult = await executeTool("create_task", {
-        status: "pending_review",
-        priority: "medium",
-        requestType: "scheduling",
+      const intake = await executeTool("capture_booking_request", {
         clientName: clientName ?? null,
         clientPhone: clientPhone ?? null,
         petName: normalized.petName ?? null,
-        request: `Booking exception: ${getInputText(normalized) || "Client requested an appointment."}`,
-        notes: "Agent needs client and pet confirmation."
-      }, runtime) as TaskToolResult;
+        appointmentType: normalized.appointmentType ?? null,
+        request: getInputText(normalized) || "Client requested an appointment."
+      }, runtime);
       return buildResult({
         intent,
         mode,
-        message: "I could not match the client and pet, so I opened a scheduling exception in the clinic dashboard.",
-        result: { booked: false, action: "scheduling_exception_opened", needsReview: false },
+        message: "I could not match the client and pet, so I captured a scheduler intake item in the mock booking integration.",
+        result: { booked: false, action: "booking_request_captured", needsReview: false, intake },
         runtime,
-        options,
-        task: taskResult.task
+        options
       });
     }
 
@@ -190,23 +174,20 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
     };
     const selected = slots.slots[0] ?? null;
     if (!selected) {
-      const taskResult = await executeTool("create_task", {
-        status: "pending_review",
-        priority: "medium",
-        requestType: "scheduling",
+      const intake = await executeTool("capture_booking_request", {
         clientName: client.fullName,
         clientPhone: client.phone,
         petName: pet.name,
+        appointmentType: normalized.appointmentType ?? null,
         request: `No mock slots found for ${normalized.appointmentType ?? "requested appointment"}.`
-      }, runtime) as TaskToolResult;
+      }, runtime);
       return buildResult({
         intent,
         mode,
-        message: "I did not find an open matching slot, so I opened an overflow scheduling request.",
-        result: { booked: false, action: "overflow_scheduling_opened", slots: [] },
+        message: "I did not find an open matching slot, so I captured the request in the mock scheduler intake.",
+        result: { booked: false, action: "booking_request_captured", slots: [], intake },
         runtime,
-        options,
-        task: taskResult.task
+        options
       });
     }
 
@@ -259,7 +240,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         intent,
         mode,
         message: ready
-          ? `${pet.name} is marked ready for pickup. I queued the pickup note to the client portal.`
+          ? `${pet.name} is marked ready for pickup. I sent the pickup note through the mock client portal.`
           : `${pet.name} is not marked ready yet. Current status is ${wait.waitStatus?.roomStatus ?? "not active"}.`,
         result: {
           ready,
@@ -274,26 +255,23 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         options
       });
     }
-    const taskResult = await executeTool("create_task", {
-      status: ready ? "due" : "pending_review",
-      priority: ready ? "low" : "medium",
-      requestType: "patient_update",
+    const message = await executeTool("send_clinic_inbox_message", {
+      subject: "Pickup status lookup could not match a patient",
+      priority: "medium",
       clientName: client?.fullName ?? normalized.clientName ?? null,
       clientPhone: client?.phone ?? normalized.clientPhone ?? null,
       petName: pet?.name ?? normalized.petName ?? null,
-      request: `Pickup/status request: ${getInputText(normalized) || "Client asked if pet is ready."}`,
-      notes: wait.waitStatus ? `Current room status: ${wait.waitStatus.roomStatus}` : "No active status matched."
-    }, runtime) as TaskToolResult;
+      message: getInputText(normalized) || "Client asked if pet is ready."
+    }, runtime);
     return buildResult({
       intent,
       mode,
       message: ready
         ? `${pet?.name ?? "Your pet"} is marked ready for pickup. Please check in at the front desk.`
-        : "I asked the team to check pickup status manually.",
-      result: { ready, action: "pickup_manual_review", pet, client, waitStatus: wait.waitStatus, source: "mock/DB data" },
+        : "I could not match an active pickup, so I sent a front-desk mock message with the client details.",
+      result: { ready, action: "clinic_message_sent", pet, client, waitStatus: wait.waitStatus, source: "mock/DB data", message },
       runtime,
-      options,
-      task: taskResult.task
+      options
     });
   }
 

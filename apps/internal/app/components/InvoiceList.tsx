@@ -1,11 +1,11 @@
 import { AlertTriangle, ReceiptText } from "lucide-react";
 
-export interface InvoiceFlag {
+interface InvoiceFlag {
   severity?: string;
   message: string;
 }
 
-export interface InvoiceLineItem {
+interface InvoiceLineItem {
   service: string;
   amountCents?: number | string;
   priceCents?: number;

@@ -58,6 +58,13 @@ function promptFor(kind: AgentKind, intent: AgentIntent, input: AgentInput, maxT
   });
 }
 
+function adkTimeoutMs(kind: AgentKind) {
+  const raw = process.env.AGENT_ADK_TIMEOUT_MS || process.env.GOOGLE_ADK_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed >= 1_000) return parsed;
+  return kind === "internal" ? 20_000 : 15_000;
+}
+
 const concreteIntents = new Set<AgentIntent>([
   "booking",
   "call",
@@ -84,20 +91,18 @@ function intentFor(kind: AgentKind, input: AgentInput, options: RunAgentOptions)
 // The real ADK LlmAgent above executes for real: it reasons, calls FunctionTools
 // (the same typed registry as the deterministic path), and its tool calls + events
 // are mirrored into runtime.toolCalls / runtime.workflowEvents and persisted — so
-// run-detail proves the ADK agent invoked tools (e.g. an `adk_tool_call` create_task
-// plus an agent_tool_calls row with the ADK args).
+// run-detail proves the ADK agent invoked tools (e.g. an `adk_tool_call`
+// book_appointment/send_followup_outreach plus an agent_tool_calls row with the
+// ADK args).
 //
 // For the STABLE API contract (message/result/task/approval/report), we then run the
 // deterministic agent once and use ITS effects. This keeps the response shape and
 // safety invariants reliable regardless of LLM nondeterminism.
 //
-// KNOWN DEVIATION from mainCompleteAllAgents.md ("a task created through a FunctionTool,
-// not route logic"): the *persisted* task/approval/report rows are finalized by the
-// deterministic re-run, not the ADK FunctionTool drafts (which live in runtime.effects
-// and are intentionally not merged here). To make persisted artifacts ADK-sourced,
-// merge the kind:"task"|"approval"|"report" drafts from runtime.effects into the
-// returned effects (deduped by id) instead of regenerating them below — at the cost of
-// reintroducing model nondeterminism into the contract.
+// Persisted reports and workflow events are finalized by the deterministic re-run,
+// not the ADK FunctionTool drafts (which live in runtime.effects and are
+// intentionally not merged here). This keeps no-HITL action contracts stable while
+// still proving real ADK tool execution.
 async function contractResultFor(input: {
   kind: AgentKind;
   normalized: AgentInput;
@@ -155,12 +160,14 @@ export async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unk
   });
   const maxToolCalls = kind === "internal" ? 12 : 8;
   const model = options.model || process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash";
+  const timeoutMs = adkTimeoutMs(kind);
+  const abortController = new AbortController();
 
   addEvent(runtime, intent, {
     eventType: "adk_start",
     title: "Google ADK run started",
     detail: "LlmAgent and InMemoryRunner execution started.",
-    metadata: { model, agent: kind, routeIntent: options.routeIntent ?? null }
+    metadata: { model, agent: kind, routeIntent: options.routeIntent ?? null, timeoutMs }
   });
 
   try {
@@ -183,14 +190,31 @@ export async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unk
       }
     });
     let finalText = "";
-    for await (const event of runner.runAsync({
-      userId: session.userId,
-      sessionId: session.id,
-      newMessage: createUserContent(promptFor(kind, intent, normalized, maxToolCalls)),
-      runConfig: { maxLlmCalls: kind === "internal" ? 8 : 6 }
-    })) {
-      mirrorAdkEvent(runtime, intent, event);
-      if (isFinalResponse(event)) finalText = stringifyContent(event).trim();
+    const runPromise = (async () => {
+      for await (const event of runner.runAsync({
+        userId: session.userId,
+        sessionId: session.id,
+        newMessage: createUserContent(promptFor(kind, intent, normalized, maxToolCalls)),
+        runConfig: { maxLlmCalls: kind === "internal" ? 8 : 6 },
+        abortSignal: abortController.signal
+      })) {
+        mirrorAdkEvent(runtime, intent, event);
+        if (isFinalResponse(event)) finalText = stringifyContent(event).trim();
+      }
+      return finalText;
+    })();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        abortController.abort();
+        reject(new Error(`Google ADK execution timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+    try {
+      finalText = await Promise.race([runPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      runPromise.catch(() => undefined);
     }
 
     addEvent(runtime, intent, {
@@ -211,12 +235,14 @@ export async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unk
 
     return contractResultFor({ kind, normalized, intent, runtime, options, model, finalText });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "ADK execution failed";
+    const message = abortController.signal.aborted
+      ? `Google ADK execution timed out after ${timeoutMs}ms`
+      : error instanceof Error ? error.message : "ADK execution failed";
     addEvent(runtime, intent, {
       eventType: "runtime_fallback",
       title: "Google ADK runtime fallback",
       detail: message,
-      metadata: { model, agent: kind }
+      metadata: { model, agent: kind, timeoutMs }
     });
     const fallback = kind === "internal"
       ? await runInternalAgent(normalized, { ...options, mode: "mock" })

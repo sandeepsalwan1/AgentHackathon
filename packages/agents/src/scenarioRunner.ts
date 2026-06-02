@@ -14,12 +14,22 @@ function expectIntent(intent: AgentWorkflowResult["intent"]) {
     result.intent === intent ? null : `Expected intent ${intent}, got ${result.intent}`;
 }
 
-function expectTask(result: AgentWorkflowResult) {
-  return result.task ? null : "Expected a staff task draft";
+function expectNoTask(result: AgentWorkflowResult) {
+  return result.task ? `Expected no staff task draft, got ${result.task.id}` : null;
 }
 
-function expectApproval(result: AgentWorkflowResult) {
-  return result.approval ? null : "Expected an approval draft";
+function expectNoApproval(result: AgentWorkflowResult) {
+  return result.approval ? `Expected no approval draft, got ${result.approval.id}` : null;
+}
+
+function expectResult(path: string, expected: unknown) {
+  return (result: AgentWorkflowResult) => {
+    const actual = path.split(".").reduce<unknown>((item, key) => {
+      if (!item || typeof item !== "object") return undefined;
+      return (item as Record<string, unknown>)[key];
+    }, result.result);
+    return actual === expected ? null : `Expected result.${path}=${String(expected)}, got ${String(actual)}`;
+  };
 }
 
 function all(...checks: Array<(result: AgentWorkflowResult) => string | null>) {
@@ -41,7 +51,7 @@ export const scenarios: Scenario[] = [
       petName: "Biscuit",
       message: "I'm outside for my appointment. Can you check me in?"
     }),
-    expect: all(expectIntent("checkin"), expectTask)
+    expect: all(expectIntent("checkin"), expectNoTask, expectResult("matched", true))
   },
   {
     name: "arrival no appointment",
@@ -50,7 +60,7 @@ export const scenarios: Scenario[] = [
       petName: "Ghost",
       message: "I'm here for my appointment."
     }),
-    expect: all(expectIntent("checkin"), expectTask)
+    expect: all(expectIntent("checkin"), expectNoTask, expectResult("action", "arrival_exception_captured"))
   },
   {
     name: "booking happy path",
@@ -60,14 +70,14 @@ export const scenarios: Scenario[] = [
       appointmentType: "Vaccines",
       message: "Can I book Bella for vaccines next Tuesday?"
     }),
-    expect: all(expectIntent("booking"), expectTask)
+    expect: all(expectIntent("booking"), expectNoTask, expectResult("booked", true))
   },
   {
     name: "booking ambiguous",
     run: () => runExternalAgent({
       message: "Can I get the first appointment after 3?"
     }),
-    expect: all(expectIntent("booking"), expectTask)
+    expect: all(expectIntent("booking"), expectNoTask, expectResult("booked", false), expectResult("action", "booking_request_captured"))
   },
   {
     name: "sick-pet emergency",
@@ -76,7 +86,7 @@ export const scenarios: Scenario[] = [
       petName: "Buddy",
       message: "Buddy is vomiting blood and very lethargic."
     }),
-    expect: all(expectIntent("sick_pet"), expectTask)
+    expect: all(expectIntent("sick_pet"), expectNoTask, expectResult("medicalAdviceGiven", false))
   },
   {
     name: "records transfer",
@@ -86,7 +96,7 @@ export const scenarios: Scenario[] = [
       destination: "Eastside Vet Clinic",
       message: "Please transfer Bella's records to Eastside Vet Clinic."
     }),
-    expect: all(expectIntent("records"), expectTask, expectApproval)
+    expect: all(expectIntent("records"), expectNoTask, expectNoApproval, expectResult("recordsSentAutomatically", true))
   },
   {
     name: "pickup status",
@@ -95,37 +105,37 @@ export const scenarios: Scenario[] = [
       petName: "Buddy",
       message: "Is Buddy ready for pickup?"
     }),
-    expect: all(expectIntent("pickup"), expectTask)
+    expect: all(expectIntent("pickup"), expectNoTask, expectResult("ready", false))
   },
   {
     name: "follow-up vaccine due",
     run: () => runInternalAgent({
       message: "Scan follow-up vaccine candidates."
     }),
-    expect: all(expectIntent("followup"), expectTask)
+    expect: all(expectIntent("followup"), expectNoTask, expectResult("action", "followup_outreach_sent"))
   },
   {
     name: "invoice issue",
     run: () => runInternalAgent({
       message: "Run invoice audit for unusual charges."
     }),
-    expect: all(expectIntent("invoice"), expectTask)
+    expect: all(expectIntent("invoice"), expectNoTask, expectResult("changedInvoices", false))
   },
   {
     name: "pricing review",
     run: () => runInternalAgent({
       message: "Check competitor prices and flag differences."
     }),
-    expect: all(expectIntent("pricing"), expectTask)
+    expect: all(expectIntent("pricing"), expectNoTask, expectResult("changedPrices", false))
   },
   {
-    name: "call transcript to task",
+    name: "call transcript to check-in",
     run: () => runExternalAgent({
       callerName: "Maya Parker",
       callerPhone: "(415) 555-0134",
       transcript: "Hi, I parked outside with Biscuit. Can you check us in?"
     }),
-    expect: all(expectIntent("checkin"), expectTask)
+    expect: all(expectIntent("checkin"), expectNoTask)
   }
 ];
 

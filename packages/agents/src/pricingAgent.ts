@@ -1,7 +1,6 @@
 import type {
   AgentInput,
   AgentReportDraft,
-  AgentTaskDraft,
   AgentWorkflowResult,
   RunAgentOptions
 } from "./contracts";
@@ -42,7 +41,6 @@ export async function runPricingAgent(input: AgentInput | unknown, options: RunA
     flaggedCount: flagged.length,
     comparisons: comparisonResult.comparisons
   }, runtime) as {
-    task: AgentTaskDraft;
     report: AgentReportDraft;
   };
 
@@ -57,7 +55,6 @@ export async function runPricingAgent(input: AgentInput | unknown, options: RunA
     },
     runtime,
     options,
-    task: reportResult.task,
     report: reportResult.report
   });
 }

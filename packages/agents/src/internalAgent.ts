@@ -1,7 +1,6 @@
 import type {
   AgentInput,
   AgentReportDraft,
-  AgentTaskDraft,
   AgentWorkflowResult,
   MockApproval,
   MockFollowup,
@@ -35,24 +34,21 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
 
   if (intent === "sick_pet") {
     const guardrail = checkMedicalGuardrail(normalized);
-    const taskResult = await executeTool("create_task", {
-      status: "due",
+    const triage = await executeTool("dispatch_clinical_triage", {
       priority: guardrail.priority,
-      requestType: "patient_update",
       clientName: normalized.clientName ?? null,
       clientPhone: normalized.clientPhone ?? null,
       petName: normalized.petName ?? null,
-      request: `Staff triage needed for sick-pet message: ${getInputText(normalized)}`,
-      notes: "No diagnosis or treatment recommendation was produced."
-    }, runtime) as { task: AgentTaskDraft };
+      message: getInputText(normalized),
+      reasons: guardrail.reasons
+    }, runtime);
     return buildResult({
       intent,
       mode,
-      message: guardrail.message ?? "Sick-pet message routed for staff triage.",
-      result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons },
+      message: guardrail.message ?? "Sick-pet message sent to the clinical triage mock integration.",
+      result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons, triage },
       runtime,
-      options,
-      task: taskResult.task
+      options
     });
   }
 
@@ -60,26 +56,25 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
     const guardrail = checkBillingGuardrail(getInputText(normalized));
     const invoice = runtime.data.invoices.find((candidate) => candidate.flags.length > 0) ?? runtime.data.invoices[0] ?? null;
     const reportResult = invoice
-      ? await executeTool("flag_invoice_issue", {
+      ? await executeTool("review_invoice_flags", {
           invoiceId: invoice.id,
           issueDetails: invoice.flags[0]?.reason ?? "Invoice needs staff review."
-        }, runtime) as { task: AgentTaskDraft; report: AgentReportDraft; invoice: MockInvoice | null }
+        }, runtime) as { report: AgentReportDraft; invoice: MockInvoice | null; changedInvoices: false }
       : null;
     return buildResult({
       intent,
       mode,
       message: guardrail.allowed
         ? invoice
-          ? `Invoice review created for ${summarizeInvoice(invoice)}.`
+          ? `Invoice audit report created for ${summarizeInvoice(invoice)}.`
           : "No mock invoice issues found."
-        : guardrail.message ?? "Billing review task created.",
+        : guardrail.message ?? "Billing mutation blocked; invoice audit report created.",
       result: {
         changedInvoices: false,
         invoice: reportResult?.invoice ?? null
       },
       runtime,
       options,
-      task: reportResult?.task,
       report: reportResult?.report
     });
   }
@@ -101,28 +96,28 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
     const summary = order
       ? await executeTool("summarize_lab_result", { labOrderId: order.id }, runtime) as { summary: Record<string, unknown> }
       : { summary: { labVendor: "antech_mock", source: "mock lab data", status: "not_found", medicalAdviceGiven: false } };
-    const followup = order
-      ? await executeTool("create_lab_followup_task", {
+    const clientUpdate = order
+      ? await executeTool("prepare_lab_client_update", {
           labOrderId: order.id,
           reason: result.result?.abnormalFlags?.length
             ? "Final mock lab result has abnormal flags; veterinarian review required."
             : "Final mock lab result requires staff review before client disclosure."
-        }, runtime) as { task: AgentTaskDraft }
+        }, runtime) as { update: Record<string, unknown> }
       : null;
     return buildResult({
       intent,
       mode,
-      message: "Mock lab data checked. I created a staff review task before any client disclosure.",
+      message: "Mock lab data checked. I prepared the safe client-update state without giving medical advice.",
       result: {
         labVendor: "antech_mock",
         source: "mock lab data",
         order,
         summary: summary.summary,
+        clientUpdate: clientUpdate?.update ?? null,
         medicalAdviceGiven: false
       },
       runtime,
-      options,
-      task: followup?.task
+      options
     });
   }
 

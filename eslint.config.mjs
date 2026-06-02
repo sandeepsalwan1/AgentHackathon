@@ -11,7 +11,7 @@ export default [
     },
     settings: {
       next: {
-        rootDir: ["apps/internal/"]
+        rootDir: ["apps/internal/", "apps/client-request/"]
       }
     }
   }

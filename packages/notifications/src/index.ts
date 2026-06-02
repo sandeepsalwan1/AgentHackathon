@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   archiveCompletedTasksBefore,
   createNotificationAttempt,
@@ -10,8 +11,9 @@ import {
 } from "@central-vet/db";
 import { Resend } from "resend";
 
-type NotificationMode = "disabled" | "test" | "production";
-type NotificationChannel = "email" | "sms" | "both";
+export type NotificationMode = "disabled" | "test" | "production";
+export type NotificationChannel = "email" | "sms" | "both";
+export type AgentEmailCadence = "once" | "monthly";
 
 type SendResult = {
   recipient: string;
@@ -24,7 +26,12 @@ type SendResult = {
 type Delivery = { channel: "email" | "sms"; recipients: string[] };
 type ProfileAlertKind = "escalation" | "dailyPriority";
 
+const defaultEmailFrom = "Central Veterinary Hospital <notifications@eepish.com>";
 const systemActor = { name: "System", role: "admin" as const };
+
+export function notificationEmailFrom() {
+  return process.env.EMAIL_FROM || defaultEmailFrom;
+}
 
 function mode(): NotificationMode {
   const value = process.env.NOTIFICATION_MODE;
@@ -88,6 +95,7 @@ function localParts(
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return {
     date: `${get("year")}-${get("month")}-${get("day")}`,
+    month: `${get("year")}-${get("month")}`,
     hour: Number(get("hour"))
   };
 }
@@ -153,6 +161,23 @@ function priorityTaskHtml(task: Task) {
       <p style="margin:0;color:#64748b;">Client: ${escapeHtml(task.clientName || "Not listed")} · Phone: ${escapeHtml(formatPhone(task.clientPhone))} · Due: ${escapeHtml(task.dueDate)} · Source: ${escapeHtml(sourceLabel(task.source))}</p>
     </div>
   `;
+}
+
+function agentExampleHtml(message: string, sentBy: string | undefined, localDate: string) {
+  const byline = sentBy ? `<p style="margin:0 0 12px;color:#64748b;">Sent by ${escapeHtml(sentBy)} via VetAgent.</p>` : "";
+  return `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
+      <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital agent email</h1>
+      ${byline}
+      <p style="margin:0 0 12px;">${escapeHtml(message)}</p>
+      <p style="margin:0;color:#64748b;">Example send verified for ${escapeHtml(localDate)}.</p>
+    </div>
+  `;
+}
+
+function agentExampleText(message: string, sentBy: string | undefined, localDate: string) {
+  const byline = sentBy ? ` Sent by ${sentBy} via VetAgent.` : "";
+  return truncateText(`Central Veterinary Hospital agent email.${byline} ${message} Example send verified for ${localDate}.`);
 }
 
 function truncateText(value: string, maxLength = 480) {
@@ -237,9 +262,7 @@ async function sendNotification(args: {
   const currentMode = args.modeOverride ?? mode();
   const currentChannel = args.channelOverride ?? channel();
   const deliveries = args.deliveriesOverride ?? deliveriesFor(currentMode, currentChannel);
-  const from =
-    process.env.EMAIL_FROM ||
-    "Central Veterinary Hospital <notifications@example.com>";
+  const from = notificationEmailFrom();
   const recipientCount = deliveries.reduce((count, delivery) => count + delivery.recipients.length, 0);
 
   if (recipientCount === 0) {
@@ -466,4 +489,51 @@ export async function sendSmokeEmail(options?: {
     channelOverride: options?.channelOverride
   });
   return { localDate: date, results };
+}
+
+export async function sendAgentExampleEmail(options?: {
+  modeOverride?: NotificationMode;
+  recipients?: string[];
+  subject?: string;
+  message?: string;
+  actorName?: string;
+  cadence?: AgentEmailCadence;
+  period?: string;
+  idempotencyKeyBase?: string;
+}) {
+  const { date, month } = localParts();
+  const requestedRecipients = Array.from(
+    new Set((options?.recipients ?? []).map((recipient) => recipient.trim()).filter(Boolean))
+  );
+  const message = options?.message?.trim() || "This is an example email from the Central Veterinary Hospital agent.";
+  const subject = options?.subject?.trim() || "Central Veterinary Hospital agent email";
+  const currentMode = options?.modeOverride ?? "test";
+  const deliveryRecipients = currentMode === "test" ? [] : requestedRecipients;
+  const cadence = options?.cadence ?? "once";
+  const period = cadence === "monthly" ? options?.period ?? month : undefined;
+  const idempotencyKeyBase = options?.idempotencyKeyBase ??
+    (cadence === "monthly"
+      ? `agent-example-email/monthly/${period}`
+      : `agent-example-email/${randomUUID()}`);
+  const results = await sendNotification({
+    notificationType: "agent_example_email",
+    subject,
+    html: agentExampleHtml(message, options?.actorName, date),
+    text: agentExampleText(message, options?.actorName, date),
+    idempotencyKeyBase,
+    modeOverride: currentMode,
+    channelOverride: "email",
+    deliveriesOverride: deliveryRecipients.length > 0 ? [{ channel: "email", recipients: deliveryRecipients }] : undefined
+  });
+  return {
+    localDate: date,
+    mode: currentMode,
+    from: notificationEmailFrom(),
+    recipients: deliveryRecipients,
+    requestedRecipients,
+    subject,
+    cadence,
+    period: period ?? null,
+    results
+  };
 }

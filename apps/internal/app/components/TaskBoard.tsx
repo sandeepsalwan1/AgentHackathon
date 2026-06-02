@@ -22,14 +22,23 @@ import {
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppRole, RecipientProfile, Task, TaskEvent, TaskPriority, TaskRequestType, TaskStatus } from "@central-vet/db";
 import {
-  canEditTask,
   canManage,
-  canMarkInvalid,
   canSeeEscalations,
   canUseNotificationSettings,
   isOpenPriorityTask,
   taskBelongsInLane
 } from "../lib/taskWorkflow";
+import { TaskCard } from "./TaskCard";
+import {
+  actorDisplay,
+  compareTasks,
+  defaultDueTime,
+  doctorName,
+  requestTypeLabel,
+  requestTypes,
+  roleLabel,
+  today
+} from "./taskBoardDisplay";
 
 type Session = {
   name: string;
@@ -75,7 +84,6 @@ const taskSyncKey = `${sessionKey}:task-sync`;
 const taskSyncChannelName = "central-vet-task-sync";
 const activeSyncIntervalMs = 8000;
 const activeSyncWindowMs = 12 * 60 * 1000;
-const defaultDueTime = "19:00";
 const blankVeterinarianProfile: RecipientProfile = {
   profileId: "",
   displayName: "Dr. ",
@@ -100,25 +108,6 @@ const laneDefs = [
 
 type LaneKey = (typeof laneDefs)[number]["key"];
 
-const requestTypes: { value: TaskRequestType; label: string }[] = [
-  { value: "prescription", label: "Prescription" },
-  { value: "labs_xrays", label: "Labs & X-Rays" },
-  { value: "records_request", label: "Records Request" },
-  { value: "scheduling", label: "Scheduling" },
-  { value: "patient_update", label: "Patient Update" }
-];
-
-function today() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
 function blankForm(): FormState {
   return {
     status: "due",
@@ -139,83 +128,6 @@ function blankForm(): FormState {
   };
 }
 
-function doctorName(name: string | null) {
-  const clean = name?.trim();
-  if (!clean) return "Veterinarian";
-  return /^dr\.?\s/i.test(clean) ? clean : `Dr. ${clean}`;
-}
-
-function statusLabel(status: TaskStatus) {
-  return status.replace("_", " ");
-}
-
-function roleLabel(role: AppRole) {
-  if (role === "va" || role === "task_adder") return "VA";
-  if (role === "veterinarian") return "Veterinarian";
-  if (role === "admin") return "Admin";
-  return "Staff";
-}
-
-function actorDisplay(
-  name: string | null,
-  role: AppRole | null,
-  viewerRole: AppRole
-) {
-  if (viewerRole === "staff" && (role === "va" || role === "task_adder")) return "VA";
-  if (viewerRole === "staff" && role === "admin") return "Admin";
-  if (role === "veterinarian") return doctorName(name);
-  return name || (role ? roleLabel(role) : "Unknown");
-}
-
-function sourceDisplay(task: Task, viewerRole: AppRole) {
-  if (task.source === "client_form") return "Client request";
-  if (task.source === "staff_request") {
-    return `Added by ${actorDisplay(task.createdByName, task.createdByRole, viewerRole)}`;
-  }
-  if (task.source === "veterinarian") {
-    return `Added by ${doctorName(task.createdByName)}`;
-  }
-  if (task.source === "admin") {
-    return viewerRole === "staff" ? "Admin" : `Added by ${task.createdByName || "Admin"}`;
-  }
-  if (task.source === "va") {
-    return viewerRole === "staff" ? "VA" : `Added by ${task.createdByName || "VA"}`;
-  }
-  return viewerRole === "staff"
-    ? "VA"
-    : `Added by ${task.createdByName || "VA"}`;
-}
-
-function sourceRank(source: Task["source"]) {
-  if (source === "task_adder" || source === "va") return 0;
-  if (source === "admin") return 1;
-  if (source === "veterinarian") return 2;
-  if (source === "staff_request") return 3;
-  return 4;
-}
-
-function requestTypeLabel(value: TaskRequestType) {
-  return requestTypes.find((item) => item.value === value)?.label || "Labs & X-Rays";
-}
-
-function priorityLabel(value: TaskPriority) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatPhone(value: string | null) {
-  const clean = value?.trim();
-  if (!clean) return "Not listed";
-  if (clean.includes("@")) return clean;
-  const digits = clean.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  if (local.length === 10) {
-    const formatted = `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-    return digits.length === 11 ? `+1 ${formatted}` : formatted;
-  }
-  if (local.length === 7) return `${local.slice(0, 3)}-${local.slice(3)}`;
-  return clean;
-}
-
 function formatPhoneInput(value: string) {
   if (value.includes("@")) return value;
   const digits = value.replace(/\D/g, "");
@@ -228,60 +140,6 @@ function formatPhoneInput(value: string) {
     return `${prefix}(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
   }
   return value;
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "Not set";
-  const [date] = value.split("T");
-  return date || value;
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return "Not set";
-  return new Date(value).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
-function formatTime(value: string | null) {
-  if (!value) return "";
-  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)/);
-  if (!match) return "";
-  const date = new Date();
-  date.setHours(Number(match[1]), Number(match[2]), 0, 0);
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function formatDue(task: Task) {
-  const date = formatDate(task.dueDate);
-  const time = formatTime(task.dueTime);
-  return time ? `${date}, ${time}` : date;
-}
-
-function isOverdue(task: Task) {
-  return (
-    task.status !== "completed" &&
-    task.status !== "archived" &&
-    task.dueDate < today()
-  );
-}
-
-function compareTasks(a: Task, b: Task) {
-  const dueDateDelta = a.dueDate.localeCompare(b.dueDate);
-  if (dueDateDelta !== 0) return dueDateDelta;
-
-  const sourceDelta = sourceRank(a.source) - sourceRank(b.source);
-  if (sourceDelta !== 0) return sourceDelta;
-
-  const dueTimeDelta = (a.dueTime || defaultDueTime).localeCompare(
-    b.dueTime || defaultDueTime
-  );
-  if (dueTimeDelta !== 0) return dueTimeDelta;
-
-  return a.createdAt.localeCompare(b.createdAt);
 }
 
 function requiredLabel(text: string) {
@@ -1741,227 +1599,5 @@ function TaskForm({
         <p className="requiredNote"><span className="requiredStar">*</span> Required</p>
       </form>
     </div>
-  );
-}
-
-function TaskCard({
-  task,
-  role,
-  onEdit,
-  onStatus,
-  onInvalid,
-  onArchive,
-  onEscalate,
-  onUndo
-}: {
-  task: Task;
-  role: AppRole;
-  onEdit: (task: Task) => void;
-  onStatus: (task: Task, status: TaskStatus) => void;
-  onInvalid: (task: Task) => void;
-  onArchive: (task: Task, action: "archive" | "restore") => void;
-  onEscalate: (task: Task) => void;
-  onUndo: (taskId: string) => void;
-}) {
-  const overdue = isOverdue(task);
-  const manageable = canManage(role);
-  const editable = canEditTask(role, task);
-  const archiveAccess = canManage(role);
-  const archived = task.status === "archived";
-  const pendingReview = task.status === "pending_review";
-  const finished = task.status === "completed" || task.status === "invalid";
-  const invalidArchived = archived && Boolean(task.invalidReason);
-  const showAssignment = Boolean(task.assignedTo) && !finished && !archived;
-  const invalidAllowed = canMarkInvalid(role, task);
-
-  return (
-    <article className={`taskCard status-${task.status} ${overdue ? "isOverdue" : ""} ${task.escalatedAt ? "isEscalated" : ""}`}>
-      <div className="cardTop">
-        <span className={`sourceBadge source-${task.source}`}>{sourceDisplay(task, role)}</span>
-        <span className={`statusBadge badge-${invalidArchived ? "invalid" : task.status}`}>
-          {overdue ? "Overdue" : invalidArchived ? "Invalid" : statusLabel(task.status)}
-        </span>
-      </div>
-      {task.escalatedAt ? (
-        <div className="escalatedBanner">
-          <BellRing size={15} />
-          Escalated by {actorDisplay(task.escalatedByName, task.escalatedByRole, role)} {formatDateTime(task.escalatedAt)}
-        </div>
-      ) : null}
-      {(task.priority === "medium" || task.priority === "high") && !finished && !archived ? (
-        <div className="priorityBanner">
-          <AlertTriangle size={15} />
-          {priorityLabel(task.priority)} priority
-        </div>
-      ) : null}
-      <h3 className={task.status === "completed" ? "doneTitle" : ""}>
-        {task.petName || "No pet listed"}
-      </h3>
-      <p className={task.status === "invalid" || invalidArchived ? "invalidText" : ""}>
-        {task.request}
-      </p>
-      <dl className="taskMeta">
-        <div>
-          <dt>Request Type</dt>
-          <dd>{requestTypeLabel(task.requestType)}</dd>
-        </div>
-        <div>
-          <dt>Client Name</dt>
-          <dd>{task.clientName || "Not listed"}</dd>
-        </div>
-        {task.clarityId ? (
-          <div>
-            <dt>Client ID</dt>
-            <dd>{task.clarityId}</dd>
-          </div>
-        ) : null}
-        <div>
-          <dt>Priority</dt>
-          <dd>{priorityLabel(task.priority)}</dd>
-        </div>
-        <div>
-          <dt>Phone</dt>
-          <dd>{formatPhone(task.clientPhone)}</dd>
-        </div>
-        {task.clientDateOfBirth ? (
-          <div>
-            <dt>Pet DOB</dt>
-            <dd>{formatDate(task.clientDateOfBirth)}</dd>
-          </div>
-        ) : null}
-        <div>
-          <dt>Due</dt>
-          <dd>{formatDue(task)}</dd>
-        </div>
-        <div>
-          <dt>Created by</dt>
-          <dd>{actorDisplay(task.createdByName, task.createdByRole, role)}</dd>
-        </div>
-        <div>
-          <dt>Created at</dt>
-          <dd>{formatDateTime(task.createdAt)}</dd>
-        </div>
-        {showAssignment ? (
-          <div>
-            <dt>{task.status === "pending" ? "Pending by" : "Assigned"}</dt>
-            <dd>{task.assignedTo}</dd>
-          </div>
-        ) : null}
-        {task.completedByName ? (
-          <div>
-            <dt>Completed by</dt>
-            <dd>{actorDisplay(task.completedByName, task.completedByRole, role)}</dd>
-          </div>
-        ) : null}
-        {task.completedAt ? (
-          <div>
-            <dt>Completed at</dt>
-            <dd>{formatDateTime(task.completedAt)}</dd>
-          </div>
-        ) : null}
-        {task.archivedByName ? (
-          <div>
-            <dt>Archived by</dt>
-            <dd>{actorDisplay(task.archivedByName, task.archivedByRole, role)}</dd>
-          </div>
-        ) : null}
-        {task.escalatedByName ? (
-          <div>
-            <dt>Escalated by</dt>
-            <dd>{actorDisplay(task.escalatedByName, task.escalatedByRole, role)}</dd>
-          </div>
-        ) : null}
-      </dl>
-      {task.invalidReason ? <div className="invalidReason">{task.invalidReason}</div> : null}
-      <div className="cardActions">
-        {pendingReview && manageable ? (
-          <>
-            <button onClick={() => onStatus(task, "due")} className="plainButton compact">
-              <Clock3 size={16} />
-              Move to Due
-            </button>
-            <button onClick={() => onInvalid(task)} className="plainButton compact">
-              <XCircle size={16} />
-              Invalid
-            </button>
-          </>
-        ) : null}
-        {!archived && !pendingReview && !finished ? (
-          <button onClick={() => onStatus(task, "completed")} className="completeButton">
-            <CheckCircle2 size={16} />
-            Complete
-          </button>
-        ) : null}
-        {!archived && !pendingReview && invalidAllowed && task.status !== "invalid" && task.status !== "completed" ? (
-          <button onClick={() => onInvalid(task)} className="plainButton compact">
-            <XCircle size={16} />
-            Invalid
-          </button>
-        ) : null}
-        {role === "staff" && !archived && !pendingReview && task.status !== "invalid" ? (
-          <>
-            {task.status !== "due" ? (
-              <button onClick={() => onStatus(task, "due")} className="plainButton compact">
-                Due
-              </button>
-            ) : null}
-            {task.status !== "pending" ? (
-              <button onClick={() => onStatus(task, "pending")} className="plainButton compact">
-                Pending
-              </button>
-            ) : null}
-          </>
-        ) : null}
-        {manageable && !archived && !pendingReview ? (
-          <>
-            {task.status !== "due" ? (
-              <button onClick={() => onStatus(task, "due")} className="plainButton compact">
-                Due
-              </button>
-            ) : null}
-            {task.status !== "pending" && task.status !== "invalid" ? (
-              <button onClick={() => onStatus(task, "pending")} className="plainButton compact">
-                Pending
-              </button>
-            ) : null}
-            {task.status !== "invalid" ? (
-              <button onClick={() => onEdit(task)} className="plainButton compact">
-                <Pencil size={16} />
-                Edit
-              </button>
-            ) : null}
-            <button onClick={() => onUndo(task.id)} className="plainButton compact">
-              <RotateCcw size={16} />
-              Undo
-            </button>
-          </>
-        ) : null}
-        {archiveAccess ? (
-          archived ? (
-            <button onClick={() => onArchive(task, "restore")} className="plainButton compact">
-              <RotateCcw size={16} />
-              {invalidArchived ? "Restore to Due" : "Restore"}
-            </button>
-          ) : !pendingReview ? (
-            <button onClick={() => onArchive(task, "archive")} className="plainButton compact">
-              <Archive size={16} />
-              Archive
-            </button>
-          ) : null
-        ) : null}
-        {!manageable && editable && !archived && !pendingReview && task.status !== "invalid" ? (
-          <button onClick={() => onEdit(task)} className="plainButton compact">
-            <Pencil size={16} />
-            Edit
-          </button>
-        ) : null}
-        {!archived && !finished && !task.escalatedAt ? (
-          <button onClick={() => onEscalate(task)} className="escalateButton">
-            <BellRing size={16} />
-            Escalate
-          </button>
-        ) : null}
-      </div>
-    </article>
   );
 }

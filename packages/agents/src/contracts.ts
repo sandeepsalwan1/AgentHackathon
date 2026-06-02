@@ -1,4 +1,7 @@
+import type { MockLabCatalogItem, MockLabOrder, MockLabResult } from "@central-vet/db";
 import { z } from "zod";
+
+export type { MockLabCatalogItem, MockLabOrder, MockLabResult };
 
 export const agentIntentSchema = z.enum([
   "booking",
@@ -245,46 +248,6 @@ export type MockReport = {
   title: string;
   summary: string;
   taskId?: string | null;
-};
-
-export type MockLabCatalogItem = {
-  id: string;
-  labVendor: string;
-  testCode: string;
-  testName: string;
-  specimenType: string;
-  turnaroundHours: number;
-  active: boolean;
-  raw: Record<string, unknown>;
-};
-
-export type MockLabOrder = {
-  id: string;
-  labVendor: string;
-  externalOrderId: string;
-  clientId: string;
-  petId: string;
-  patientName: string;
-  orderedBy: string;
-  testCode: string;
-  testName: string;
-  specimenType: string;
-  orderedAt: string;
-  status: "ordered" | "in_progress" | "partial" | "final" | "cancelled";
-  raw: Record<string, unknown>;
-};
-
-export type MockLabResult = {
-  id: string;
-  labOrderId: string;
-  labVendor: string;
-  externalOrderId: string;
-  status: "ordered" | "in_progress" | "partial" | "final" | "cancelled";
-  resultSummary: string;
-  abnormalFlags: Record<string, unknown>[];
-  reportUrl: string | null;
-  raw: Record<string, unknown>;
-  resultedAt: string | null;
 };
 
 export type MockMessage = {

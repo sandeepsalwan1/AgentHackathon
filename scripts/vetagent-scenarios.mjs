@@ -72,7 +72,13 @@ const scenarios = [
       petName: "Moose",
       message: `I am here but I am not sure my appointment exists. Scenario ${runSalt}.`
     }),
-    expect: { intent: "checkin", task: true, minTools: 2, tools: ["start_arrival", "create_task"], result: { matched: false } }
+    expect: {
+      intent: "checkin",
+      minTools: 2,
+      tools: ["start_arrival", "capture_arrival_exception"],
+      result: { matched: false, action: "arrival_exception_captured" },
+      noTask: true
+    }
   },
   {
     label: "wait complaint",
@@ -83,7 +89,14 @@ const scenarios = [
       petName: "Otis",
       message: `I am outside and have been waiting a long time for Otis. Scenario ${runSalt}.`
     }),
-    expect: { intent: "checkin", task: true, minTools: 3, tools: ["start_arrival", "mark_arrived", "get_wait_status"], taskPriority: "high" }
+    expect: {
+      intent: "checkin",
+      minTools: 3,
+      tools: ["start_arrival", "mark_arrived", "get_wait_status"],
+      workflowEvents: ["wait_concern_dispatched"],
+      result: { matched: true, action: "checked_in" },
+      noTask: true
+    }
   },
   {
     label: "booking happy path",
@@ -107,7 +120,13 @@ const scenarios = [
       appointmentType: "Dental",
       message: `Can I schedule a dental appointment? Scenario ${runSalt}.`
     }),
-    expect: { intent: "booking", task: true, minTools: 2, tools: ["start_arrival", "create_task"], result: { booked: false } }
+    expect: {
+      intent: "booking",
+      minTools: 2,
+      tools: ["start_arrival", "capture_booking_request"],
+      result: { booked: false, action: "booking_request_captured" },
+      noTask: true
+    }
   },
   {
     label: "pickup status ready",
@@ -118,7 +137,7 @@ const scenarios = [
       petName: "Luna",
       message: `Is Luna ready for pickup yet? Scenario ${runSalt}.`
     }),
-    expect: { intent: "pickup", minTools: 3, tools: ["start_arrival", "get_wait_status", "send_status_update"], result: { ready: true, action: "pickup_ready_confirmed", source: "mock/DB data" } }
+    expect: { intent: "pickup", minTools: 3, tools: ["start_arrival", "get_wait_status", "send_status_update"], result: { ready: true, action: "pickup_ready_confirmed", source: "mock/DB data", "statusUpdate.sent": true } }
   },
   {
     label: "pickup status unknown",
@@ -129,10 +148,16 @@ const scenarios = [
       petName: "Comet",
       message: `Is Comet ready for pickup? Scenario ${runSalt}.`
     }),
-    expect: { intent: "pickup", task: true, minTools: 2, tools: ["start_arrival", "create_task"], result: { source: "mock/DB data" } }
+    expect: {
+      intent: "pickup",
+      minTools: 2,
+      tools: ["start_arrival", "send_clinic_inbox_message"],
+      result: { source: "mock/DB data", action: "clinic_message_sent" },
+      noTask: true
+    }
   },
   {
-    label: "records transfer approval",
+    label: "records transfer direct",
     path: "/api/agent/records",
     body: publicBody({
       clientName: "Hannah Kim",
@@ -145,7 +170,9 @@ const scenarios = [
       intent: "records",
       minTools: 3,
       tools: ["prepare_records_packet", "audit_records_transfer", "complete_records_transfer"],
-      result: { requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy", "transfer.transfer.status": "queued" }
+      result: { action: "records_transfer_sent", requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy", "transfer.transfer.status": "sent" },
+      noTask: true,
+      noApproval: true
     }
   },
   {
@@ -165,7 +192,9 @@ const scenarios = [
       tools: ["prepare_records_packet", "audit_records_transfer", "complete_records_transfer"],
       messageIncludes: "secure transfer",
       messageExcludes: "approval",
-      result: { audience: "internal", requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy" }
+      result: { audience: "internal", action: "records_transfer_sent", requiresApproval: false, recordsSentAutomatically: true, "audit.audit.source": "local_records_policy" },
+      noTask: true,
+      noApproval: true
     }
   },
   {
@@ -177,7 +206,7 @@ const scenarios = [
       petName: "Otis",
       message: `Otis is coughing blood and breathing harder than usual. Scenario ${runSalt}.`
     }),
-    expect: { intent: "sick_pet", task: true, minTools: 1, tools: ["create_task"], safety: { medicalAdviceGiven: false }, taskPriority: "high" }
+    expect: { intent: "sick_pet", minTools: 1, tools: ["dispatch_clinical_triage"], safety: { medicalAdviceGiven: false }, workflowEvents: ["clinical_triage_dispatched"], noTask: true }
   },
   {
     label: "sick-pet non-emergency",
@@ -188,7 +217,7 @@ const scenarios = [
       petName: "Maple",
       message: `Maple vomited once but is alert. Please have someone call me. Scenario ${runSalt}.`
     }),
-    expect: { intent: "sick_pet", task: true, minTools: 1, tools: ["create_task"], safety: { medicalAdviceGiven: false } }
+    expect: { intent: "sick_pet", minTools: 1, tools: ["dispatch_clinical_triage"], safety: { medicalAdviceGiven: false }, workflowEvents: ["clinical_triage_dispatched"], noTask: true }
   },
   {
     label: "call transcript unknown",
@@ -201,7 +230,7 @@ const scenarios = [
       petName: "Nova",
       transcript: `I have a complicated question and need someone at the clinic to call me. Scenario ${runSalt}.`
     }),
-    expect: { intent: "call", task: true, minTools: 2, tools: ["triage_call", "create_task"] }
+    expect: { intent: "call", minTools: 2, tools: ["triage_call", "send_clinic_inbox_message"], resultPresent: ["action.message.messageId"], noTask: true }
   },
   {
     label: "follow-up scan",
@@ -212,7 +241,7 @@ const scenarios = [
       petName: "Biscuit",
       message: `I got a vaccine reminder and want to know what is due. Scenario ${runSalt}.`
     }),
-    expect: { intent: "followup", report: true, minTools: 2, tools: ["find_followup_candidates", "create_followup_task"], result: { action: "followup_outreach_queued", "outreach.status": "queued" }, resultPresent: ["candidate.id"] }
+    expect: { intent: "followup", report: true, minTools: 2, tools: ["find_followup_candidates", "send_followup_outreach"], result: { action: "followup_outreach_sent", "outreach.status": "sent" }, resultPresent: ["candidate.id"], noTask: true }
   },
   {
     label: "daily ops",
@@ -230,7 +259,7 @@ const scenarios = [
     label: "invoice review",
     path: "/api/agent/invoice",
     body: { actor: managerActor(), request: `Review invoice flags. Scenario ${runSalt}.` },
-    expect: { intent: "invoice", task: true, report: true, minTools: 1, tools: ["flag_invoice_issue"], safety: { changedInvoices: false } }
+    expect: { intent: "invoice", report: true, minTools: 1, tools: ["review_invoice_flags"], safety: { changedInvoices: false }, noTask: true }
   },
   {
     label: "pricing sample",
@@ -238,11 +267,11 @@ const scenarios = [
     body: { actor: managerActor(), live: false, request: `Run pricing review. Scenario ${runSalt}.` },
     expect: {
       intent: "pricing",
-      task: true,
       report: true,
       minTools: 3,
       tools: ["list_service_catalog", "run_competitor_scan", "compare_service_prices", "create_price_review_report"],
-      safety: { changedPrices: false }
+      safety: { changedPrices: false },
+      noTask: true
     }
   },
   {
@@ -251,24 +280,24 @@ const scenarios = [
     body: { actor: managerActor(), live: true, request: `Run live pricing review if configured. Scenario ${runSalt}.` },
     expect: {
       intent: "pricing",
-      task: true,
       report: true,
       minTools: 3,
       tools: ["list_service_catalog", "run_competitor_scan", "compare_service_prices", "create_price_review_report"],
-      safety: { changedPrices: false }
+      safety: { changedPrices: false },
+      noTask: true
     }
   },
   {
-    label: "internal lab-result review",
+    label: "internal lab-result safe update",
     path: "/api/agent/internal",
-    body: { actor: managerActor(), request: `Check final abnormal mock lab results and create review tasks. Scenario ${runSalt}.` },
+    body: { actor: managerActor(), request: `Check final abnormal mock lab results and prepare the safe client update. Scenario ${runSalt}.` },
     expect: {
       intent: "labs",
-      task: true,
       minTools: 4,
-      tools: ["list_lab_catalog", "lookup_lab_orders", "get_lab_result", "summarize_lab_result", "create_lab_followup_task"],
+      tools: ["list_lab_catalog", "lookup_lab_orders", "get_lab_result", "summarize_lab_result", "prepare_lab_client_update"],
       safety: { medicalAdviceGiven: false },
-      result: { labVendor: "antech_mock", source: "mock lab data" }
+      result: { labVendor: "antech_mock", source: "mock lab data", "clientUpdate.status": "held_for_doctor" },
+      noTask: true
     }
   }
 ];
@@ -333,7 +362,9 @@ function assertScenario(scenario, data, detail) {
   if (!data.runId) errors.push("runId missing");
   if (!data.traceId) errors.push("traceId missing");
   if (expect.task && !data.task?.id) errors.push("task missing");
+  if (expect.noTask && data.task?.id) errors.push(`unexpected task ${data.task.id}`);
   if (expect.approval && !data.approval?.id) errors.push("approval missing");
+  if (expect.noApproval && data.approval?.id) errors.push(`unexpected approval ${data.approval.id}`);
   if (expect.report && !data.report?.id) errors.push("report missing");
   if (expect.taskPriority && data.task?.priority !== expect.taskPriority) errors.push(`task priority ${data.task?.priority || "missing"} expected ${expect.taskPriority}`);
   if (expect.messageIncludes && !data.message?.includes(expect.messageIncludes)) errors.push(`message missing ${expect.messageIncludes}`);
@@ -355,7 +386,9 @@ function assertScenario(scenario, data, detail) {
       if (!detailToolNames.includes(toolName)) errors.push(`run detail tool ${toolName} missing`);
     }
     if (expect.task && !detail.linkedTaskIds?.length) errors.push("run detail linked task missing");
+    if (expect.noTask && detail.linkedTaskIds?.length) errors.push(`run detail unexpected task ${detail.linkedTaskIds.join(",")}`);
     if (expect.approval && !detail.linkedApprovalIds?.length) errors.push("run detail linked approval missing");
+    if (expect.noApproval && detail.linkedApprovalIds?.length) errors.push(`run detail unexpected approval ${detail.linkedApprovalIds.join(",")}`);
     if (expect.report && !detail.linkedReportIds?.length) errors.push("run detail linked report missing");
   }
   for (const [key, value] of Object.entries(expect.result ?? {})) {

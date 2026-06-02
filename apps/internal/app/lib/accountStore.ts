@@ -3,7 +3,7 @@
 // Replace implementations with real API calls when the backend is ready.
 // SECURITY NOTE: mockHash is NOT cryptographic. Replace with bcrypt server-side.
 
-export type AuthRole = "customer" | "veterinarian" | "staff" | "admin";
+type AuthRole = "customer" | "veterinarian" | "staff" | "admin";
 
 // Roles an admin can create from the clinic team panel.
 export type TeamRole = "veterinarian" | "staff";
@@ -36,12 +36,12 @@ export type AccountSession = {
 const ACCOUNTS_KEY = "central-vet-accounts";
 const SESSION_KEY = "central-vet-session";
 
-export const DEMO_PASSCODES = {
+const DEMO_PASSCODES = {
   admin: "246810",
   veterinarian: "135790"
 } as const;
 
-export const DEMO_ACCOUNTS = [
+const DEMO_ACCOUNTS = [
   {
     role: "customer" as const,
     name: "Maya Parker",

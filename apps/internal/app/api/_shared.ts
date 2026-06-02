@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 export { canAdmin, canManage } from "../lib/taskWorkflow";
 
-export const roleSchema = z.enum(["staff", "va", "task_adder", "veterinarian", "admin"]);
+const roleSchema = z.enum(["staff", "va", "task_adder", "veterinarian", "admin"]);
 export const noStoreHeaders = {
   "Cache-Control": "no-store, max-age=0, must-revalidate"
 };
@@ -38,15 +38,15 @@ function demoAccountsEnabled() {
   return process.env.DEMO_ACCOUNTS !== "disabled";
 }
 
-export function vaPasscode() {
+function vaPasscode() {
   return configuredPasscode(process.env.VET_ADMIN_PASSCODE);
 }
 
-export function adminPasscode() {
+function adminPasscode() {
   return configuredPasscode(process.env.VET_APP_ADMIN_PASSCODE || process.env.VET_VETERINARIAN_PASSCODE);
 }
 
-export function veterinarianPasscode() {
+function veterinarianPasscode() {
   return configuredPasscode(process.env.VET_VETERINARIAN_PASSCODE);
 }
 
@@ -55,7 +55,7 @@ function passcodeMatches(input: string | undefined, ...allowed: Array<string | n
   return Boolean(passcode && allowed.some((candidate) => candidate === passcode));
 }
 
-export async function normalizeActor(actor: z.infer<typeof actorSchema>): Promise<Actor | null> {
+async function normalizeActor(actor: z.infer<typeof actorSchema>): Promise<Actor | null> {
   const name = actor.name?.trim() || "";
   if (actor.role === "staff") {
     return name ? { name, role: "staff" } : null;
@@ -87,27 +87,8 @@ export async function normalizeActor(actor: z.infer<typeof actorSchema>): Promis
   return null;
 }
 
-export async function validateVet(actor: z.infer<typeof actorSchema>) {
-  return Boolean(await normalizeActor(actor));
-}
-
 function passcodeFromRequest(url: URL, request?: Request) {
   return request?.headers.get(passcodeHeader) || url.searchParams.get("passcode") || undefined;
-}
-
-export async function actorFromQuery(url: URL, request?: Request) {
-  const role = roleSchema.safeParse(url.searchParams.get("role") ?? "staff");
-  const name = url.searchParams.get("name") || "";
-  const passcode = passcodeFromRequest(url, request);
-  if (!role.success) return null;
-  const actor = { name, role: role.data, passcode };
-  return normalizeActor(actor);
-}
-
-export async function publicActor(actor: z.infer<typeof actorSchema>): Promise<Actor> {
-  const normalized = await normalizeActor(actor);
-  if (!normalized) throw new Error("Invalid actor.");
-  return normalized;
 }
 
 function clientIdentity(request: Request, role: AppRole) {

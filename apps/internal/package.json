@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@central-vet/db": "*",
-    "@central-vet/notifications": "*"
+    "@central-vet/notifications": "*",
+    "@central-vet/request-form": "*",
+    "@central-vet/request-intake": "*"
   }
 }

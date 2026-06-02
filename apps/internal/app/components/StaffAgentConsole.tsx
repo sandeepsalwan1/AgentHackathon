@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FileCheck2, Loader2, ReceiptText, Search, Stethoscope, ClipboardList } from "lucide-react";
+import { Bot, ClipboardList, FileCheck2, Loader2, Mail, ReceiptText, Search, Stethoscope } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { AppRole } from "@central-vet/db";
 import { canManage } from "../lib/taskWorkflow";
@@ -20,6 +20,17 @@ type AgentResult = {
   task?: { id: string };
   approval?: { id: string };
   report?: { id: string; title?: string; summary?: string };
+  result?: {
+    from?: string;
+    subject?: string;
+    results?: Array<{
+      recipient: string;
+      status: string;
+      channel: string;
+      resendId?: string | null;
+      error?: string;
+    }>;
+  };
 };
 
 const sessionKey = "central-vet-session";
@@ -27,6 +38,13 @@ const quickActions = [
   { intent: "daily_ops", label: "Daily ops", icon: ClipboardList, endpoint: "/api/agent/daily-ops" },
   { intent: "pricing", label: "Pricing", icon: Search, endpoint: "/api/agent/pricing" },
   { intent: "invoice", label: "Invoices", icon: ReceiptText, endpoint: "/api/agent/invoice" },
+  {
+    intent: "email",
+    label: "Email",
+    icon: Mail,
+    endpoint: "/api/agent/email",
+    prompt: "Send the monthly example email from VetAgent."
+  },
   { intent: "records", label: "Records", icon: FileCheck2, endpoint: "/api/agent/internal" },
   { intent: "sick_pet", label: "Sick pet", icon: Stethoscope, endpoint: "/api/agent/internal" }
 ] as const;
@@ -69,9 +87,11 @@ export function StaffAgentConsole() {
       profileId: session.profileId
     };
   }, [session]);
+  const emailResults = result?.intent === "email" ? result.result?.results ?? [] : [];
 
-  async function run(endpoint: string, intent?: string) {
+  async function run(endpoint: string, intent?: string, promptOverride?: string) {
     if (!actor) return;
+    const requestMessage = promptOverride ?? message;
     setLoading(intent || "freeform");
     setError("");
     setResult(null);
@@ -81,7 +101,7 @@ export function StaffAgentConsole() {
           await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message })
+            body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message: requestMessage })
           })
         )
       );
@@ -140,7 +160,7 @@ export function StaffAgentConsole() {
                 type="button"
                 className="plainButton"
                 disabled={Boolean(loading)}
-                onClick={() => void run(action.endpoint, action.intent)}
+                onClick={() => void run(action.endpoint, action.intent, "prompt" in action ? action.prompt : undefined)}
               >
                 {loading === action.intent ? <Loader2 className="spinIcon" size={17} /> : <Icon size={17} />}
                 {action.label}
@@ -188,7 +208,24 @@ export function StaffAgentConsole() {
                     <dd>{result.report.id}</dd>
                   </div>
                 ) : null}
+                {result.intent === "email" && result.result?.from ? (
+                  <div>
+                    <dt>from</dt>
+                    <dd>{result.result.from}</dd>
+                  </div>
+                ) : null}
               </dl>
+              {emailResults.length > 0 ? (
+                <div className="agentEmailResults">
+                  {emailResults.map((item) => (
+                    <div key={`${item.channel}-${item.recipient || item.status}`}>
+                      <span>{item.recipient || "configured recipients"}</span>
+                      <strong>{item.status}</strong>
+                      {item.error ? <em>{item.error}</em> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

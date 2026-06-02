@@ -33,7 +33,7 @@ const flows = [
     }
   },
   {
-    label: "pickup queues portal update",
+    label: "pickup sends portal update",
     path: "/api/agent/pickup",
     body: {
       clientName: "Luis Rivera",
@@ -45,11 +45,11 @@ const flows = [
       intent: "pickup",
       "result.action": "pickup_ready_confirmed",
       "result.ready": true,
-      "result.statusUpdate.queued": true
+      "result.statusUpdate.sent": true
     }
   },
   {
-    label: "records queues secure transfer",
+    label: "records sends secure transfer",
     path: "/api/agent/records",
     body: {
       clientName: "Hannah Kim",
@@ -60,14 +60,14 @@ const flows = [
     },
     expect: {
       intent: "records",
-      "result.action": "records_transfer_queued",
+      "result.action": "records_transfer_sent",
       "result.requiresApproval": false,
       "result.recordsSentAutomatically": true,
-      "result.transfer.transfer.status": "queued"
+      "result.transfer.transfer.status": "sent"
     }
   },
   {
-    label: "follow-up queues outreach",
+    label: "follow-up sends outreach",
     path: "/api/agent/followup",
     body: {
       clientName: "Maya Parker",
@@ -77,9 +77,9 @@ const flows = [
     },
     expect: {
       intent: "followup",
-      "result.action": "followup_outreach_queued",
+      "result.action": "followup_outreach_sent",
       "result.pet.name": "Biscuit",
-      "result.outreach.status": "queued"
+      "result.outreach.status": "sent"
     }
   }
 ];

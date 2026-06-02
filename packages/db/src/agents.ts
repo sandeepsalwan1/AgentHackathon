@@ -1,7 +1,7 @@
 import { getSql } from "./connection";
 import type { Actor, AppRole } from "./types";
 
-export type JsonValue =
+type JsonValue =
   | string
   | number
   | boolean
@@ -9,7 +9,7 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-export type JsonObject = { [key: string]: JsonValue };
+type JsonObject = { [key: string]: JsonValue };
 
 export type AgentRun = {
   id: string;

@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Minus, TrendingUp } from "lucide-react";
 
-export interface PricingObservation {
+interface PricingObservation {
   id?: string;
   serviceName: string;
   competitorName?: string;
@@ -10,7 +10,7 @@ export interface PricingObservation {
   url?: string | null;
 }
 
-export interface ServiceCatalogItem {
+interface ServiceCatalogItem {
   id?: string;
   serviceName: string;
   currentPriceCents: number;

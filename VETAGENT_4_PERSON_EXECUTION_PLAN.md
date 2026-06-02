@@ -1,4 +1,4 @@
-# VetAgent 4-Person Hackathon Execution Plan
+# VetAgent 4-Person Execution Plan
 
 Date: 2026-05-31
 
@@ -174,7 +174,7 @@ Must support:
 
 ## Person 1 vs Person 3 - Plain Split
 
-Person 1 is not the frontend person. Person 1 is the backend/product-systems owner for the whole hackathon.
+Person 1 is not the frontend person. Person 1 is the backend/product-systems owner for the whole project.
 
 Person 1 works across all 5 product steps:
 

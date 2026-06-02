@@ -1,0 +1,15 @@
+{
+  "name": "@central-vet/request-intake",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@central-vet/db": "*",
+    "zod": "^4.4.3"
+  }
+}

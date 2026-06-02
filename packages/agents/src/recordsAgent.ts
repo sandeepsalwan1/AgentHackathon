@@ -48,14 +48,14 @@ export async function runRecordsAgent(input: AgentInput | unknown, options: Reco
     intent,
     mode,
     message: transferStatus === "blocked"
-      ? "I prepared the records packet and audit, but need a destination before secure transfer can be queued."
-      : "I prepared the records packet, passed the disclosure audit, and queued secure transfer.",
+      ? "I prepared the records packet and audit, but need a destination before secure transfer can be submitted."
+      : "I prepared the records packet, passed the disclosure audit, and submitted the secure transfer through the mock integration.",
     result: {
       audience,
-      action: "records_transfer_queued",
+      action: transferStatus === "blocked" ? "records_transfer_blocked" : "records_transfer_sent",
       requiresApproval: false,
       allowedAutomatically: true,
-      recordsSentAutomatically: true,
+      recordsSentAutomatically: transferStatus !== "blocked",
       packet,
       audit,
       transfer

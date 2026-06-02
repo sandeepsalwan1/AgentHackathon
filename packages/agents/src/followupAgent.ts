@@ -26,7 +26,7 @@ type FollowupTaskResult = {
   outreach?: {
     status: string;
     channel: string;
-    queuedAt?: string;
+    sentAt?: string;
     message?: string;
   } | null;
   task?: null;
@@ -79,7 +79,7 @@ export async function runFollowupAgent(input: AgentInput | unknown, options: Run
     });
   }
 
-  const taskResult = await executeTool("create_followup_task", { candidateId: candidate.id }, runtime) as FollowupTaskResult;
+  const taskResult = await executeTool("send_followup_outreach", { candidateId: candidate.id }, runtime) as FollowupTaskResult;
   const report: AgentReportDraft = {
     id: `report-followup-${candidate.id}`,
     kind: "report",
@@ -99,14 +99,14 @@ export async function runFollowupAgent(input: AgentInput | unknown, options: Run
     intent,
     mode,
     message: taskResult.pet
-      ? `I queued a follow-up portal message for ${taskResult.pet.name}.`
+      ? `I sent a mock follow-up portal message for ${taskResult.pet.name}.`
       : "I found a follow-up opportunity, but could not match the client and pet.",
     result: {
       candidate,
       client: taskResult.client,
       pet: taskResult.pet,
       outreach: taskResult.outreach ?? null,
-      action: taskResult.outreach?.status === "queued" ? "followup_outreach_queued" : "followup_review_needed"
+      action: taskResult.outreach?.status === "sent" ? "followup_outreach_sent" : "followup_not_sent"
     },
     runtime,
     options,

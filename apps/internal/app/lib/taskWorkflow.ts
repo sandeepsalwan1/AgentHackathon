@@ -33,7 +33,7 @@ export function canUseNotificationSettings(role: AppRole) {
   return role === "veterinarian" || role === "admin";
 }
 
-export function canStaffEditTask(role: AppRole, task: Task) {
+function canStaffEditTask(role: AppRole, task: Task) {
   return role === "staff" &&
     task.source === "staff_request" &&
     task.createdByRole === "staff";

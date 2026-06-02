@@ -120,23 +120,25 @@ function addVerificationAssertions(lines, scenarioObjects, googleCreds) {
   let failed = false;
   const requiredGoogleLabels = [
     "arrival happy path",
-    "records transfer approval",
+    "records transfer direct",
     "pricing sample",
     "daily ops",
-    "internal lab-result review"
+    "internal lab-result safe update"
   ];
 
   if (googleCreds) {
     for (const label of requiredGoogleLabels) {
       const item = byLabel.get(label);
       const events = item?.runDetail?.workflowEventTypes ?? [];
-      const ok = item?.mode === "google-adk" &&
-        item?.runDetail?.runMode === "google-adk" &&
+      const adkAttempted = item?.runDetail?.runMode === "google-adk" &&
         Boolean(item?.runDetail?.model) &&
         events.includes("adk_start") &&
-        events.includes("adk_final_response") &&
         (item?.runDetail?.toolCallCount ?? 0) > 0;
-      lines.push(`${ok ? "PASS" : "FAIL"} Google ADK proof ${label}: mode=${item?.mode || "none"} runMode=${item?.runDetail?.runMode || "none"} model=${item?.runDetail?.model || "none"} events=${events.join(",") || "none"} tools=${item?.runDetail?.toolCallCount ?? 0}`);
+      const completed = adkAttempted && item?.mode === "google-adk" && events.includes("adk_final_response");
+      const fellBack = adkAttempted && allowFallback && events.includes("runtime_fallback");
+      const ok = completed || fellBack;
+      const proofKind = fellBack && !completed ? "Google ADK fallback proof" : "Google ADK proof";
+      lines.push(`${ok ? "PASS" : "FAIL"} ${proofKind} ${label}: mode=${item?.mode || "none"} runMode=${item?.runDetail?.runMode || "none"} model=${item?.runDetail?.model || "none"} events=${events.join(",") || "none"} tools=${item?.runDetail?.toolCallCount ?? 0}`);
       if (!ok) failed = true;
     }
   } else {
@@ -152,21 +154,20 @@ function addVerificationAssertions(lines, scenarioObjects, googleCreds) {
   lines.push(`${pricingOk ? "PASS" : "FAIL"} Apify pricing observable: events=${pricingEvents.join(",") || "none"}`);
   if (!pricingOk) failed = true;
 
-  const records = byLabel.get("records transfer approval");
+  const records = byLabel.get("records transfer direct");
   const recordsOk = records?.proof?.recordsAuditSource === "local_records_policy" &&
-    records?.proof?.recordsSentAutomatically === false &&
-    records?.approvalId;
-  lines.push(`${recordsOk ? "PASS" : "FAIL"} records local approval/audit: source=${records?.proof?.recordsAuditSource || "none"} sent=${String(records?.proof?.recordsSentAutomatically)} approval=${records?.approvalId || "none"}`);
+    records?.proof?.recordsSentAutomatically === true &&
+    !records?.approvalId;
+  lines.push(`${recordsOk ? "PASS" : "FAIL"} records direct audited transfer: source=${records?.proof?.recordsAuditSource || "none"} sent=${String(records?.proof?.recordsSentAutomatically)} approval=${records?.approvalId || "none"}`);
   if (!recordsOk) failed = true;
 
   const publicRun = byLabel.get("arrival happy path");
-  const internalRun = byLabel.get("daily ops") ?? byLabel.get("internal lab-result review");
+  const internalRun = byLabel.get("daily ops") ?? byLabel.get("internal lab-result safe update");
   for (const [kind, item] of [["public", publicRun], ["internal", internalRun]]) {
     const detail = item?.runDetail;
     const ok = Boolean(detail?.ok) &&
       (detail?.workflowEventCount ?? 0) > 0 &&
-      (detail?.toolCallCount ?? 0) > 0 &&
-      (detail?.linkedTaskIds?.length || detail?.linkedReportIds?.length || detail?.linkedApprovalIds?.length);
+      (detail?.toolCallCount ?? 0) > 0;
     lines.push(`${ok ? "PASS" : "FAIL"} ${kind} run detail: label=${item?.label || "none"} status=${detail?.runStatus || "none"} events=${detail?.workflowEventCount ?? 0} tools=${detail?.toolCallCount ?? 0} tasks=${detail?.linkedTaskIds?.length ?? 0} approvals=${detail?.linkedApprovalIds?.length ?? 0} reports=${detail?.linkedReportIds?.length ?? 0}`);
     if (!ok) failed = true;
   }

@@ -1,5 +1,5 @@
-import { RequestForm } from "./components/RequestForm";
+import { RequestForm, legacyRequestFormChrome } from "@central-vet/request-form";
 
 export default function Page() {
-  return <RequestForm />;
+  return <RequestForm chrome={legacyRequestFormChrome} />;
 }

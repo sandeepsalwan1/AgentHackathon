@@ -54,7 +54,7 @@ export function checkRecordsGuardrail(action: string): GuardrailDecision {
     allowed: true,
     risk: risky ? "records" : "none",
     priority: risky ? "medium" : "low",
-    message: risky ? "Records transfer can be queued through the secure portal after local audit." : null,
+    message: risky ? "Records transfer can be submitted through the secure portal after local audit." : null,
     reasons: risky ? ["client_requested_records_transfer"] : []
   };
 }
@@ -65,7 +65,7 @@ export function checkBillingGuardrail(action: string): GuardrailDecision {
     allowed: !risky,
     risk: risky ? "billing" : "none",
     priority: risky ? "medium" : "low",
-    message: risky ? "Billing changes require staff review. I can create a review task instead." : null,
+    message: risky ? "Billing changes are blocked. I can produce an invoice audit report instead." : null,
     reasons: risky ? ["billing_mutation_requires_review"] : []
   };
 }
@@ -76,7 +76,7 @@ export function checkPricingGuardrail(action: string): GuardrailDecision {
     allowed: !risky,
     risk: risky ? "pricing" : "none",
     priority: risky ? "medium" : "low",
-    message: risky ? "Prices are not changed automatically. I can create a pricing report and review task." : null,
+    message: risky ? "Prices are not changed automatically. I can create a pricing report instead." : null,
     reasons: risky ? ["pricing_mutation_blocked"] : []
   };
 }
