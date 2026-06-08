@@ -21,7 +21,7 @@ Supabase setup:
 - Render-compatible pooler host: `aws-1-us-east-1.pooler.supabase.com`.
 - Pooler username: `postgres.xydoircvankwomaqaxcw`.
 - The repo disables prepared statements for Supabase transaction-pooler compatibility.
-- Migrations `001` through `022` are expected; `021_agent_observability.sql` adds run trace/tool-call observability and mock lab tables, and `022_multi_clinic_tenants.sql` adds clinic/domain tenancy.
+- Migrations `001` through `025` are expected; `021_agent_observability.sql` adds run trace/tool-call observability and mock lab tables, `022_multi_clinic_tenants.sql` adds clinic/domain tenancy, and `025_centralvet_domain_alias.sql` seeds the Central Vet custom-domain alias.
 
 Render setup:
 
@@ -35,6 +35,9 @@ Render setup:
   - Legacy `vetagent-client` was deleted from Render on 2026-05-31.
 - Internal build: `npm ci && npm run build --workspace @central-vet/internal`
 - Internal start: `npm run start --workspace @central-vet/internal -- -p $PORT`
+- Custom domains route to the internal app through Render:
+  - `centralvet.eepish.com`
+  - `central-vet.eepish.com`
 - Render MCP currently has no workspace selected; service creation was done through the Render REST API using the configured `RENDER_API_KEY`.
 
 Required Render env:

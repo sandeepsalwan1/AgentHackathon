@@ -1,38 +1,39 @@
 # PIMS Permission Packet — Email Command Center
 
-Last updated: 2026-06-08. This is your one-stop file to get IDEXX / ezyVet access moving. The three emails below are **already saved as Gmail drafts** — you mostly just hit Send.
+Last updated: 2026-06-08. This is your one-stop file to get IDEXX / ezyVet / Antech access moving. Three vendor emails are **send-ready Gmail drafts**. The Tricity authorization note is a relay template that still needs the clinic contact/address/account blanks filled by the clinic.
 
-Pilot clinic: **Tricity Veterinary Hospital** (Cornerstone). Sender: **Sandeep Salwan, Founder, VetAgent** (salwansandeep5@gmail.com).
+Sender: **Sandeep Salwan, Founder, VetAgent** · salwansandeep5@gmail.com · (510) 789-3428 · eepish.com
+Pilot clinic: **Tricity Veterinary Hospital** (Cornerstone) · (510) 796-8387 · no clinic email (you have direct contact)
 
 ---
 
 ## ✅ What's already done
 
-- Researched the real IDEXX path (see `docs/pims-integration.md`). The official front door is the **IDEXX Integration Request Form** (a web form) plus a routed support email.
-- Wrote three polished, human, professional emails — and **saved them as Gmail drafts** in your account, ready to send.
-- Baked in your pilot clinic (Tricity, Cornerstone) and your name/email so there's almost nothing to type.
+- Researched the real path (see `docs/pims-integration.md`). Official front door = the **IDEXX Integration Request Form** (a web form) plus routed support email.
+- Wrote three vendor emails and one Tricity relay template as Gmail drafts, with your phone, website, and known Tricity details already filled in.
+- Found the real Antech HealthTracks support route (`healthtrackssupport@antechdx.com`, or US support `1-800-872-1001`) so that one is send-ready too.
 
-## 👉 What to do next (in order — ~15 minutes)
+## 👉 What to do next (~10 minutes)
 
-1. **Fill 2 blanks once.** In each draft, replace `[your phone]` and `[your website]` with your real phone and the VetAgent site (or just delete those two lines if you don't have them yet). That's the only edit the two IDEXX drafts need.
-2. **Send Draft 1 — IDEXX / Cornerstone.** Open the draft titled *"VetAgent — IDEXX integration partner request"* (to `cornerstone@idexx.com`) and hit Send.
-3. **Send Draft 2 — ezyVet.** Open *"VetAgent — ezyVet API commercial partnership inquiry"* (to `apisupport-ezyvet@idexx.com`) and hit Send.
-4. **Send Draft 3 — Tricity authorization (biggest accelerator).** Open *"Quick favor — one note to your IDEXX rep…"*. Change the **To** field to your Tricity contact's email, fill the bracketed clinic details, then Send. A request from the clinic moves the review faster than anything else.
-5. **Submit the web form** if you haven't already: https://www.idexx.com/en/veterinary/software-services/idexx-practice-management-software-integration-request-form/ — answers are ready in `docs/pims-integration.md` section 8. Select **Cornerstone**.
-6. **Log it.** Note the date you sent each one. If IDEXX goes quiet for ~2 days, use the phone script below and ask for a ticket/reference number.
+1. **Clean up first.** You'll see **3 older drafts** that still contain the text `[your phone]` / `[your website]` from an earlier pass — **delete those 3**. (I can create drafts but can't delete them for you.) Keep the three send-ready vendor drafts plus the Tricity relay template below.
+2. **Send → IDEXX / Cornerstone** — draft to `cornerstone@idexx.com`. One click.
+3. **Send → ezyVet** — draft to `apisupport-ezyvet@idexx.com`. One click.
+4. **Send → Antech** — draft to `healthtrackssupport@antechdx.com`. One click.
+5. **Relay → Tricity authorization** (biggest accelerator) — open the draft titled *"Tricity → IDEXX authorization note"*. Since Tricity has no email, use your direct contact: ask the clinic owner/manager to send the lower note to their IDEXX rep from the clinic's own email and CC you. Fill the clinic's address + IDEXX account ID if they have it.
+6. **Submit the web form** if not done yet: https://www.idexx.com/en/veterinary/software-services/idexx-practice-management-software-integration-request-form/ — answers ready in `docs/pims-integration.md` §8. Select **Cornerstone**.
+7. **Log dates.** If IDEXX is quiet ~2 days, call `1-800-695-2877`, ask for PIMS integrations, get a ticket number (phone script below).
 
-> The only blanks anywhere: **your phone, your website, and the Tricity contact's email + clinic address/ID** (Draft 3). Everything else is filled in.
+> Optional credibility boost: a `@eepish.com` email reads better to IDEXX than gmail. If you have one, swap the signature address before sending.
 
 ---
 
-## The three emails (same text as the Gmail drafts)
+## The four drafts
 
-### Draft 1 — IDEXX / Cornerstone (Data Services)
+### 1 — IDEXX / Cornerstone (Data Services) → `cornerstone@idexx.com`
 
-To: `cornerstone@idexx.com`
 Subject: VetAgent — IDEXX integration partner request (Cornerstone, pilot clinic ready)
 
-> If you already submitted the web form, you can add one line at the top: "I recently submitted the IDEXX Integration Request Form and am following up to make sure it reached the right team."
+> Already submitted the web form? Add one line at the top: "I recently submitted the IDEXX Integration Request Form and am following up to make sure it reached the right team."
 
 ```text
 Dear IDEXX Integration Team,
@@ -58,13 +59,12 @@ Best regards,
 Sandeep Salwan
 Founder, VetAgent
 salwansandeep5@gmail.com
-[your phone]
-[your website]
+(510) 789-3428
+eepish.com
 ```
 
-### Draft 2 — ezyVet API (parallel track)
+### 2 — ezyVet API → `apisupport-ezyvet@idexx.com`
 
-To: `apisupport-ezyvet@idexx.com`
 Subject: VetAgent — ezyVet API commercial partnership inquiry
 
 ```text
@@ -91,23 +91,50 @@ Best regards,
 Sandeep Salwan
 Founder, VetAgent
 salwansandeep5@gmail.com
-[your phone]
-[your website]
+(510) 789-3428
+eepish.com
 ```
 
-### Draft 3 — Tricity clinic authorization (highest leverage)
+### 3 — Antech lab / HealthTracks → `healthtrackssupport@antechdx.com`
 
-To: **your Tricity contact** (the draft is parked in your own inbox — change the To field before sending)
-Subject: Quick favor — one note to your IDEXX rep to speed up the VetAgent integration
+Subject: VetAgent — Antech lab / HealthTracks integration routing request
 
-Sandeep sends this to the Tricity contact; they forward the inner note to their IDEXX rep and CC Sandeep.
+> Note: Antech is Mars-owned and has no public developer API. Once IDEXX is live you can read Antech results straight through Cornerstone, so this email is mainly to open the conversation. Phone fallback: 1-800-872-1001.
+
+```text
+Dear Antech HealthTracks Team,
+
+My name is Sandeep Salwan, and I am the founder of VetAgent, a front-desk workflow tool for veterinary clinics. I am writing to find the supported way for an authorized clinic to let VetAgent receive Antech lab result context, whether through HealthTracks, Antech Online, or the standard PIMS result workflow.
+
+To be clear up front, we are not asking for portal scraping or shared clinic logins. We are looking for the approved partner or integration path, if one exists.
+
+Our pilot clinic, Tricity Veterinary Hospital, runs on Cornerstone and is ready to authorize access. Our initial use case is simple and read-only:
+
+- Read lab result status and result context for a clinic that authorizes it.
+- Match each result to the right client, patient, and task inside VetAgent.
+- No ordering or write-back in phase one, unless you recommend a supported workflow.
+
+Could you route this to the team that handles HealthTracks, Antech Online, PIMS, HL7, or third-party software integrations, and let me know the correct next step and any partner requirements?
+
+Thank you very much for your help.
+
+Best regards,
+
+Sandeep Salwan
+Founder, VetAgent
+salwansandeep5@gmail.com
+(510) 789-3428
+eepish.com
+```
+
+### 4 — Tricity → IDEXX authorization note (relay through the clinic)
+
+Draft is parked in your own inbox. Tricity has no email, so use your direct contact: have the clinic owner/manager send the lower note to their IDEXX rep from the clinic email and CC you.
 
 ```text
 Hi [Tricity contact first name],
 
-Thank you again for partnering with us on VetAgent. There is one quick thing that would genuinely speed up the IDEXX integration: a short note from Tricity to your IDEXX or Cornerstone account contact, authorizing them to discuss the integration with us. A request that comes from the clinic moves the review along far faster than anything we can send on our own.
-
-If it is easy, would you mind sending the note below to your IDEXX/Cornerstone contact and copying me? Please feel free to edit anything.
+Thank you again for partnering with us on VetAgent. One quick thing would genuinely speed up the IDEXX integration: a short note from Tricity to your IDEXX or Cornerstone account contact, authorizing them to discuss the integration with us. A request that comes from the clinic moves the review along far faster than anything we can send on our own. If it is easy, would you mind sending the note below from your clinic email and copying me? Please feel free to edit anything.
 
 ----------
 
@@ -119,6 +146,7 @@ We authorize IDEXX to discuss VetAgent's integration request with them on our be
 
 Clinic details:
 - Clinic: Tricity Veterinary Hospital
+- Phone: (510) 796-8387
 - Address: [clinic address]
 - Website: [clinic website]
 - PIMS: Cornerstone
@@ -139,13 +167,15 @@ Best regards,
 Sandeep Salwan
 Founder, VetAgent
 salwansandeep5@gmail.com
+(510) 789-3428
+eepish.com
 ```
 
 ---
 
 ## If IDEXX goes quiet — phone script
 
-Call one of these and ask to be routed to PIMS integrations / Data Services:
+Call and ask to be routed to PIMS integrations / Data Services:
 
 - Cornerstone software/hardware: 1-800-695-2877
 - Practice Solutions: 1-888-224-4408
@@ -195,16 +225,10 @@ Credential storage? Encrypted at rest, scoped per tenant, never printed in logs,
 Audit logs? Yes — actor, time, route, and result for every action and write-back attempt.
 ```
 
----
-
-## Antech (later, optional)
-
-Antech is Mars-owned (a competitor to IDEXX), and there is no public developer API. The clean path is to read Antech results **through Cornerstone** once the IDEXX integration is live — no separate Antech deal needed. Only pursue Antech directly if a clinic is Antech-portal-only. Routing line if needed: US support 1-800-872-1001, ask for Website Support (HealthTracks / Antech Online / PIMS). Full draft and details are in git history if you need them.
-
 ## Sources
 
 - IDEXX Integration Request Form: https://www.idexx.com/en/veterinary/software-services/idexx-practice-management-software-integration-request-form/
 - IDEXX support contacts: https://www.idexx.com/en/veterinary/support/support-contact/
 - ezyVet commercial partner application: https://developers.ezyvet.com/apply/commercial.html
-- ezyVet become a partner: https://www.ezyvet.com/become-a-partner
+- Antech contact / support: https://www.antechdiagnostics.com/contact-us/ · HealthTracks support source: https://www.antechdiagnostics.com/reference-lab/microbiology/
 - Full research + form answers: `docs/pims-integration.md`
