@@ -77,6 +77,7 @@ export function buildResult(input: {
   task?: AgentTaskDraft | null;
   approval?: AgentWorkflowResult["approval"] | null;
   report?: AgentReportDraft | null;
+  decision?: AgentWorkflowResult["decision"] | null;
 }): AgentWorkflowResult {
   const effects: AgentEffect[] = [...input.runtime.effects];
   const workflowEvents: WorkflowEventDraft[] = [...input.runtime.workflowEvents];
@@ -87,6 +88,7 @@ export function buildResult(input: {
     intent: input.intent,
     message: input.message,
     result: input.result,
+    decision: input.decision ?? undefined,
     task: input.task ?? undefined,
     approval: input.approval ?? undefined,
     report: input.report ?? undefined,

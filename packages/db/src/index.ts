@@ -45,6 +45,24 @@ export {
   updateAgentRun
 } from "./agents";
 export {
+  createAgentDecision,
+  listAgentDecisions,
+  updateAgentDecisionStatus
+} from "./agentDecisions";
+export type {
+  AgentDecision,
+  AgentDecisionStatus,
+  AgentDecisionTtl
+} from "./agentDecisions";
+export {
+  correctAgentMemory,
+  createAgentMemory,
+  deleteAgentMemory,
+  listAgentMemories,
+  searchAgentMemories
+} from "./agentMemory";
+export type { AgentMemory } from "./agentMemory";
+export {
   getAgentRun,
   getAgentRunWithTimeline,
   listAgentReports,

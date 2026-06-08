@@ -6,6 +6,7 @@ import type {
   WorkflowEventDraft
 } from "@central-vet/agents";
 import {
+  createAgentDecision,
   createAgentReport,
   createAgentToolCall,
   createApproval,
@@ -13,6 +14,7 @@ import {
   createWorkflowEvent,
   type Actor,
   type AgentReport,
+  type AgentDecision,
   type Approval,
   type ClinicContext,
   type Task,
@@ -24,6 +26,7 @@ export type PersistedAgentEffects = {
   task?: Task;
   approval?: Approval;
   report?: AgentReport;
+  decisions: AgentDecision[];
   workflowEvents: WorkflowEvent[];
 };
 
@@ -44,6 +47,31 @@ function replaceDraftIds(value: unknown, ids: Map<string, string>): unknown {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, replaceDraftIds(item, ids)])
   );
+}
+
+function decisionStatus(result: AgentWorkflowResult) {
+  if (result.decision?.status) return result.decision.status;
+  const nextAction = result.capabilityDecision?.nextAction;
+  if (nextAction === "block") return "blocked";
+  if (nextAction === "confirm" || nextAction === "ask_once") return "proposed";
+  return "completed";
+}
+
+function decisionTtl(result: AgentWorkflowResult) {
+  if (result.decision?.ttl) return result.decision.ttl;
+  const capability = result.capabilityDecision?.capability ?? result.capability ?? result.intent;
+  if (/booking|records|email/.test(capability)) return "permanent";
+  if (result.capabilityDecision?.cachePolicy === "short_greeting" || result.capabilityDecision?.cachePolicy === "short_run_context") {
+    return "short";
+  }
+  return "long";
+}
+
+function decisionAction(result: AgentWorkflowResult) {
+  const action = result.result.action;
+  return typeof action === "string"
+    ? action
+    : result.capabilityDecision?.nextAction ?? result.intent;
 }
 
 async function persistTask(draft: AgentTaskDraft, actor: Actor, clinic: ClinicContext) {
@@ -76,7 +104,32 @@ export async function persistAgentEffects(
   let task: Task | undefined;
   let approval: Approval | undefined;
   let report: AgentReport | undefined;
+  const decisions: AgentDecision[] = [];
   const workflowEvents: WorkflowEvent[] = [];
+
+  if (result.capabilityDecision || result.decision) {
+    decisions.push(await createAgentDecision({
+      clinicId: clinic.clinicId,
+      runId,
+      traceId,
+      agent: result.capabilityDecision?.agent ?? "unknown",
+      capability: result.capabilityDecision?.capability ?? result.capability ?? result.intent,
+      decisionKind: result.decision?.kind ?? result.capabilityDecision?.capability ?? result.intent,
+      status: decisionStatus(result),
+      ttl: decisionTtl(result),
+      actor,
+      action: decisionAction(result),
+      inputSummary: typeof result.capabilityDecision?.parsedInput.message === "string"
+        ? result.capabilityDecision.parsedInput.message.slice(0, 500)
+        : null,
+      resultSummary: result.message.slice(0, 500),
+      metadata: {
+        decision: result.decision ?? null,
+        capabilityDecision: result.capabilityDecision ?? null,
+        result: result.result
+      }
+    }));
+  }
 
   for (const effect of result.effects.filter((effect) => "kind" in effect && effect.kind === "task") as AgentTaskDraft[]) {
     if (seen.has(effect.id)) continue;
@@ -148,5 +201,5 @@ export async function persistAgentEffects(
   }
 
   const mutationEvents = await persistOperationalMutations(runId, traceId, result.toolCalls, clinic.clinicId);
-  return { task, approval, report, workflowEvents: [...workflowEvents, ...mutationEvents] };
+  return { task, approval, report, decisions, workflowEvents: [...workflowEvents, ...mutationEvents] };
 }

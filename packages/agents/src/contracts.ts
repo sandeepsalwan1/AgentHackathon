@@ -191,6 +191,7 @@ export type AgentWorkflowResult = {
   intent: AgentIntent;
   capability?: AgentCapability;
   capabilityDecision?: CapabilityRouteDecision;
+  decision?: CapabilityDecisionRecord;
   message: string;
   result: Record<string, unknown>;
   task?: AgentTaskDraft;
