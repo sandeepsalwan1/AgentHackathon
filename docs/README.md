@@ -7,6 +7,7 @@ Current docs:
 - `two-agent-architecture-plan.md`: two-agent architecture and capability backlog.
 - `deployment.md`: Render, Supabase, Opsera, env, and smoke setup.
 - `pims-integration.md`: PIMS/lab integration access plan.
+- `pims-permission-packet.md`: copy/paste PIMS permission follow-up, clinic authorization, and vendor outreach.
 - `google-test-account.md`: non-secret note for Google-account testing.
 
 Generated docs:

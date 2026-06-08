@@ -20,6 +20,7 @@ Docs:
 - `docs/two-agent-architecture-plan.md`: current two-agent architecture and capability backlog.
 - `docs/deployment.md`: Render, Supabase, Opsera, and smoke setup.
 - `docs/pims-integration.md`: PIMS/lab integration access plan.
+- `docs/pims-permission-packet.md`: copy/paste PIMS permission follow-up and vendor outreach.
 - `docs/oldplans/`: archived dated implementation plans.
 - `docs/proof/`: generated verification output; `npm run verify:agents` recreates it when needed.
 

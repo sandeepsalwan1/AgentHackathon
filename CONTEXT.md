@@ -54,6 +54,10 @@ _Avoid_: Seating
 The placement of a matched arrival into an available check-in room, with the clinic team able to override room state.
 _Avoid_: Staff-confirmed recommendation
 
+**Room turnover**:
+The process of moving a room from occupied to cleaning to open after a visit is done, preferably from a PIMS signal with clinic-team fallback.
+_Avoid_: Manual-only room release
+
 ## Implementation Map
 
 - Task workflow: rules for task creation, status moves, archive/restore, escalation, assignment side effects, and audit meaning.

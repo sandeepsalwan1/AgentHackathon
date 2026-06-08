@@ -9,6 +9,7 @@ import type {
   MockTask,
   RunAgentOptions
 } from "./contracts";
+import { decideCapabilityRoute, withCapabilityDecision } from "./capabilityRouting";
 import { checkBillingGuardrail, checkMedicalGuardrail } from "./guardrails";
 import {
   buildResult,
@@ -25,9 +26,12 @@ import { executeTool, getInputText, summarizeInvoice } from "./tools";
 export async function runInternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
   const intent = classifyIntent(normalized, "daily_ops");
-  if (intent === "pricing") return runPricingAgent(normalized, options);
-  if (intent === "records") return runRecordsAgent(normalized, { ...options, audience: "internal" });
-  if (intent === "followup") return runFollowupAgent(normalized, options);
+  const routeIntent = intent === "unknown" ? "daily_ops" : intent;
+  const capabilityDecision = decideCapabilityRoute("internal", normalized, routeIntent);
+  const complete = (result: AgentWorkflowResult) => withCapabilityDecision(result, capabilityDecision);
+  if (intent === "pricing") return complete(await runPricingAgent(normalized, options));
+  if (intent === "records") return complete(await runRecordsAgent(normalized, { ...options, audience: "internal" }));
+  if (intent === "followup") return complete(await runFollowupAgent(normalized, options));
 
   const mode = resolveMode(options);
   const runtime = createRuntime(normalized, intent === "unknown" ? "daily_ops" : intent, options);
@@ -42,14 +46,14 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
       message: getInputText(normalized),
       reasons: guardrail.reasons
     }, runtime);
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message: guardrail.message ?? "Sick-pet message sent to the clinical triage mock integration.",
       result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons, triage },
       runtime,
       options
-    });
+    }));
   }
 
   if (intent === "invoice") {
@@ -61,7 +65,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
           issueDetails: invoice.flags[0]?.reason ?? "Invoice needs staff review."
         }, runtime) as { report: AgentReportDraft; invoice: MockInvoice | null; changedInvoices: false }
       : null;
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message: guardrail.allowed
@@ -76,7 +80,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
       runtime,
       options,
       report: reportResult?.report
-    });
+    }));
   }
 
   if (intent === "labs") {
@@ -104,7 +108,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
             : "Final mock lab result requires staff review before client disclosure."
         }, runtime) as { update: Record<string, unknown> }
       : null;
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message: "Mock lab data checked. I prepared the safe client-update state without giving medical advice.",
@@ -118,7 +122,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
       },
       runtime,
       options
-    });
+    }));
   }
 
   const tasksResult = await executeTool("list_tasks", {}, runtime) as { tasks: MockTask[] };
@@ -147,7 +151,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
   ];
   const reportResult = await executeTool("create_daily_ops_report", { summary, rankedWork }, runtime) as { report: AgentReportDraft };
 
-  return buildResult({
+  return complete(buildResult({
     intent: "daily_ops",
     mode,
     message: reportResult.report.summary,
@@ -155,5 +159,5 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
     runtime,
     options,
     report: reportResult.report
-  });
+  }));
 }

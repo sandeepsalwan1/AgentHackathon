@@ -76,6 +76,26 @@ export {
   listServiceCatalog
 } from "./mockClinicPricing";
 export { findArrivalAppointment } from "./mockClinicLookup";
+export {
+  checkoutArrivalRoom,
+  createArrivalException,
+  defaultArrivalQuestionnaire,
+  getArrivalSettings,
+  listArrivalDesk,
+  matchArrivalIdentity,
+  submitMatchedArrival,
+  updateArrivalSettings,
+  updateClinicRoom
+} from "./arrivalIntake";
+export type {
+  ArrivalDeskSnapshot,
+  ArrivalIntake,
+  ArrivalMatch,
+  ArrivalQuestionnaire,
+  ArrivalSettings,
+  ClinicRoom,
+  RoomState
+} from "./arrivalIntake";
 export type {
   MockAppointment,
   MockCallTranscript,

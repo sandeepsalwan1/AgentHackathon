@@ -16,6 +16,7 @@ import {
   resolveMode
 } from "./mockProvider";
 import { runCallAgent } from "./callAgent";
+import { decideCapabilityRoute, withCapabilityDecision } from "./capabilityRouting";
 import { runFollowupAgent } from "./followupAgent";
 import { runRecordsAgent } from "./recordsAgent";
 import { executeTool, getInputText } from "./tools";
@@ -55,9 +56,11 @@ type StatusUpdateResult = {
 export async function runExternalAgent(input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
   const intent = classifyIntent(normalized, "call");
-  if (intent === "records") return runRecordsAgent(normalized, { ...options, audience: "external" });
-  if (intent === "followup") return runFollowupAgent(normalized, options);
-  if (intent === "call" || intent === "unknown") return runCallAgent(normalized, options);
+  const capabilityDecision = decideCapabilityRoute("external", normalized, intent);
+  const complete = (result: AgentWorkflowResult) => withCapabilityDecision(result, capabilityDecision);
+  if (intent === "records") return complete(await runRecordsAgent(normalized, { ...options, audience: "external" }));
+  if (intent === "followup") return complete(await runFollowupAgent(normalized, options));
+  if (intent === "call" || intent === "unknown") return complete(await runCallAgent(normalized, options));
 
   const mode = resolveMode(options);
   const runtime = createRuntime(normalized, intent, options);
@@ -72,14 +75,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       message: getInputText(normalized) || "Client reports pet illness.",
       reasons: guardrail.reasons
     }, runtime);
-      return buildResult({
-        intent,
-        mode,
-        message: guardrail.message ?? "I sent this to the clinical triage channel.",
+    return complete(buildResult({
+      intent,
+      mode,
+      message: guardrail.message ?? "I sent this to the clinical triage channel.",
       result: { escalated: true, medicalAdviceGiven: false, reasons: guardrail.reasons, triage },
       runtime,
       options
-    });
+    }));
   }
 
   if (intent === "checkin") {
@@ -96,14 +99,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         petName: normalized.petName ?? null,
         request: getInputText(normalized) || "Client says they are here."
       }, runtime);
-      return buildResult({
+      return complete(buildResult({
         intent,
         mode,
         message: "I could not find a matching appointment, so I captured an arrival exception in the front-desk mock integration.",
         result: { matched: false, action: "arrival_exception_captured", exception },
         runtime,
         options
-      });
+      }));
     }
 
     const waitComplaint = /wait|waiting|been here|long time|so long/i.test(getInputText(normalized));
@@ -120,7 +123,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       : waitComplaint
         ? `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes, and I flagged the queue issue on the clinic board.`
         : `You are checked in for ${arrival.pet.name}. Current wait is about ${waitMinutes} minutes.`;
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message,
@@ -136,7 +139,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       runtime,
       options,
       task: arrived.task ?? undefined
-    });
+    }));
   }
 
   if (intent === "booking") {
@@ -157,14 +160,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         appointmentType: normalized.appointmentType ?? null,
         request: getInputText(normalized) || "Client requested an appointment."
       }, runtime);
-      return buildResult({
+      return complete(buildResult({
         intent,
         mode,
         message: "I could not match the client and pet, so I captured a scheduler intake item in the mock booking integration.",
         result: { booked: false, action: "booking_request_captured", needsReview: false, intake },
         runtime,
         options
-      });
+      }));
     }
 
     const slots = await executeTool("list_slots", {
@@ -181,14 +184,14 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         appointmentType: normalized.appointmentType ?? null,
         request: `No mock slots found for ${normalized.appointmentType ?? "requested appointment"}.`
       }, runtime);
-      return buildResult({
+      return complete(buildResult({
         intent,
         mode,
         message: "I did not find an open matching slot, so I captured the request in the mock scheduler intake.",
         result: { booked: false, action: "booking_request_captured", slots: [], intake },
         runtime,
         options
-      });
+      }));
     }
 
     const booking = await executeTool("book_appointment", {
@@ -198,7 +201,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       reason: normalized.appointmentType ?? "Appointment request"
     }, runtime) as BookingToolResult;
     const appointment = booking.appointment ?? null;
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message: appointment
@@ -216,7 +219,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       runtime,
       options,
       task: booking.task ?? undefined
-    });
+    }));
   }
 
   if (intent === "pickup") {
@@ -236,7 +239,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
             message: `${pet.name} is ready for pickup. Please check in at the front desk.`
           }, runtime) as StatusUpdateResult
         : null;
-      return buildResult({
+      return complete(buildResult({
         intent,
         mode,
         message: ready
@@ -253,7 +256,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
         },
         runtime,
         options
-      });
+      }));
     }
     const message = await executeTool("send_clinic_inbox_message", {
       subject: "Pickup status lookup could not match a patient",
@@ -263,7 +266,7 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       petName: pet?.name ?? normalized.petName ?? null,
       message: getInputText(normalized) || "Client asked if pet is ready."
     }, runtime);
-    return buildResult({
+    return complete(buildResult({
       intent,
       mode,
       message: ready
@@ -272,8 +275,8 @@ export async function runExternalAgent(input: AgentInput | unknown, options: Run
       result: { ready, action: "clinic_message_sent", pet, client, waitStatus: wait.waitStatus, source: "mock/DB data", message },
       runtime,
       options
-    });
+    }));
   }
 
-  return runCallAgent(normalized, options);
+  return complete(await runCallAgent(normalized, options));
 }

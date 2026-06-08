@@ -26,7 +26,7 @@ import {
 } from "./notificationDelivery";
 import { sendNotification, type SendResult } from "./notificationSend";
 
-export type AgentEmailCadence = "once" | "monthly";
+export type AgentEmailCadence = "once" | "monthly" | "post_appointment";
 export { notificationEmailFrom };
 export type { NotificationChannel, NotificationMode };
 
@@ -197,6 +197,7 @@ export async function sendAgentExampleEmail(options?: {
   actorName?: string;
   cadence?: AgentEmailCadence;
   period?: string;
+  postAppointmentDelayDays?: number;
   idempotencyKeyBase?: string;
 }) {
   const clinicName = await clinicNameFor(options?.clinicId);
@@ -210,9 +211,12 @@ export async function sendAgentExampleEmail(options?: {
   const deliveryRecipients = currentMode === "test" ? [] : requestedRecipients;
   const cadence = options?.cadence ?? "once";
   const period = cadence === "monthly" ? options?.period ?? month : undefined;
+  const postAppointmentDelayDays = options?.postAppointmentDelayDays ?? 7;
   const idempotencyKeyBase = options?.idempotencyKeyBase ??
     (cadence === "monthly"
       ? `agent-example-email/monthly/${period}`
+      : cadence === "post_appointment"
+        ? `agent-example-email/post-appointment/${date}/delay-${postAppointmentDelayDays}`
       : `agent-example-email/${randomUUID()}`);
   const results = await sendNotification({
     clinicId: options?.clinicId,
@@ -234,6 +238,7 @@ export async function sendAgentExampleEmail(options?: {
     requestedRecipients,
     subject,
     cadence,
+    postAppointmentDelayDays: cadence === "post_appointment" ? postAppointmentDelayDays : null,
     period: period ?? null,
     results
   };

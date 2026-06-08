@@ -20,6 +20,65 @@ export const agentIntentSchema = z.enum([
 
 export const agentModeSchema = z.enum(["mock", "google-adk", "apify", "e2b-local", "e2b"]);
 
+export const agentKindSchema = z.enum(["external", "internal"]);
+
+export const agentCapabilitySchema = z.enum([
+  "external_booking",
+  "external_records",
+  "external_conversation",
+  "internal_email",
+  "internal_pricing",
+  "internal_conversation",
+  "internal_booking",
+  "internal_ops",
+  "internal_records",
+  "internal_labs",
+  "internal_invoice"
+]);
+
+export const capabilityRiskLevelSchema = z.enum(["low", "medium", "high"]);
+
+export const capabilityCachePolicySchema = z.enum([
+  "none",
+  "short_greeting",
+  "short_run_context"
+]);
+
+export const capabilityNextActionSchema = z.enum([
+  "answer",
+  "ask_once",
+  "block",
+  "call_tool",
+  "confirm"
+]);
+
+export const capabilityDecisionRecordSchema = z.object({
+  kind: z.string(),
+  status: z.enum(["proposed", "confirmed", "completed", "blocked"]),
+  ttl: z.enum(["short", "long", "permanent"]).optional()
+});
+
+export const capabilityRouteDecisionSchema = z.object({
+  agent: agentKindSchema,
+  agentKind: agentKindSchema,
+  capability: agentCapabilitySchema,
+  parsedInput: z.record(z.string(), z.unknown()),
+  requiredMissingFields: z.array(z.string()),
+  riskLevel: capabilityRiskLevelSchema,
+  cachePolicy: capabilityCachePolicySchema,
+  nextAction: capabilityNextActionSchema
+});
+
+export const capabilityResultSchema = z.object({
+  ok: z.literal(true),
+  message: z.string(),
+  result: z.record(z.string(), z.unknown()),
+  decision: capabilityDecisionRecordSchema.optional(),
+  effects: z.array(z.unknown()),
+  toolCalls: z.array(z.unknown()),
+  capability: agentCapabilitySchema.optional()
+});
+
 export const actorSchema = z.object({
   name: z.string().trim().min(1).optional(),
   role: z.enum(["staff", "va", "task_adder", "veterinarian", "admin"]).optional(),
@@ -46,6 +105,14 @@ export const agentInputSchema = z.object({
 
 export type AgentIntent = z.infer<typeof agentIntentSchema>;
 export type AgentMode = z.infer<typeof agentModeSchema>;
+export type AgentKind = z.infer<typeof agentKindSchema>;
+export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
+export type CapabilityRiskLevel = z.infer<typeof capabilityRiskLevelSchema>;
+export type CapabilityCachePolicy = z.infer<typeof capabilityCachePolicySchema>;
+export type CapabilityNextAction = z.infer<typeof capabilityNextActionSchema>;
+export type CapabilityDecisionRecord = z.infer<typeof capabilityDecisionRecordSchema>;
+export type CapabilityRouteDecision = z.infer<typeof capabilityRouteDecisionSchema>;
+export type CapabilityResult = z.infer<typeof capabilityResultSchema>;
 export type AgentInput = z.infer<typeof agentInputSchema>;
 export type Actor = z.infer<typeof actorSchema>;
 
@@ -122,6 +189,8 @@ export type AgentWorkflowResult = {
   ok: true;
   mode: AgentMode;
   intent: AgentIntent;
+  capability?: AgentCapability;
+  capabilityDecision?: CapabilityRouteDecision;
   message: string;
   result: Record<string, unknown>;
   task?: AgentTaskDraft;
@@ -218,6 +287,19 @@ export type PricingObservation = {
   observedPriceCents: number | null;
   observedText?: string;
   url?: string;
+};
+
+export type PricingRecommendation = {
+  serviceId: string;
+  serviceName: string;
+  currentPriceCents: number;
+  competitorLowCents?: number | null;
+  competitorMedianCents?: number | null;
+  competitorHighCents?: number | null;
+  proposedPriceCents?: number | null;
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  action: "keep" | "raise" | "lower" | "manual_review";
 };
 
 export type MockTask = {

@@ -171,7 +171,8 @@ export const pricingTools = {
     parameters: z.object({
       summary: z.string(),
       flaggedCount: z.number(),
-      comparisons: z.array(z.unknown())
+      comparisons: z.array(z.unknown()),
+      recommendations: z.array(z.unknown()).optional()
     }),
     execute: async (args, runtime) => {
       const report = addEffect(runtime, makeReport({
@@ -179,7 +180,11 @@ export const pricingTools = {
         title: "Competitor pricing review",
         summary: args.summary,
         taskId: null,
-        data: { comparisons: args.comparisons, changedPrices: false }
+        data: {
+          comparisons: args.comparisons,
+          recommendations: args.recommendations ?? [],
+          changedPrices: false
+        }
       }));
       recordEvent(runtime, {
         eventType: "pricing_report_created",

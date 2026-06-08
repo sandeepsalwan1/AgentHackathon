@@ -6,6 +6,8 @@ Last researched: 2026-06-01. Last docs cleanup: 2026-06-08. This is a real produ
 
 ## 1. Action plan (do these in order)
 
+If the IDEXX form is already submitted and there is no response, use the copy/paste follow-up packet in `docs/pims-permission-packet.md` before doing more research. The practical unlock is a real clinic authorization email plus a routed IDEXX support ticket/reference number.
+
 1. Submit the IDEXX Practice Management Software Integration Request Form. This is the single biggest unlock and covers Cornerstone, Neo, and ezyVet in one application.
    - Form: https://www.idexx.com/en/veterinary/software-services/idexx-practice-management-software-integration-request-form/
    - Select Cornerstone (priority). Also select Neo and ezyVet, since it is the same connection and there is no downside.
