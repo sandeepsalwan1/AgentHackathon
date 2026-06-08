@@ -13,6 +13,7 @@ type AgentResult = {
   intent?: string;
   capability?: string;
   runId?: string;
+  decisionIds?: string[];
   task?: { id: string };
   approval?: { id: string };
   report?: { id: string; title?: string; summary?: string };
@@ -37,6 +38,28 @@ type AgentResult = {
       error?: string;
     }>;
   };
+};
+
+type AgentDecisionRow = {
+  id: string;
+  runId: string | null;
+  agent: string;
+  capability: string;
+  decisionKind: string;
+  status: string;
+  action: string;
+  resultSummary: string | null;
+  createdAt: string;
+};
+
+type AgentMemoryRow = {
+  id: string;
+  subjectType: string;
+  subjectId: string | null;
+  memoryType: string;
+  fact: string;
+  confidence: number;
+  createdAt: string;
 };
 
 const quickActions = [
@@ -72,6 +95,12 @@ export function StaffAgentConsole() {
   const [templateReviewed, setTemplateReviewed] = useState(false);
   const [productionConfirmed, setProductionConfirmed] = useState(false);
   const [postAppointmentDelayDays, setPostAppointmentDelayDays] = useState(7);
+  const [decisions, setDecisions] = useState<AgentDecisionRow[]>([]);
+  const [memories, setMemories] = useState<AgentMemoryRow[]>([]);
+  const [memoryFact, setMemoryFact] = useState("");
+  const [memorySubjectType, setMemorySubjectType] = useState("client");
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState("");
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -91,6 +120,52 @@ export function StaffAgentConsole() {
   }, [session]);
   const emailResults = result?.intent === "email" ? result.result?.results ?? [] : [];
 
+  function authQuery() {
+    const params = new URLSearchParams();
+    if (actor?.name) params.set("name", actor.name);
+    if (actor?.role) params.set("role", actor.role);
+    return params;
+  }
+
+  function authHeaders() {
+    return {
+      "Content-Type": "application/json",
+      ...(actor?.passcode ? { "x-central-vet-passcode": actor.passcode } : {})
+    };
+  }
+
+  async function loadAudit() {
+    if (!actor) return;
+    setAuditLoading(true);
+    setAuditError("");
+    try {
+      const query = authQuery();
+      const [decisionResponse, memoryResponse] = await Promise.all([
+        fetch(`/api/agent/decisions?${query.toString()}&limit=6`, { headers: authHeaders() }),
+        fetch(`/api/agent/memory?${query.toString()}&limit=6`, { headers: authHeaders() })
+      ]);
+      const decisionData = await decisionResponse.json().catch(() => ({}));
+      const memoryData = await memoryResponse.json().catch(() => ({}));
+      if (!decisionResponse.ok) throw new Error(decisionData.error || "Decision audit failed.");
+      if (!memoryResponse.ok) throw new Error(memoryData.error || "Memory audit failed.");
+      setDecisions(Array.isArray(decisionData.decisions) ? decisionData.decisions : []);
+      setMemories(Array.isArray(memoryData.memories) ? memoryData.memories : []);
+    } catch (auditLoadError) {
+      setAuditError(auditLoadError instanceof Error ? auditLoadError.message : "Audit load failed.");
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!actor || !canManage(actor.role)) return;
+    const auditTimer = window.setTimeout(() => {
+      void loadAudit();
+    }, 0);
+    return () => window.clearTimeout(auditTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor?.name, actor?.role, actor?.passcode]);
+
   async function run(endpoint: string, intent?: string, promptOverride?: string) {
     if (!actor) return;
     const requestMessage = promptOverride ?? message;
@@ -107,15 +182,15 @@ export function StaffAgentConsole() {
     setError("");
     setResult(null);
     try {
-      setResult(
-        await readJson(
-          await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message: requestMessage, ...emailPayload })
-          })
-        )
+      const nextResult = await readJson(
+        await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message: requestMessage, ...emailPayload })
+        })
       );
+      setResult(nextResult);
+      void loadAudit();
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "Agent failed.");
     } finally {
@@ -126,6 +201,33 @@ export function StaffAgentConsole() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     await run("/api/agent/internal");
+  }
+
+  async function writeMemory(method: "POST" | "PATCH" | "DELETE", id?: string) {
+    if (!actor) return;
+    const body = method === "DELETE"
+      ? { actor, id, correctionNote: "Deleted from staff agent console." }
+      : {
+          actor,
+          ...(id ? { id, correctionNote: "Corrected from staff agent console." } : {}),
+          subjectType: memorySubjectType,
+          fact: memoryFact,
+          memoryType: "preference"
+        };
+    setAuditError("");
+    try {
+      const response = await fetch("/api/agent/memory", {
+        method,
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Memory update failed.");
+      setMemoryFact("");
+      await loadAudit();
+    } catch (memoryError) {
+      setAuditError(memoryError instanceof Error ? memoryError.message : "Memory update failed.");
+    }
   }
 
   if (!session) {
@@ -277,6 +379,12 @@ export function StaffAgentConsole() {
                     <dd>{result.decision.status}</dd>
                   </div>
                 ) : null}
+                {result.decisionIds?.length ? (
+                  <div>
+                    <dt>decision id</dt>
+                    <dd>{result.decisionIds[0]}</dd>
+                  </div>
+                ) : null}
                 {result.confirmation?.cadence ? (
                   <div>
                     <dt>cadence</dt>
@@ -314,6 +422,71 @@ export function StaffAgentConsole() {
             </div>
           </div>
         ) : null}
+        <div className="staffAgentAudit">
+          <section>
+            <div className="staffAgentAuditHeader">
+              <h2>Decisions</h2>
+              <button className="plainButton" type="button" onClick={() => void loadAudit()} disabled={auditLoading}>
+                {auditLoading ? <Loader2 className="spinIcon" size={15} /> : <Search size={15} />}
+                Refresh
+              </button>
+            </div>
+            {decisions.length > 0 ? (
+              <div className="agentEmailResults">
+                {decisions.map((decision) => (
+                  <div key={decision.id}>
+                    <span>{decision.decisionKind} - {decision.action}</span>
+                    <strong>{decision.status}</strong>
+                    <em>{decision.resultSummary || decision.capability}</em>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mutedLine">No decisions yet.</p>
+            )}
+          </section>
+          <section>
+            <div className="staffAgentAuditHeader">
+              <h2>Memory</h2>
+            </div>
+            <div className="staffMemoryEditor">
+              <select value={memorySubjectType} onChange={(event) => setMemorySubjectType(event.target.value)}>
+                <option value="client">client</option>
+                <option value="pet">pet</option>
+                <option value="clinic">clinic</option>
+              </select>
+              <input
+                value={memoryFact}
+                onChange={(event) => setMemoryFact(event.target.value)}
+                placeholder="Preference or durable fact"
+              />
+              <button className="plainButton" type="button" disabled={!memoryFact.trim()} onClick={() => void writeMemory("POST")}>
+                Add
+              </button>
+            </div>
+            {memories.length > 0 ? (
+              <div className="agentEmailResults">
+                {memories.map((memory) => (
+                  <div key={memory.id}>
+                    <span>{memory.fact}</span>
+                    <strong>{memory.subjectType}</strong>
+                    <em>
+                      <button className="textButton" type="button" disabled={!memoryFact.trim()} onClick={() => void writeMemory("PATCH", memory.id)}>
+                        Correct
+                      </button>
+                      <button className="textButton dangerTextButton" type="button" onClick={() => void writeMemory("DELETE", memory.id)}>
+                        Delete
+                      </button>
+                    </em>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mutedLine">No memory yet.</p>
+            )}
+            {auditError ? <div className="errorBox">{auditError}</div> : null}
+          </section>
+        </div>
       </section>
     </main>
   );
