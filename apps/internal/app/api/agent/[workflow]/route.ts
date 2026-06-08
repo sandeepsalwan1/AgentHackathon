@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbError, resolveClinicFromRequest } from "../../_shared";
 import { requireManagerFromBody } from "../_auth";
+import { internalAgentGuard } from "../_internalAgentGuard";
 import { readPublicAgentBody } from "../_publicAgentGuard";
 import { executeVetAgentWorkflow, getAgentWorkflowRoute } from "../_runner";
 
@@ -19,6 +20,14 @@ export async function POST(
     if (route.auth === "manager") {
       const auth = await requireManagerFromBody(request);
       if ("response" in auth) return auth.response;
+      const guard = await internalAgentGuard({
+        clinicId: clinic.clinicId,
+        request,
+        actor: auth.actor,
+        route: route.routeIntent,
+        body: auth.body
+      });
+      if (guard) return guard;
       return executeVetAgentWorkflow({
         agent: route.agent,
         routeIntent: route.routeIntent,

@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { dbError, logInfo, noStoreHeaders } from "../../_shared";
 import { requireManagerFromBody } from "../_auth";
+import { internalAgentGuard } from "../_internalAgentGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +160,15 @@ export async function POST(request: Request) {
     const auth = await requireManagerFromBody(request);
     if ("response" in auth) return auth.response;
     clinicId = auth.clinic.clinicId;
+
+    const guard = await internalAgentGuard({
+      clinicId,
+      request,
+      actor: auth.actor,
+      route: "email",
+      body: auth.body
+    });
+    if (guard) return guard;
 
     const parsed = emailBodySchema.safeParse(auth.body);
     if (!parsed.success) {
