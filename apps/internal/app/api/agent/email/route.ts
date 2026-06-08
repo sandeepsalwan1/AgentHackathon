@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  createAgentDecision,
   createAgentRun,
   createAgentToolCall,
   createWorkflowEvent,
@@ -259,6 +260,21 @@ export async function POST(request: Request) {
           capabilityDecision
         }
       });
+      const decisionRow = await createAgentDecision({
+        clinicId,
+        runId,
+        traceId,
+        agent: "internal",
+        capability: "internal_email",
+        decisionKind: "email_campaign",
+        status: "blocked",
+        ttl: "long",
+        actor: auth.actor,
+        action: "validate_email_campaign_confirmation",
+        inputSummary: summarizeInput(input),
+        resultSummary: message,
+        metadata: { blockers, confirmation, capabilityDecision }
+      });
       await updateAgentRun(runId, {
         clinicId,
         status: "completed",
@@ -278,7 +294,8 @@ export async function POST(request: Request) {
             kind: "email_campaign",
             status: "blocked",
             ttl: "long"
-          }
+          },
+          decisionIds: [decisionRow.id]
         },
         error: null,
         durationMs,
@@ -308,6 +325,7 @@ export async function POST(request: Request) {
             status: "blocked",
             ttl: "long"
           },
+          decisionIds: [decisionRow.id],
           result: { blocked: true, blockers, confirmation },
           workflowEvents: [event],
           toolCalls: [toolCall]
@@ -337,6 +355,7 @@ export async function POST(request: Request) {
     const stats = resultStats(sent.results);
     const message = statusMessage(stats, mode);
     const durationMs = Date.now() - started;
+    const decisionStatus = stats.sent > 0 ? "completed" : stats.skipped > 0 ? "blocked" : "proposed";
     const toolCall = await createAgentToolCall({
       clinicId,
       runId,
@@ -377,6 +396,21 @@ export async function POST(request: Request) {
         capabilityDecision
       }
     });
+    const decisionRow = await createAgentDecision({
+      clinicId,
+      runId,
+      traceId,
+      agent: "internal",
+      capability: "internal_email",
+      decisionKind: "email_campaign",
+      status: decisionStatus,
+      ttl: "long",
+      actor: auth.actor,
+      action: "send_agent_email",
+      inputSummary: summarizeInput(input),
+      resultSummary: message,
+      metadata: { stats, confirmation, capabilityDecision, sent }
+    });
     await updateAgentRun(runId, {
       clinicId,
       status: "completed",
@@ -395,9 +429,10 @@ export async function POST(request: Request) {
         confirmation,
         decision: {
           kind: "email_campaign",
-          status: stats.sent > 0 ? "completed" : stats.skipped > 0 ? "blocked" : "proposed",
+          status: decisionStatus,
           ttl: "long"
-        }
+        },
+        decisionIds: [decisionRow.id]
       },
       error: null,
       durationMs,
@@ -424,9 +459,10 @@ export async function POST(request: Request) {
         confirmation,
         decision: {
           kind: "email_campaign",
-          status: stats.sent > 0 ? "completed" : stats.skipped > 0 ? "blocked" : "proposed",
+          status: decisionStatus,
           ttl: "long"
         },
+        decisionIds: [decisionRow.id],
         result: sent,
         workflowEvents: [event],
         toolCalls: [toolCall]

@@ -1,5 +1,6 @@
 import { getSql } from "./connection";
 import { resolveClinicId } from "./clinics";
+import { listAgentDecisions } from "./agentDecisions";
 import {
   agentRunColumns,
   approvalColumns,
@@ -189,6 +190,7 @@ export async function getAgentRunWithTimeline(
       order by created_at asc
     `
   ]);
+  const decisions = await listAgentDecisions({ clinicId, runId: id, limit: 100 });
   const approvals = approvalRows.map(normalizeApproval);
   const reports = reportRows.map(normalizeReport);
   const eventTaskIds = workflowEvents
@@ -207,8 +209,10 @@ export async function getAgentRunWithTimeline(
     toolCalls,
     approvals,
     reports,
+    decisions,
     linkedTaskIds,
     linkedApprovalIds: approvals.map((approval) => approval.id),
-    linkedReportIds: reports.map((report) => report.id)
+    linkedReportIds: reports.map((report) => report.id),
+    linkedDecisionIds: decisions.map((decision) => decision.id)
   };
 }

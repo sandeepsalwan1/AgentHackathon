@@ -333,7 +333,8 @@ function detailSummary(detail) {
       toolNames: [],
       linkedTaskIds: [],
       linkedApprovalIds: [],
-      linkedReportIds: []
+      linkedReportIds: [],
+      linkedDecisionIds: []
     };
   }
   return {
@@ -348,7 +349,8 @@ function detailSummary(detail) {
     toolNames: unique((detail.toolCalls ?? []).map((tool) => tool.toolName)),
     linkedTaskIds: detail.linkedTaskIds ?? [],
     linkedApprovalIds: detail.linkedApprovalIds ?? [],
-    linkedReportIds: detail.linkedReportIds ?? []
+    linkedReportIds: detail.linkedReportIds ?? [],
+    linkedDecisionIds: detail.linkedDecisionIds ?? []
   };
 }
 
@@ -390,6 +392,7 @@ function assertScenario(scenario, data, detail) {
     if (expect.approval && !detail.linkedApprovalIds?.length) errors.push("run detail linked approval missing");
     if (expect.noApproval && detail.linkedApprovalIds?.length) errors.push(`run detail unexpected approval ${detail.linkedApprovalIds.join(",")}`);
     if (expect.report && !detail.linkedReportIds?.length) errors.push("run detail linked report missing");
+    if (expect.decision !== false && !detail.linkedDecisionIds?.length) errors.push("run detail linked decision missing");
   }
   for (const [key, value] of Object.entries(expect.result ?? {})) {
     if (getPath(data.result, key) !== value) errors.push(`result.${key} expected ${String(value)}`);

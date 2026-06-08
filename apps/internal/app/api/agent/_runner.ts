@@ -150,6 +150,7 @@ function withResponseFields(result: AgentWorkflowResult, input: {
     task: input.task ?? result.task,
     approval: input.approval ?? result.approval,
     report: input.report ?? result.report,
+    decisions: input.decisions,
     workflowEvents: input.workflowEvents,
     toolCalls: result.toolCalls
   };
@@ -238,7 +239,8 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
         result: result.result,
         taskId: persisted.task?.id ?? null,
         approvalId: persisted.approval?.id ?? null,
-        reportId: persisted.report?.id ?? null
+        reportId: persisted.report?.id ?? null,
+        decisionIds: persisted.decisions.map((decision) => decision.id)
       },
       error: null,
       durationMs,
@@ -253,6 +255,7 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       task: persisted.task,
       approval: persisted.approval,
       report: persisted.report,
+      decisions: persisted.decisions,
       workflowEvents: persisted.workflowEvents
     });
     return NextResponse.json(body, { headers: runnerHeaders(runId, traceId) });

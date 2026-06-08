@@ -173,8 +173,9 @@ function addVerificationAssertions(lines, scenarioObjects, googleCreds) {
     const detail = item?.runDetail;
     const ok = Boolean(detail?.ok) &&
       (detail?.workflowEventCount ?? 0) > 0 &&
-      (detail?.toolCallCount ?? 0) > 0;
-    lines.push(`${ok ? "PASS" : "FAIL"} ${kind} run detail: label=${item?.label || "none"} status=${detail?.runStatus || "none"} events=${detail?.workflowEventCount ?? 0} tools=${detail?.toolCallCount ?? 0} tasks=${detail?.linkedTaskIds?.length ?? 0} approvals=${detail?.linkedApprovalIds?.length ?? 0} reports=${detail?.linkedReportIds?.length ?? 0}`);
+      (detail?.toolCallCount ?? 0) > 0 &&
+      (detail?.linkedDecisionIds?.length ?? 0) > 0;
+    lines.push(`${ok ? "PASS" : "FAIL"} ${kind} run detail: label=${item?.label || "none"} status=${detail?.runStatus || "none"} events=${detail?.workflowEventCount ?? 0} tools=${detail?.toolCallCount ?? 0} tasks=${detail?.linkedTaskIds?.length ?? 0} approvals=${detail?.linkedApprovalIds?.length ?? 0} reports=${detail?.linkedReportIds?.length ?? 0} decisions=${detail?.linkedDecisionIds?.length ?? 0}`);
     if (!ok) failed = true;
   }
 

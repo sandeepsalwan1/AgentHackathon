@@ -1,4 +1,5 @@
 import type { AppRole } from "./types";
+import type { AgentDecision } from "./agentDecisions";
 
 export type AgentRun = {
   id: string;
@@ -88,9 +89,11 @@ export type AgentRunTimeline = {
   toolCalls: AgentToolCall[];
   approvals: Approval[];
   reports: AgentReport[];
+  decisions: AgentDecision[];
   linkedTaskIds: string[];
   linkedApprovalIds: string[];
   linkedReportIds: string[];
+  linkedDecisionIds: string[];
 };
 
 export type AgentRunRow = {
