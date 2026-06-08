@@ -1,6 +1,6 @@
 import { sendOverdueSummary } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
-import { dbError, logInfo, logWarn } from "../../_shared";
+import { dbError, logInfo, logWarn, resolveClinicFromRequest } from "../../_shared";
 
 function cronAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -16,7 +16,11 @@ export async function GET(request: Request) {
       });
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
-    const result = await sendOverdueSummary();
+    const clinic = await resolveClinicFromRequest(request);
+    const result = await sendOverdueSummary({
+      clinicId: clinic.clinicId,
+      timeZone: clinic.timeZone
+    });
     logInfo("overdue_notification_checked", {
       skipped: result.skipped,
       taskCount: result.taskCount,

@@ -19,6 +19,7 @@ import {
   type AccountSession,
   type TeamRole,
 } from "../../lib/accountStore";
+import { useClinicBrand } from "../ClinicContext";
 
 type Props = {
   session: AccountSession;
@@ -49,6 +50,7 @@ function CopyableOtp({ otp }: { otp: string }) {
 }
 
 export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard, embedded = false }: Props) {
+  const clinic = useClinicBrand();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<TeamRole>("veterinarian");
@@ -88,7 +90,7 @@ export function CreateVetPanel({ session, onLogout, onOpenLegacyBoard, embedded 
           <div className="adminHeaderLeft">
             <ShieldCheck size={22} strokeWidth={1.8} />
             <div>
-              <p className="adminHeaderEyebrow">Central Veterinary Hospital</p>
+              <p className="adminHeaderEyebrow">{clinic.name}</p>
               <h1 className="adminHeaderTitle">Admin Portal</h1>
             </div>
           </div>

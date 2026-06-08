@@ -8,13 +8,19 @@ import {
   type WorkflowEvent
 } from "@central-vet/db";
 
-export async function persistOperationalMutations(runId: string, traceId: string, toolCalls: ToolCallTrace[]) {
+export async function persistOperationalMutations(
+  runId: string,
+  traceId: string,
+  toolCalls: ToolCallTrace[],
+  clinicId: string
+) {
   const events: WorkflowEvent[] = [];
-  await persistArrivalMutations(toolCalls);
-  const appointment = await persistBookingMutations(toolCalls);
-  const followup = await persistFollowupMutations(toolCalls);
+  await persistArrivalMutations(toolCalls, clinicId);
+  const appointment = await persistBookingMutations(toolCalls, clinicId);
+  const followup = await persistFollowupMutations(toolCalls, clinicId);
   if (appointment) {
     events.push(await createWorkflowEvent({
+      clinicId,
       runId,
       workflowType: "booking",
       eventType: "appointment_booked",
@@ -31,6 +37,7 @@ export async function persistOperationalMutations(runId: string, traceId: string
   }
   if (followup) {
     events.push(await createWorkflowEvent({
+      clinicId,
       runId,
       workflowType: "followup",
       eventType: "followup_contacted",
@@ -47,7 +54,7 @@ export async function persistOperationalMutations(runId: string, traceId: string
   return events;
 }
 
-async function persistArrivalMutations(toolCalls: ToolCallTrace[]) {
+async function persistArrivalMutations(toolCalls: ToolCallTrace[], clinicId: string) {
   const arrival = toolCalls.find((call) =>
     call.toolName === "mark_arrived" &&
     call.result?.arrived === true &&
@@ -55,11 +62,14 @@ async function persistArrivalMutations(toolCalls: ToolCallTrace[]) {
   );
   const appointment = arrival?.result?.appointment;
   if (appointment && typeof appointment === "object" && "id" in appointment && typeof appointment.id === "string") {
-    await markAppointmentArrived(appointment.id);
+    await markAppointmentArrived(appointment.id, { clinicId });
   }
 }
 
-async function persistBookingMutations(toolCalls: ToolCallTrace[]): Promise<MockAppointment | null> {
+async function persistBookingMutations(
+  toolCalls: ToolCallTrace[],
+  clinicId: string
+): Promise<MockAppointment | null> {
   const booking = toolCalls.find((call) =>
     call.toolName === "book_appointment" &&
     call.result?.booked === true
@@ -76,6 +86,7 @@ async function persistBookingMutations(toolCalls: ToolCallTrace[]): Promise<Mock
     : null;
   if (!slotId || !clientId || !petId) return null;
   return bookMockAppointment({
+    clinicId,
     slotId,
     clientId,
     petId,
@@ -83,7 +94,7 @@ async function persistBookingMutations(toolCalls: ToolCallTrace[]): Promise<Mock
   });
 }
 
-async function persistFollowupMutations(toolCalls: ToolCallTrace[]) {
+async function persistFollowupMutations(toolCalls: ToolCallTrace[], clinicId: string) {
   const outreach = toolCalls.find((call) =>
     (call.toolName === "send_followup_outreach" || call.toolName === "create_followup_task") &&
     call.result?.outreach &&
@@ -96,5 +107,5 @@ async function persistFollowupMutations(toolCalls: ToolCallTrace[]) {
     ? candidate.id
     : null;
   if (!followupId) return null;
-  return markFollowupContacted(followupId);
+  return markFollowupContacted(followupId, { clinicId });
 }

@@ -14,10 +14,11 @@ import {
   createWorkflowEvent,
   failAgentRun,
   updateAgentRun,
-  type Actor
+  type Actor,
+  type ClinicContext
 } from "@central-vet/db";
 import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders } from "../_shared";
+import { dbError, noStoreHeaders, resolveClinicFromRequest } from "../_shared";
 import { loadAgentClinicData } from "./_clinicData";
 import { persistAgentEffects, type PersistedAgentEffects } from "./_effectPersistence";
 
@@ -46,6 +47,7 @@ type RunnerInput = {
   routeIntent: RouteIntent;
   input: Record<string, unknown>;
   actor?: Actor;
+  clinic?: ClinicContext;
   request: Request;
 };
 
@@ -166,11 +168,13 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
   const requestId = input.request.headers.get("x-request-id") || randomUUID();
   const started = Date.now();
   const mode = agentMode();
+  const clinic = input.clinic ?? await resolveClinicFromRequest(input.request);
   const normalizedInput = normalizeInput(input.routeIntent, input.input);
   let runId: string | null = null;
 
   try {
     const run = await createAgentRun({
+      clinicId: clinic.clinicId,
       agent: input.agent,
       intent: input.routeIntent,
       // Record the actual resolved runtime, not just the env flag: when
@@ -187,7 +191,7 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       inputSummary: summary(normalizedInput)
     });
     runId = run.id;
-    const clinicData = await loadAgentClinicData();
+    const clinicData = await loadAgentClinicData(clinic.clinicId);
     const options = {
       runId,
       traceId,
@@ -215,9 +219,16 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       };
     }
 
-    const persisted = await persistAgentEffects(runId, traceId, result, input.actor ?? agentActor);
+    const persisted = await persistAgentEffects(
+      runId,
+      traceId,
+      result,
+      input.actor ?? agentActor,
+      clinic
+    );
     const durationMs = Date.now() - started;
     await updateAgentRun(runId, {
+      clinicId: clinic.clinicId,
       status: "completed",
       output: {
         ok: true,
@@ -250,11 +261,13 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
     const message = error instanceof Error ? error.message : "Agent workflow failed";
     if (runId) {
       await failAgentRun(runId, {
+        clinicId: clinic.clinicId,
         error: message,
         errorKind: error instanceof Error ? error.name : "agent_error",
         durationMs
       }).catch(() => null);
       await createWorkflowEvent({
+        clinicId: clinic.clinicId,
         runId,
         workflowType: concreteIntents.has(input.routeIntent) ? input.routeIntent : "unknown",
         eventType: "run_failed",

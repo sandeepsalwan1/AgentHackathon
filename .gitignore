@@ -1,3 +1,4 @@
+.DS_Store
 node_modules
 .next
 out
@@ -9,8 +10,8 @@ out
 dist
 
 # Local agent skill mirrors
-skills/
-skills-lock.json
+/skills/
+/skills-lock.json
 .claude/skills/apify-ultimate-scraper/
 .adal/
 .agents/

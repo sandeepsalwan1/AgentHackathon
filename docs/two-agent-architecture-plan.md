@@ -391,15 +391,39 @@ Agent responsibilities:
 
 Internal capabilities:
 
+How to read this section:
+
+- A capability is not a worker agent right now.
+- It is a named tool/capability contract inside `InternalAgent` or `ExternalAgent`.
+- In code it can be a `FunctionTool`, typed helper, route-backed capability, prompt behavior, or deterministic guardrail.
+- "Plan-and-execute" means the tool follows a fixed multi-step workflow with validation, action, and storage.
+- "Tool loop" means the top-level ADK agent can call several allowed tools to answer or complete the request.
+- Later, these same capability contracts can become worker agents without changing the UI/route contract.
+
 ### InternalEmailCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
 - Monthly client outreach.
 - Post-appointment follow-up email.
 - One-off admin-triggered email.
+- Reuse the same internal email capability for chat-triggered sends, settings changes, monthly automation, and post-appointment automation.
+
+Current repo state:
+
+- `apps/internal/app/api/agent/email/route.ts` exists and is manager-authenticated.
+- `apps/internal/app/api/notifications/monthly-agent-email/route.ts` exists for cron.
+- `packages/notifications/src/index.ts` has `sendAgentExampleEmail`.
+- Current cadence support is example/once/monthly shaped.
+- Missing target behavior:
+  - post-appointment follow-up cadence
+  - template review workflow
+  - email settings tab with two toggles
+  - durable email decision records
+  - audience sizing and confirmation
+  - analytics consumer/reporting path
 
 Required confirmation in one message:
 
@@ -410,6 +434,48 @@ Required confirmation in one message:
 - cadence: once/monthly/post-appointment
 - schedule/frequency
 - explicit confirmation before production/bulk send
+- Do not ask these one-by-one. Group all missing questions into one admin message.
+
+Plan-and-execute steps:
+
+1. Parse admin intent.
+   - one-off send
+   - monthly outreach setting
+   - post-appointment follow-up setting
+   - edit/review template
+   - check whether a send happened
+2. Show current settings in one response.
+   - mode
+   - enabled/disabled
+   - cadence
+   - audience
+   - template link
+   - recipient estimate
+   - last send / next scheduled send
+3. Require review before risky action.
+   - admin must open/review the email template page or explicitly mark template reviewed
+   - production/bulk sends need explicit confirmation
+4. Execute action through backend sender/scheduler.
+   - update setting
+   - create scheduled job/cron decision
+   - send test/production email
+   - skip safely if disabled
+5. Store decision.
+   - actor id/name/role
+   - timestamp/current date
+   - cadence
+   - audience
+   - template id/version
+   - send mode
+   - recipient count
+   - run id/trace id
+   - status: proposed/confirmed/sent/skipped/failed
+6. Answer admin with a short status.
+   - "sent"
+   - "scheduled"
+   - "disabled"
+   - "needs template review"
+   - "already sent this period"
 
 UI touch:
 
@@ -420,17 +486,50 @@ UI touch:
   - monthly outreach
   - post-appointment follow-up
 - Post-appointment default: 7 days, editable.
+- Monthly template and post-appointment template are separate.
+- Admin can change settings from chat, but the same confirmation/review rules apply.
+- The UI should not make the user hunt through chat history to verify a template; the template page/status is the source of truth.
+
+Monthly outreach target:
+
+- Default off.
+- Friendly client relationship email, not aggressive sales.
+- Audience default: all reachable customers/clients.
+- "Reachable" means usable email/portal contact and not opted out.
+- Audience can later become configurable, but default should not be only recent/active clients unless deliverability/legal settings require it.
+- Idempotency key: clinic + cadence + month + template version.
+- Repeated monthly cron should duplicate-skip.
+
+Post-appointment follow-up target:
+
+- Default off.
+- Default delay: 7 days after completed appointment.
+- Admin can edit delay in UI or chat.
+- Trigger source now: appointment-completed event/decision in Postgres.
+- Trigger source later: PMS event from AviMark/Cornerstone.
+- Idempotency key: clinic + appointment id + cadence + delay + template version.
 
 Storage:
 
 - Store decision for about 1 year or permanent audit.
 - Store run id, actor, mode, recipients/audience, cadence, template id, timestamp.
+- Store enough structured fields that admin can later ask "did we send this?" without relying on LLM memory.
 
 Queue path:
 
 - Now: Render cron / Postgres idempotency.
 - Later: Postgres job queue.
-- Much later: Kafka/PubSub only if volume requires it.
+- Later event shape:
+  - `appointment.completed`
+  - `email.campaign_due`
+  - `email.sent`
+  - `email.skipped`
+  - `email.failed`
+- Later consumers:
+  - email sender
+  - analytics/revenue reporting
+  - audit/report writer
+- Much later: Kafka/PubSub only if volume or separate services require it.
 
 Implementation specifics:
 
@@ -448,10 +547,11 @@ Implementation specifics:
 type EmailConfirmation = {
   mode: "disabled" | "test" | "production";
   cadence: "once" | "monthly" | "post_appointment";
-  audience: "explicit_recipients" | "all_active_clients" | "recent_appointments";
+  audience: "explicit_recipients" | "all_active_clients" | "recent_clients" | "recent_appointments";
   recipientCount: number;
   subject: string;
   templateId: string;
+  templateVersion: string;
   templateReviewed: boolean;
   reviewedByActorId: string;
   sendNow: boolean;
@@ -467,10 +567,11 @@ Block send when:
 - `recipientCount` is unexpectedly high.
 - actor is missing manager auth.
 - requested audience does not match selected cadence.
+- duplicate idempotency key already sent.
 
 ### InternalPricingCapability
 
-Type: plan-and-execute with careful reasoning.
+Tool behavior: plan-and-execute with careful reasoning.
 
 Purpose:
 
@@ -484,6 +585,17 @@ Current default:
 
 - Recommendation/report only.
 - Do not mutate prices automatically yet.
+
+What this tool/capability does:
+
+1. Read current service catalog.
+2. Read current pricing scan settings.
+3. Run competitor scan when requested and rate-limit allows.
+4. Compare clinic prices against competitor observations.
+5. Produce recommendations with confidence/reasons.
+6. Store recommendation and admin decision.
+7. Create report for admin review.
+8. Never apply price changes unless future auto-mode contract is explicitly enabled.
 
 Admin UX:
 
@@ -550,13 +662,21 @@ Auto mode blockers:
 
 ### InternalConversationCapability
 
-Type: tool loop + memory retrieval.
+Tool behavior: tool loop + memory retrieval.
 
 Purpose:
 
 - General admin chat over clinic operations.
 - Retrieve previous decisions and stable admin preferences.
 - Keep answer simple.
+
+What it does:
+
+1. Read admin message.
+2. Retrieve relevant structured decisions/runs/reports.
+3. Later retrieve durable memory with hybrid vector + BM25.
+4. Answer concisely or route to another internal capability.
+5. Store only durable facts/preferences when useful.
 
 Memory:
 
@@ -567,7 +687,7 @@ Memory:
 
 ### InternalBookingCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
@@ -575,6 +695,14 @@ Purpose:
 - No client payment/hold.
 - Adding is easy.
 - Changing/deleting has higher confirmation friction.
+
+What it does:
+
+1. Parse appointment action: add, change, cancel/archive.
+2. Collect client, pet, date/time, reason, actor, and reason for change.
+3. For add: list/open slot and create appointment.
+4. For change/delete: require confirmation and prefer cancel/archive over hard delete.
+5. Persist actor, old value, new value, run id, and timestamp.
 
 Guardrails:
 
@@ -584,7 +712,7 @@ Guardrails:
 
 ### InternalOpsCapability
 
-Type: tool loop.
+Tool behavior: tool loop.
 
 Purpose:
 
@@ -593,9 +721,17 @@ Purpose:
 - Report summaries.
 - Staff work prioritization.
 
+What it does:
+
+1. List tasks, approvals, reports, follow-ups.
+2. Rank what needs attention today.
+3. Explain why, briefly.
+4. Create/update daily ops report.
+5. Return a staff/admin summary.
+
 ### InternalRecordsCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
@@ -603,9 +739,17 @@ Purpose:
 - Audit every transfer.
 - Keep provenance.
 
+What it does:
+
+1. Verify client/pet/destination.
+2. Prepare records packet metadata.
+3. Run records audit.
+4. Submit transfer through mock/adapter path.
+5. Persist audit and transfer event.
+
 ### InternalLabsCapability
 
-Type: tool loop.
+Tool behavior: tool loop.
 
 Purpose:
 
@@ -614,14 +758,30 @@ Purpose:
 - Summarize status/metadata safely.
 - No diagnosis/treatment advice.
 
+What it does:
+
+1. Find lab order/result by pet/client/status.
+2. Read lab metadata and abnormal-flag status.
+3. Summarize safely for staff.
+4. Prepare client-update state only when safe.
+5. Never provide diagnosis/treatment advice.
+
 ### InternalInvoiceCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
 - Invoice audit/report.
 - No direct invoice mutation until adapter/approval contract exists.
+
+What it does:
+
+1. Read invoice summary/flags.
+2. Detect requested mutation and block it.
+3. Create invoice audit report.
+4. Persist report/run/tool calls.
+5. Return what staff should review next.
 
 ## External Agent
 
@@ -652,7 +812,7 @@ External capabilities:
 
 ### ExternalBookingCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
@@ -673,16 +833,26 @@ Flow:
 6. Later: Stripe hold/payment before final booking if clinic wants no-show protection.
 7. Persist booking decision.
 
+What this tool/capability does:
+
+- Turns vague client booking language into structured scheduler input.
+- Uses existing client/pet facts when available.
+- Asks for missing fields once, grouped.
+- Reads slots through the appointment adapter.
+- Confirms and books through the appointment adapter.
+- Stores booking result so client/admin can ask about it later.
+
 Stripe/no-show later:
 
-- Card hold, not scary wording.
+- Card hold or payment intent tied to exam cost.
+- Default amount should be the configured exam fee for that clinic/service.
 - Clear cancel/change policy.
-- Clinic-configured amount.
+- Clinic can configure exam fee/hold amount, but starting assumption is exam cost.
 - No payment implementation until explicit product decision.
 
 ### ExternalRecordsCapability
 
-Type: plan-and-execute.
+Tool behavior: plan-and-execute.
 
 Purpose:
 
@@ -697,9 +867,17 @@ Flow:
 - Submit secure mock/adapter transfer.
 - Persist audit.
 
+What this tool/capability does:
+
+- Handles records requests only when the client asks.
+- Keeps records transfer lower prominence in the UI.
+- Runs audit/provenance before transfer.
+- Uses records adapter so mock can become real PMS/portal transfer later.
+- Stores destination, actor/client, packet metadata, audit result, and transfer status.
+
 ### ExternalConversationCapability
 
-Type: tool loop + memory.
+Tool behavior: prompt behavior + allowed tool loop + memory later.
 
 Purpose:
 
@@ -722,9 +900,18 @@ Memory:
 - Store stable facts/preferences.
 - Do not store temporary concern/emotion as durable memory.
 
+What this tool/capability does:
+
+- Greets/responds to simple client messages.
+- Routes booking intent into booking capability.
+- Routes records intent into records capability.
+- Uses prompt/scanner medical safety rules before answering medical content.
+- Later retrieves client-safe memory/preferences.
+- Keeps conversation positive and booking-oriented without exposing internals.
+
 ### External Medical Safety Guardrail
 
-Type: prompt rule + deterministic scanner, not a capability tool.
+Behavior: prompt rule + deterministic scanner, not a capability tool.
 
 Purpose:
 
@@ -849,6 +1036,70 @@ Avoid:
 - redesigning whole app.
 - big visual changes.
 - landing-page work.
+- new design system.
+- UI that does not match the existing app.
+
+Style rule:
+
+- Do very little UI.
+- Add only what is needed to review/confirm risky actions.
+- Match existing app components, density, spacing, and interaction style.
+- Prefer current routes/components over introducing a new UI pattern.
+
+## Required UI Surfaces
+
+Keep UI work small, but these surfaces matter because they are the control plane for risky agent actions.
+
+Internal/admin:
+
+- Agent chat.
+  - Mobile-friendly.
+  - Manager-auth only.
+  - Lets admin ask for email/pricing/ops/booking help.
+  - Should show current settings when relevant instead of hiding state in chat.
+- Email settings/sendout tab.
+  - Default off.
+  - Two toggles:
+    - monthly outreach
+    - post-appointment follow-up
+  - Separate template for monthly outreach.
+  - Separate template for post-appointment follow-up.
+  - Template review link/button.
+  - Post-appointment delay control, default 7 days.
+  - Mode selector: disabled/test/production.
+  - Recipient/audience estimate before send.
+  - Last send / next scheduled send.
+  - Confirmation state: not reviewed / reviewed / confirmed / sent / skipped / failed.
+- Pricing / competitor tab.
+  - Shows current clinic services/prices.
+  - Shows competitor scan settings:
+    - location
+    - competitor/search terms
+    - rate limit status
+    - last scan time
+  - Runs scan/report.
+  - Shows recommended price changes.
+  - Auto mode toggle default off.
+  - "Are you sure?" confirmation before auto mode.
+  - No automatic price mutation until PMS adapter, caps, audit, and rollback exist.
+- Decisions/audit surface.
+  - Shows important agent decisions by actor/date/run.
+  - Lets admin answer "did we send it?", "did we approve this?", "what changed?"
+  - Links to run detail, workflow events, and tool calls.
+- Memory/preferences surface, later.
+  - Shows durable remembered facts/preferences.
+  - Lets admin/client correct or delete memory.
+
+External/client:
+
+- Booking-first chat/page.
+  - Main visible goal is appointment booking.
+  - Ask missing booking fields in one grouped message first.
+  - After booking intent is clear, multi-turn conversation is okay because it improves conversion.
+- Records transfer entry should be lower prominence/hidden-ish.
+  - Still available when requested.
+  - Not promoted as a primary CTA.
+- Medical questions are handled by prompt/scanner safety, not a visible medical advice feature.
 
 ## Google ADK / Open Source Reference
 

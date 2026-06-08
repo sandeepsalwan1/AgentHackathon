@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Send } from "lucide-react";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type RequestType = "prescription" | "labs_xrays" | "records_request" | "scheduling";
 
@@ -32,6 +32,13 @@ type RequestFormChrome = {
 export type RequestFormProps = {
   endpoint?: string;
   chrome: RequestFormChrome;
+  brandName?: string;
+};
+
+type ClinicBrandResponse = {
+  clinic?: {
+    name?: string;
+  };
 };
 
 export const internalRequestFormChrome: RequestFormChrome = {
@@ -103,10 +110,10 @@ function formatPhoneInput(value: string) {
   return value;
 }
 
-function Brand({ chrome }: { chrome: RequestFormChrome }) {
+function Brand({ chrome, brandName }: { chrome: RequestFormChrome; brandName: string }) {
   const content = (
     <div className={chrome.brandClassName}>
-      <p>Central Veterinary Hospital</p>
+      <p>{brandName}</p>
       <h1>Client Request</h1>
     </div>
   );
@@ -119,12 +126,31 @@ function Brand({ chrome }: { chrome: RequestFormChrome }) {
   );
 }
 
-export function RequestForm({ endpoint = "/api/requests", chrome }: RequestFormProps) {
+export function RequestForm({
+  endpoint = "/api/requests",
+  chrome,
+  brandName: initialBrandName = "Central Veterinary Hospital"
+}: RequestFormProps) {
   const [form, setForm] = useState<FormState>(blank);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [brandName, setBrandName] = useState(initialBrandName);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/clinic", { cache: "no-store" })
+      .then((response) => response.json() as Promise<ClinicBrandResponse>)
+      .then((data) => {
+        const resolvedName = data.clinic?.name?.trim();
+        if (!cancelled && resolvedName) setBrandName(resolvedName);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const update = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -163,7 +189,7 @@ export function RequestForm({ endpoint = "/api/requests", chrome }: RequestFormP
   return (
     <main className={chrome.shellClassName}>
       <section className={chrome.panelClassName}>
-        <Brand chrome={chrome} />
+        <Brand chrome={chrome} brandName={brandName} />
 
         {done ? (
           <div className="successBox">

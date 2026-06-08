@@ -1,23 +1,33 @@
 export { getSql, hasDatabaseUrl, MissingDatabaseUrlError } from "./connection";
 export {
+  cleanHostname,
+  getClinicById,
+  getDefaultClinicContext,
+  resolveClinicForHostname,
+  resolveClinicId
+} from "./clinics";
+export type { Clinic, ClinicContext } from "./clinics";
+export {
   checkAuthAttemptLimit,
   hashAuthIdentity,
   recordAuthAttempt
 } from "./auth";
 export {
   createTask,
-  archiveCompletedTasksBefore,
   editTask,
-  escalateTask,
   getTask,
   listIncompletePriorityTasks,
   listOverdueTasks,
-  listTaskEvents,
   listTasks,
-  renameActorReferences,
+  renameActorReferences
+} from "./tasks";
+export {
+  archiveCompletedTasksBefore,
+  escalateTask,
   transitionTask,
   undoLastStatusChange
-} from "./tasks";
+} from "./taskTransitions";
+export { listTaskEvents } from "./taskAudit";
 export {
   createNotificationAttempt,
   markNotificationFailed,
@@ -32,14 +42,16 @@ export {
   createWorkflowEvent,
   decideApproval,
   failAgentRun,
-  getAgentRun,
-  getAgentRunWithTimeline,
-  listAgentToolCalls,
-  listAgentReports,
-  listApprovals,
-  listWorkflowEvents,
   updateAgentRun
 } from "./agents";
+export {
+  getAgentRun,
+  getAgentRunWithTimeline,
+  listAgentReports,
+  listAgentToolCalls,
+  listApprovals,
+  listWorkflowEvents
+} from "./agentTimeline";
 export type {
   AgentReport,
   AgentRun,
@@ -49,19 +61,21 @@ export type {
   WorkflowEvent
 } from "./agents";
 export {
-  createPricingObservation,
   bookMockAppointment,
-  findArrivalAppointment,
   listAvailableSlots,
-  listMockClinic,
   listOpenFollowups,
-  listPricingObservations,
   listReviewInvoices,
-  listServiceCatalog,
   markAppointmentArrived,
   markFollowupContacted,
   resetMockClinicState
 } from "./mockClinic";
+export { listMockClinic } from "./mockClinicSnapshot";
+export {
+  createPricingObservation,
+  listPricingObservations,
+  listServiceCatalog
+} from "./mockClinicPricing";
+export { findArrivalAppointment } from "./mockClinicLookup";
 export type {
   MockAppointment,
   MockCallTranscript,

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { actorSchema, authenticateActor, canManage, logWarn } from "../_shared";
+import {
+  actorSchema,
+  authenticateActor,
+  canManage,
+  logWarn,
+  resolveClinicFromRequest
+} from "../_shared";
 
 async function readBody(request: Request) {
   return await request.json().catch(() => ({}));
@@ -7,6 +13,7 @@ async function readBody(request: Request) {
 
 async function requireActorFromBody(request: Request) {
   const body = await readBody(request);
+  const clinic = await resolveClinicFromRequest(request);
   const actorResult = actorSchema.safeParse(body.actor);
   if (!actorResult.success) {
     return {
@@ -14,11 +21,11 @@ async function requireActorFromBody(request: Request) {
       response: NextResponse.json({ error: "Internal agent routes require actor credentials." }, { status: 403 })
     };
   }
-  const auth = await authenticateActor(actorResult.data, request);
+  const auth = await authenticateActor(actorResult.data, request, clinic);
   if ("response" in auth) {
     return { body, response: auth.response };
   }
-  return { body, actor: auth.actor };
+  return { body, actor: auth.actor, clinic };
 }
 
 export async function requireManagerFromBody(request: Request) {

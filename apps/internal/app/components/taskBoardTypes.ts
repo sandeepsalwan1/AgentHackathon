@@ -6,3 +6,8 @@ export type TaskBoardSession = {
   passcode?: string;
   profileId?: string | null;
 };
+
+export type TaskBoardToast = {
+  text: string;
+  taskId?: string;
+};

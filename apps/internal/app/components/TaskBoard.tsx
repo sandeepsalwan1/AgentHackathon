@@ -2,421 +2,109 @@
 
 import {
   AlertTriangle,
-  Archive,
   BellRing,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
   LogOut,
   Plus,
-  RotateCcw,
-  Settings,
-  ShieldCheck,
-  UserPlus,
   Undo2,
   XCircle
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppRole, RecipientProfile, Task, TaskEvent, TaskStatus } from "@central-vet/db";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Task, TaskStatus } from "@central-vet/db";
 import {
   canManage,
   canSeeEscalations,
-  canUseNotificationSettings,
-  isOpenPriorityTask,
-  taskBelongsInLane
+  isOpenPriorityTask
 } from "../lib/taskWorkflow";
-import { TaskCard } from "./TaskCard";
+import { TaskActivityPanel, TaskLaneGrid } from "./TaskBoardPanels";
+import { useClinicBrand } from "./ClinicContext";
 import { TaskForm, type TaskFormState } from "./TaskForm";
 import { BootScreen, EntryScreen, MiniConfetti, SessionNameTag } from "./TaskBoardChrome";
-import { blankVeterinarianProfile, ProfileSettings } from "./TaskBoardSettings";
-import { isAuthError, readJson, sessionReadHeaders } from "./taskBoardClient";
+import { NotificationSettingsMenu } from "./TaskBoardSettings";
+import { writeStoredTaskBoardSession } from "./taskBoardBrowserState";
 import {
-  actorDisplay,
-  compareTasks,
-  defaultDueTime,
+  escalateTaskBoardTask,
+  saveTaskBoardForm,
+  setTaskBoardArchiveState,
+  undoTaskBoardStatus,
+  updateTaskBoardProfileName,
+  updateTaskBoardStatus
+} from "./taskBoardClient";
+import {
   doctorName,
-  requestTypeLabel,
-  roleLabel,
-  today
+  roleLabel
 } from "./taskBoardDisplay";
-import type { TaskBoardSession as Session } from "./taskBoardTypes";
-
-type Toast = {
-  text: string;
-  taskId?: string;
-};
-
-const sessionKey = "central-vet-session";
-const taskSyncKey = `${sessionKey}:task-sync`;
-const taskSyncChannelName = "central-vet-task-sync";
-const activeSyncIntervalMs = 8000;
-const activeSyncWindowMs = 12 * 60 * 1000;
-
-const laneDefs = [
-  { key: "escalated", title: "Escalated", icon: BellRing },
-  { key: "pending_review", title: "Pending Review", icon: ClipboardList },
-  { key: "due", title: "Due Tasks", icon: Clock3 },
-  { key: "pending", title: "Pending", icon: AlertTriangle },
-  { key: "completed", title: "Completed", icon: CheckCircle2 },
-  { key: "archived", title: "Archived", icon: Archive }
-] as const;
-
-type LaneKey = (typeof laneDefs)[number]["key"];
-
-function blankForm(): TaskFormState {
-  return {
-    status: "due",
-    requestType: "labs_xrays",
-    clientName: "",
-    clarityId: "",
-    clientPhone: "",
-    clientDateOfBirth: "",
-    petName: "",
-    petWeight: "",
-    lastVisit: "",
-    request: "",
-    notes: "",
-    assignedTo: "",
-    priority: "medium",
-    dueDate: today(),
-    dueTime: defaultDueTime
-  };
-}
-
-function parseSavedSession(saved: string | null) {
-  if (!saved) return null;
-  try {
-    const parsed = JSON.parse(saved) as Session;
-    if (parsed.role !== "staff" && !parsed.passcode) return null;
-    return parsed;
-  } catch {
-    window.localStorage.removeItem(sessionKey);
-    return null;
-  }
-}
-
-function readStoredSession() {
-  if (typeof window === "undefined") return null;
-  return parseSavedSession(window.localStorage.getItem(sessionKey));
-}
-
-function clearStoredTaskCaches() {
-  if (typeof window === "undefined") return;
-  const prefix = `${sessionKey}:tasks:`;
-  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
-    const key = window.localStorage.key(index);
-    if (key?.startsWith(prefix)) {
-      window.localStorage.removeItem(key);
-    }
-  }
-}
-
-function actorName(value: string | null, valueRole: AppRole | null, role: AppRole, oldName: string, nextName: string) {
-  return valueRole === role && value === oldName ? nextName : value;
-}
-
-function renameTaskActorNames(task: Task, role: AppRole, oldName: string, nextName: string): Task {
-  return {
-    ...task,
-    assignedTo: actorName(task.assignedTo, task.assignedByRole, role, oldName, nextName),
-    createdByName: actorName(task.createdByName, task.createdByRole, role, oldName, nextName),
-    completedByName: actorName(task.completedByName, task.completedByRole, role, oldName, nextName),
-    archivedByName: actorName(task.archivedByName, task.archivedByRole, role, oldName, nextName),
-    escalatedByName: actorName(task.escalatedByName, task.escalatedByRole, role, oldName, nextName)
-  };
-}
-
-function renameEventActorNames(event: TaskEvent, role: AppRole, oldName: string, nextName: string): TaskEvent {
-  const metadata = { ...event.metadata };
-  if (metadata.previousAssignedByRole === role && metadata.previousAssignedTo === oldName) {
-    metadata.previousAssignedTo = nextName;
-  }
-  if (metadata.assignedByRole === role && metadata.assignedTo === oldName) {
-    metadata.assignedTo = nextName;
-  }
-  return {
-    ...event,
-    actorName: actorName(event.actorName, event.actorRole, role, oldName, nextName),
-    metadata
-  };
-}
-
-function tabId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function parseSyncPayload(value: unknown) {
-  if (!value) return null;
-  try {
-    const parsed = typeof value === "string" ? JSON.parse(value) : value;
-    if (parsed?.type !== "tasks_changed" && parsed?.type !== "settings_changed") return null;
-    return parsed as { type: "tasks_changed" | "settings_changed"; source: string; at: number };
-  } catch {
-    return null;
-  }
-}
+import {
+  blankTaskForm,
+  renameEventActorNames,
+  renameTaskActorNames,
+  taskFormFromTask
+} from "./taskBoardState";
+import type { TaskBoardToast } from "./taskBoardTypes";
+import { useTaskBoardDataSync } from "./useTaskBoardDataSync";
+import { useTaskBoardSettings } from "./useTaskBoardSettings";
 
 export function TaskBoard() {
-  const [booted, setBooted] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [events, setEvents] = useState<TaskEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [syncPaused, setSyncPaused] = useState(false);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState<Toast | null>(null);
+  const clinic = useClinicBrand();
+  const {
+    booted,
+    session,
+    setSession,
+    tasks,
+    setTasks,
+    events,
+    setEvents,
+    loading,
+    hasLoaded,
+    syncPaused,
+    error,
+    setError,
+    settingsRefreshToken,
+    actorQuery,
+    load,
+    publishSync,
+    saveSession,
+    clearSession,
+    markActive
+  } = useTaskBoardDataSync();
+  const [toast, setToast] = useState<TaskBoardToast | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formSaving, setFormSaving] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
-  const [form, setForm] = useState<TaskFormState>(blankForm);
+  const [form, setForm] = useState<TaskFormState>(blankTaskForm);
   const [invalidTask, setInvalidTask] = useState<Task | null>(null);
   const [invalidReason, setInvalidReason] = useState("");
   const [confetti, setConfetti] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [priorityAlertsEnabled, setPriorityAlertsEnabled] = useState(true);
-  const [recipientProfiles, setRecipientProfiles] = useState<RecipientProfile[]>([]);
-  const [canEditAllProfiles, setCanEditAllProfiles] = useState(false);
-  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
-  const [addingProfile, setAddingProfile] = useState(false);
-  const tabIdRef = useRef(tabId());
-  const lastActivityRef = useRef(0);
-  const actorQueryRef = useRef("");
-  const loadInFlightRef = useRef(false);
-  const loadSequenceRef = useRef(0);
 
-  const actorQuery = useMemo(() => {
-    if (!session) return "";
-    const params = new URLSearchParams({
-      name: session.name,
-      role: session.role,
-      includeArchived: canManage(session.role) ? "true" : "false"
-    });
-    return params.toString();
-  }, [session]);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      clearStoredTaskCaches();
-      setSession(readStoredSession());
-      setBooted(true);
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  useEffect(() => {
-    actorQueryRef.current = actorQuery;
-    loadInFlightRef.current = false;
-  }, [actorQuery]);
-
-  const clearSession = useCallback(() => {
-    window.localStorage.removeItem(sessionKey);
-    setSession(null);
-    setTasks([]);
-    setEvents([]);
-    setLoading(false);
-    setSyncPaused(false);
-    setHasLoaded(false);
-  }, []);
-
-  const load = useCallback(async (options: { silent?: boolean } = {}) => {
-    if (!session || !actorQuery) return;
-    if (loadInFlightRef.current) {
-      return;
-    }
-
-    const requestActorQuery = actorQuery;
-    const requestId = loadSequenceRef.current + 1;
-    loadSequenceRef.current = requestId;
-    loadInFlightRef.current = true;
-    if (!options.silent) setLoading(true);
-    setError("");
-    try {
-      const fetchOptions: RequestInit = {
-        cache: "no-store",
-        headers: sessionReadHeaders(session)
-      };
-      const taskRequest = fetch(`/api/tasks?${requestActorQuery}`, fetchOptions).then(readJson);
-      const eventRequest = canManage(session.role)
-        ? fetch(`/api/events?${requestActorQuery}`, fetchOptions).then(readJson)
-        : Promise.resolve({ events: [] });
-      const [data, eventData] = await Promise.all([taskRequest, eventRequest]);
-      if (actorQueryRef.current !== requestActorQuery || loadSequenceRef.current !== requestId) return;
-      setTasks(data.tasks);
-      setEvents(eventData.events);
-    } catch (loadError) {
-      if (actorQueryRef.current === requestActorQuery) {
-        if (isAuthError(loadError)) {
-          clearSession();
-          setError(loadError instanceof Error ? loadError.message : "Invalid passcode.");
-          return;
-        }
-        setError(loadError instanceof Error ? loadError.message : "Load failed.");
-      }
-    } finally {
-      const shouldFinish = actorQueryRef.current === requestActorQuery;
-      if (shouldFinish) {
-        setLoading(false);
-        setHasLoaded(true);
-      }
-      loadInFlightRef.current = false;
-    }
-  }, [actorQuery, clearSession, session]);
-
-  const loadSettings = useCallback(async () => {
-    if (!session || !canUseNotificationSettings(session.role)) return;
-    try {
-      const data = await readJson(
-        await fetch(`/api/settings?${actorQuery}`, {
-          cache: "no-store",
-          headers: sessionReadHeaders(session)
-        })
-      );
-      setPriorityAlertsEnabled(Boolean(data.priorityAlertsEnabled));
-      setRecipientProfiles(data.recipientProfiles ?? []);
-      setCanEditAllProfiles(Boolean(data.canEditAllProfiles));
-      setCurrentProfileId(data.currentProfileId ?? null);
-    } catch (settingsError) {
-      if (isAuthError(settingsError)) {
-        clearSession();
-        setError(settingsError instanceof Error ? settingsError.message : "Invalid passcode.");
-        return;
-      }
-      setPriorityAlertsEnabled(false);
-      setRecipientProfiles([]);
-      setCanEditAllProfiles(false);
-      setCurrentProfileId(null);
-    }
-  }, [actorQuery, clearSession, session]);
-
-  const publishSync = useCallback((type: "tasks_changed" | "settings_changed" = "tasks_changed") => {
-    const payload = {
-      type,
-      source: tabIdRef.current,
-      at: Date.now()
-    };
-    try {
-      window.localStorage.setItem(taskSyncKey, JSON.stringify(payload));
-    } catch {
-      // Best-effort same-browser sync; polling still catches cross-browser changes.
-    }
-    try {
-      const channel = new BroadcastChannel(taskSyncChannelName);
-      channel.postMessage(payload);
-      channel.close();
-    } catch {
-      // Storage events cover browsers without BroadcastChannel.
-    }
-  }, []);
+  const {
+    settingsOpen,
+    settingsSaving,
+    priorityAlertsEnabled,
+    recipientProfiles,
+    canEditAllProfiles,
+    currentProfileId,
+    addingProfile,
+    loadSettings,
+    toggleSettingsOpen,
+    togglePriorityAlerts,
+    saveRecipientProfile,
+    deactivateRecipientProfile,
+    startAddingProfile,
+    setRecipientProfiles,
+    setCurrentProfileId
+  } = useTaskBoardSettings({
+    session,
+    actorQuery,
+    clearSession,
+    setSession,
+    setError,
+    setToast,
+    publishSync
+  });
 
   useEffect(() => {
     if (!session) return;
-    lastActivityRef.current = Date.now();
-    const kickoff = window.setTimeout(() => {
-      void load();
-      void loadSettings();
-    }, 0);
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      if (Date.now() - lastActivityRef.current > activeSyncWindowMs) {
-        setSyncPaused(true);
-        return;
-      }
-      setSyncPaused(false);
-      void load({ silent: true });
-    }, activeSyncIntervalMs);
-    return () => {
-      window.clearTimeout(kickoff);
-      window.clearInterval(id);
-    };
-  }, [load, loadSettings, session]);
-
-  useEffect(() => {
-    if (!session) return;
-    const markActive = () => {
-      lastActivityRef.current = Date.now();
-      setSyncPaused(false);
-    };
-    const refresh = () => {
-      markActive();
-      void load({ silent: hasLoaded });
-      void loadSettings();
-    };
-    const refreshWhenVisible = () => {
-      if (!document.hidden) refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("pointerdown", markActive, { passive: true });
-    window.addEventListener("keydown", markActive);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("pointerdown", markActive);
-      window.removeEventListener("keydown", markActive);
-    };
-  }, [hasLoaded, load, loadSettings, session]);
-
-  useEffect(() => {
-    if (!session) return;
-
-    const refreshFromSync = (payload: ReturnType<typeof parseSyncPayload>) => {
-      if (!payload || payload.source === tabIdRef.current) return;
-      lastActivityRef.current = Date.now();
-      setSyncPaused(false);
-      if (document.hidden) return;
-      void load({ silent: true });
-      if (payload.type === "settings_changed") {
-        void loadSettings();
-      }
-    };
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== taskSyncKey) return;
-      refreshFromSync(parseSyncPayload(event.newValue));
-    };
-    const onMessage = (event: MessageEvent) => {
-      refreshFromSync(parseSyncPayload(event.data));
-    };
-    const channel = "BroadcastChannel" in window
-      ? new BroadcastChannel(taskSyncChannelName)
-      : null;
-
-    window.addEventListener("storage", onStorage);
-    channel?.addEventListener("message", onMessage);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      channel?.removeEventListener("message", onMessage);
-      channel?.close();
-    };
-  }, [load, loadSettings, session]);
-
-  useEffect(() => {
-    function syncSession(event: StorageEvent) {
-      if (event.key !== sessionKey) return;
-      const nextSession = parseSavedSession(event.newValue);
-      setSession(nextSession);
-      setTasks([]);
-      setEvents([]);
-      setHasLoaded(false);
-    }
-    window.addEventListener("storage", syncSession);
-    return () => window.removeEventListener("storage", syncSession);
-  }, []);
-
-  function saveSession(next: Session) {
-    lastActivityRef.current = Date.now();
-    setSession(next);
-    setTasks([]);
-    setEvents([]);
-    setLoading(false);
-    setHasLoaded(false);
-    window.localStorage.setItem(sessionKey, JSON.stringify(next));
-  }
+    void loadSettings();
+  }, [loadSettings, session, settingsRefreshToken]);
 
   function logout() {
     clearSession();
@@ -429,27 +117,18 @@ export function TaskBoard() {
     const name = session.role === "veterinarian" ? doctorName(cleanName) : cleanName;
     const previousSession = session;
     const nextSession = { ...session, name };
-    lastActivityRef.current = Date.now();
+    markActive();
     setSession(nextSession);
-    window.localStorage.setItem(sessionKey, JSON.stringify(nextSession));
+    writeStoredTaskBoardSession(nextSession);
     try {
-      const data = await readJson(
-        await fetch("/api/profile-name", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            actor: previousSession,
-            name
-          })
-        })
-      );
+      const data = await updateTaskBoardProfileName(previousSession, name);
       const savedSession = {
         ...nextSession,
         name: data.actor?.name ?? name,
         profileId: data.actor?.profileId ?? nextSession.profileId
       };
       setSession(savedSession);
-      window.localStorage.setItem(sessionKey, JSON.stringify(savedSession));
+      writeStoredTaskBoardSession(savedSession);
       const oldName = data.previousName ?? previousSession.name;
       if (oldName && oldName !== savedSession.name) {
         setTasks((current) =>
@@ -466,7 +145,7 @@ export function TaskBoard() {
       publishSync("settings_changed");
     } catch (profileError) {
       setSession(previousSession);
-      window.localStorage.setItem(sessionKey, JSON.stringify(previousSession));
+      writeStoredTaskBoardSession(previousSession);
       setError(profileError instanceof Error ? profileError.message : "Profile name failed.");
       return false;
     }
@@ -476,29 +155,13 @@ export function TaskBoard() {
 
   function openCreate() {
     setEditing(null);
-    setForm(blankForm());
+    setForm(blankTaskForm());
     setFormOpen(true);
   }
 
   function openEdit(task: Task) {
     setEditing(task);
-    setForm({
-      status: task.status === "archived" ? "pending_review" : task.status,
-      requestType: task.requestType,
-      clientName: task.clientName ?? "",
-      clarityId: task.clarityId ?? "",
-      clientPhone: task.clientPhone ?? "",
-      clientDateOfBirth: task.clientDateOfBirth ?? "",
-      petName: task.petName ?? "",
-      petWeight: task.petWeight ?? "",
-      lastVisit: task.lastVisit ?? "",
-      request: task.request,
-      notes: task.notes ?? "",
-      assignedTo: task.assignedTo ?? "",
-      priority: task.priority,
-      dueDate: task.dueDate,
-      dueTime: task.dueTime?.slice(0, 5) || defaultDueTime
-    });
+    setForm(taskFormFromTask(task));
     setFormOpen(true);
   }
 
@@ -506,41 +169,20 @@ export function TaskBoard() {
     event.preventDefault();
     if (!session || formSaving) return;
 
-    const payload = {
-      actor: session,
-      task: form
-    };
-
     setFormSaving(true);
     try {
-      if (editing) {
-        await readJson(
-          await fetch(`/api/tasks/${editing.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              actor: session,
-              action: "edit",
-              task: form
-            })
-          })
-        );
-        setToast({ text: "Task updated." });
-      } else {
-        await readJson(
-          await fetch("/api/tasks", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          })
-        );
-        setToast({
-          text:
-            session.role === "staff"
-              ? "Task added."
-              : "Task created."
-        });
-      }
+      await saveTaskBoardForm({
+        currentSession: session,
+        form,
+        editingTaskId: editing?.id
+      });
+      setToast({
+        text: editing
+          ? "Task updated."
+          : session.role === "staff"
+            ? "Task added."
+            : "Task created."
+      });
       setFormOpen(false);
       publishSync();
       await load({ silent: true });
@@ -558,18 +200,12 @@ export function TaskBoard() {
   ) {
     if (!session) return;
     try {
-      await readJson(
-        await fetch(`/api/tasks/${task.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            actor: session,
-            action: "status",
-            nextStatus,
-            invalidReason: invalidReasonText
-          })
-        })
-      );
+      await updateTaskBoardStatus({
+        currentSession: session,
+        taskId: task.id,
+        nextStatus,
+        invalidReason: invalidReasonText
+      });
       setToast({
         text:
           nextStatus === "completed"
@@ -595,13 +231,11 @@ export function TaskBoard() {
   async function archiveAction(task: Task, action: "archive" | "restore") {
     if (!session) return;
     try {
-      await readJson(
-        await fetch(`/api/tasks/${task.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actor: session, action })
-        })
-      );
+      await setTaskBoardArchiveState({
+        currentSession: session,
+        taskId: task.id,
+        action
+      });
       setToast({ text: action === "archive" ? "Archived." : "Restored.", taskId: task.id });
       publishSync();
       await load({ silent: true });
@@ -613,13 +247,7 @@ export function TaskBoard() {
   async function escalate(task: Task) {
     if (!session) return;
     try {
-      await readJson(
-        await fetch(`/api/tasks/${task.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actor: session, action: "escalate" })
-        })
-      );
+      await escalateTaskBoardTask(session, task.id);
       setToast({ text: "Escalated for veterinarians.", taskId: canManage(session.role) ? task.id : undefined });
       publishSync();
       await load({ silent: true });
@@ -631,13 +259,7 @@ export function TaskBoard() {
   async function undo(taskId: string) {
     if (!session) return;
     try {
-      await readJson(
-        await fetch(`/api/tasks/${taskId}/undo`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actor: session })
-        })
-      );
+      await undoTaskBoardStatus(session, taskId);
       setToast({ text: "Undone." });
       publishSync();
       await load({ silent: true });
@@ -645,120 +267,6 @@ export function TaskBoard() {
       setError(undoError instanceof Error ? undoError.message : "Undo failed.");
     }
   }
-
-  async function togglePriorityAlerts() {
-    if (!session || session.role !== "admin") return;
-    const next = !priorityAlertsEnabled;
-    setPriorityAlertsEnabled(next);
-    setSettingsSaving(true);
-    try {
-      const data = await readJson(
-        await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            actor: session,
-            priorityAlertsEnabled: next
-          })
-        })
-      );
-      setPriorityAlertsEnabled(Boolean(data.priorityAlertsEnabled));
-      setRecipientProfiles(data.recipientProfiles ?? recipientProfiles);
-      setCanEditAllProfiles(Boolean(data.canEditAllProfiles));
-      setCurrentProfileId(data.currentProfileId ?? currentProfileId);
-      setToast({ text: next ? "Priority alerts on." : "Priority alerts off." });
-      publishSync("settings_changed");
-    } catch (settingsError) {
-      setPriorityAlertsEnabled(!next);
-      setError(settingsError instanceof Error ? settingsError.message : "Settings failed.");
-    } finally {
-      setSettingsSaving(false);
-    }
-  }
-
-  async function saveRecipientProfile(profile: RecipientProfile) {
-    if (!session || !canUseNotificationSettings(session.role)) return;
-    const normalizedProfile = {
-      ...profile,
-      displayName: doctorName(profile.displayName)
-    };
-    setSettingsSaving(true);
-    try {
-      const data = await readJson(
-        await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            actor: session,
-            recipientProfile: normalizedProfile
-          })
-        })
-      );
-      setRecipientProfiles(data.recipientProfiles ?? recipientProfiles);
-      setCanEditAllProfiles(Boolean(data.canEditAllProfiles));
-      setCurrentProfileId(data.currentProfileId ?? currentProfileId);
-      if (session.role === "veterinarian" && currentProfileId === normalizedProfile.profileId) {
-        const nextSession = { ...session, name: normalizedProfile.displayName };
-        setSession(nextSession);
-        window.localStorage.setItem(sessionKey, JSON.stringify(nextSession));
-      }
-      setAddingProfile(false);
-      setToast({ text: "Notification settings saved." });
-      publishSync("settings_changed");
-    } catch (settingsError) {
-      setError(settingsError instanceof Error ? settingsError.message : "Settings failed.");
-    } finally {
-      setSettingsSaving(false);
-    }
-  }
-
-  async function deactivateRecipientProfile(profile: RecipientProfile) {
-    if (!session || !canEditAllProfiles) return;
-    const typed = window.prompt(`Type ${profile.displayName} to deactivate this veterinarian profile.`);
-    if (typed !== profile.displayName) return;
-    setSettingsSaving(true);
-    try {
-      const data = await readJson(
-        await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            actor: session,
-            deactivateProfileId: profile.profileId
-          })
-        })
-      );
-      setRecipientProfiles(data.recipientProfiles ?? recipientProfiles);
-      setCanEditAllProfiles(Boolean(data.canEditAllProfiles));
-      setCurrentProfileId(data.currentProfileId ?? currentProfileId);
-      setToast({ text: "Veterinarian profile deactivated." });
-      publishSync("settings_changed");
-    } catch (settingsError) {
-      setError(settingsError instanceof Error ? settingsError.message : "Settings failed.");
-    } finally {
-      setSettingsSaving(false);
-    }
-  }
-
-  const lanes = useMemo(() => {
-    if (!session) return [];
-    return laneDefs.filter((lane) => {
-      if (lane.key === "escalated") return canSeeEscalations(session.role);
-      if (lane.key === "pending_review" && session.role === "staff") return false;
-      if (lane.key === "archived") return false;
-      return true;
-    });
-  }, [session]);
-
-  const laneTasks = useCallback(
-    (lane: LaneKey) =>
-      tasks
-        .filter((task) =>
-          session ? taskBelongsInLane({ task, lane, viewerRole: session.role }) : false
-        )
-        .sort(compareTasks),
-    [session, tasks]
-  );
 
   const openMediumHighCount = useMemo(
     () => tasks.filter(isOpenPriorityTask).length,
@@ -783,7 +291,7 @@ export function TaskBoard() {
     <main className="appShell">
       <header className="topBar">
         <div>
-          <p className="eyebrow">Central Veterinary Hospital</p>
+          <p className="eyebrow">{clinic.name}</p>
           <h1>Clinic Tasks</h1>
         </div>
         <div className="topActions">
@@ -818,174 +326,48 @@ export function TaskBoard() {
           </span>
         ) : null}
         {session.role === "admin" || session.role === "veterinarian" ? (
-          <div className="settingsMenu">
-            <button
-              type="button"
-              className="plainButton compact"
-              onClick={() => setSettingsOpen(!settingsOpen)}
-            >
-              <Settings size={16} />
-              Settings
-            </button>
-            {settingsOpen ? (
-              <div className="settingsPanel">
-                {canEditAllProfiles ? (
-                  <label className="toggleLine strongToggle">
-                    <input
-                      type="checkbox"
-                      checked={priorityAlertsEnabled}
-                      disabled={settingsSaving}
-                      onChange={() => void togglePriorityAlerts()}
-                    />
-                    End-of-day alert
-                  </label>
-                ) : null}
-                <p className="settingsHelp">
-                  Sends once daily when any medium or high priority task is still open or overdue.
-                </p>
-                <div className="settingsDivider" />
-                <div className="settingsTitle">
-                  <strong>Veterinarian notifications</strong>
-                  <span>
-                    Choose delivery channels and alert types separately. Escalated tasks appear for veterinarians and Admin.
-                  </span>
-                </div>
-                {recipientProfiles.filter((profile) => profile.active).map((profile) => (
-                  <ProfileSettings
-                    key={`${profile.profileId}:${profile.displayName}:${profile.email}:${profile.phone}:${profile.passcode}:${profile.active}:${profile.emailOptIn}:${profile.smsOptIn}:${profile.escalationOptIn}:${profile.dailyPriorityOptIn}`}
-                    profile={profile}
-                    saving={settingsSaving}
-                    canEditAll={canEditAllProfiles}
-                    currentProfileId={currentProfileId}
-                    onChange={saveRecipientProfile}
-                    onDeactivate={deactivateRecipientProfile}
-                  />
-                ))}
-                {addingProfile ? (
-                  <ProfileSettings
-                    profile={blankVeterinarianProfile}
-                    saving={settingsSaving}
-                    canEditAll={canEditAllProfiles}
-                    currentProfileId={currentProfileId}
-                    onChange={saveRecipientProfile}
-                    onDeactivate={deactivateRecipientProfile}
-                    isNew
-                  />
-                ) : null}
-                {canEditAllProfiles ? (
-                  <button
-                    type="button"
-                    className="plainButton compact"
-                    disabled={settingsSaving}
-                    onClick={() => setAddingProfile(true)}
-                  >
-                    <UserPlus size={16} />
-                    Add veterinarian
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          <NotificationSettingsMenu
+            open={settingsOpen}
+            saving={settingsSaving}
+            priorityAlertsEnabled={priorityAlertsEnabled}
+            recipientProfiles={recipientProfiles}
+            canEditAllProfiles={canEditAllProfiles}
+            currentProfileId={currentProfileId}
+            addingProfile={addingProfile}
+            onToggleOpen={toggleSettingsOpen}
+            onTogglePriorityAlerts={togglePriorityAlerts}
+            onSaveProfile={saveRecipientProfile}
+            onDeactivateProfile={deactivateRecipientProfile}
+            onAddProfile={startAddingProfile}
+          />
         ) : null}
       </section>
 
       {error ? <div className="alertLine">{error}</div> : null}
 
-      <section className="boardGrid">
-        {lanes.map((lane) => {
-          const Icon = lane.icon;
-          const items = laneTasks(lane.key);
-          return (
-            <div className={`lane lane-${lane.key}`} key={lane.key}>
-              <div className="laneHeader">
-                <Icon size={18} />
-                <h2>{lane.title}</h2>
-                <span>{items.length}</span>
-              </div>
-              <div className="taskStack">
-                {!hasLoaded && loading ? (
-                  <div className="emptyLane loadingLane">Loading tasks</div>
-                ) : null}
-                {hasLoaded ? items.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    role={session.role}
-                    onEdit={openEdit}
-                    onStatus={updateStatus}
-                    onInvalid={(item) => {
-                      setInvalidTask(item);
-                      setInvalidReason(item.invalidReason ?? "");
-                    }}
-                    onArchive={archiveAction}
-                    onEscalate={escalate}
-                    onUndo={undo}
-                  />
-                )) : null}
-                {hasLoaded && items.length === 0 ? <div className="emptyLane">No tasks</div> : null}
-              </div>
-            </div>
-          );
-        })}
-      </section>
+      <TaskLaneGrid
+        tasks={tasks}
+        role={session.role}
+        loading={loading}
+        hasLoaded={hasLoaded}
+        onEdit={openEdit}
+        onStatus={updateStatus}
+        onInvalid={(item) => {
+          setInvalidTask(item);
+          setInvalidReason(item.invalidReason ?? "");
+        }}
+        onArchive={archiveAction}
+        onEscalate={escalate}
+        onUndo={undo}
+      />
 
       {canManage(session.role) ? (
-        <aside className="activityPanel">
-          <section className="auditSection">
-            <div className="activityHeader">
-              <ShieldCheck size={18} />
-              <h2>Audit Log</h2>
-              <span>{events.length}</span>
-            </div>
-            <div className="activityList" aria-label="Recent audit events">
-              {events.slice(0, 40).map((event) => (
-                <div className="activityItem" key={event.id}>
-                  <strong>{event.eventType.replaceAll("_", " ")}</strong>
-                  <span>
-                    {actorDisplay(event.actorName, event.actorRole, session.role)} ·{" "}
-                    {new Date(event.createdAt).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit"
-                    })}
-                  </span>
-                  <small>{event.taskId.slice(0, 8)} · {event.nextStatus || event.previousStatus || "logged"}</small>
-                </div>
-              ))}
-            </div>
-          </section>
-          <div className="archiveUnderAudit">
-            <div className="activityHeader">
-              <Archive size={18} />
-              <h2>Archive</h2>
-              <span>{archivedTasks.length}</span>
-            </div>
-            <div className="archiveList" aria-label="Archived tasks">
-              {archivedTasks.slice(0, 24).map((task) => (
-                <div className="archiveItem" key={task.id}>
-                  <div className="archiveItemText">
-                    <strong>{task.petName || task.clientName || "Archived task"}</strong>
-                    <span>
-                      {requestTypeLabel(task.requestType)} ·{" "}
-                      {actorDisplay(task.archivedByName, task.archivedByRole, session.role)}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="plainButton compact archiveRestore"
-                    onClick={() => void archiveAction(task, "restore")}
-                    title="Restore task"
-                  >
-                    <RotateCcw size={15} />
-                    Restore
-                  </button>
-                </div>
-              ))}
-              {archivedTasks.length === 0 ? <div className="emptyLane">No archived tasks</div> : null}
-            </div>
-          </div>
-        </aside>
+        <TaskActivityPanel
+          events={events}
+          archivedTasks={archivedTasks}
+          role={session.role}
+          onRestore={(task) => void archiveAction(task, "restore")}
+        />
       ) : null}
 
       {formOpen ? (

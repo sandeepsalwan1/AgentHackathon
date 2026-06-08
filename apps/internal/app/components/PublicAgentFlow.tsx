@@ -2,6 +2,7 @@
 
 import { Bot, CheckCircle2, Loader2, Send } from "lucide-react";
 import { FormEvent, useState } from "react";
+import { useClinicBrand } from "./ClinicContext";
 
 type PublicAgentFlowProps = {
   title: string;
@@ -110,6 +111,7 @@ export function PublicAgentFlow({
   transcript = false,
   destination = false
 }: PublicAgentFlowProps) {
+  const clinic = useClinicBrand();
   const [form, setForm] = useState(blanks);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -160,7 +162,7 @@ export function PublicAgentFlow({
         <div className="publicHeader">
           <Bot size={28} />
           <div>
-            <p>Central Veterinary Hospital</p>
+            <p>{clinic.name}</p>
             <h1>{title}</h1>
           </div>
         </div>

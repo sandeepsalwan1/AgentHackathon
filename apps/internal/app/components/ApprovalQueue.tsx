@@ -2,15 +2,11 @@
 
 import { Check, FileCheck2, Loader2, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { AppRole } from "@central-vet/db";
 import { canManage } from "../lib/taskWorkflow";
-
-type Session = {
-  name: string;
-  role: AppRole;
-  passcode?: string;
-  profileId?: string | null;
-};
+import { useClinicBrand } from "./ClinicContext";
+import { readStoredTaskBoardSession } from "./taskBoardBrowserState";
+import { sessionReadHeaders } from "./taskBoardClient";
+import type { TaskBoardSession as Session } from "./taskBoardTypes";
 
 type Approval = {
   id: string;
@@ -21,17 +17,6 @@ type Approval = {
   createdAt: string;
 };
 
-const sessionKey = "central-vet-session";
-
-function readSession() {
-  if (typeof window === "undefined") return null;
-  try {
-    return JSON.parse(window.localStorage.getItem(sessionKey) || "null") as Session | null;
-  } catch {
-    return null;
-  }
-}
-
 async function readJson(response: Response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Request failed.");
@@ -39,6 +24,7 @@ async function readJson(response: Response) {
 }
 
 export function ApprovalQueue() {
+  const clinic = useClinicBrand();
   const [session, setSession] = useState<Session | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,7 +33,7 @@ export function ApprovalQueue() {
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setSession(readSession());
+      setSession(readStoredTaskBoardSession());
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
@@ -72,8 +58,7 @@ export function ApprovalQueue() {
     setLoading(true);
     setError("");
     try {
-      const headers: Record<string, string> = { "Cache-Control": "no-store" };
-      if (session.passcode) headers["X-Central-Vet-Passcode"] = session.passcode;
+      const headers = sessionReadHeaders(session);
       const data = await readJson(await fetch(`/api/approvals?${actorQuery}`, { headers, cache: "no-store" }));
       setApprovals(data.approvals ?? []);
     } catch (loadError) {
@@ -141,7 +126,7 @@ export function ApprovalQueue() {
         <div className="staffToolHeader">
           <FileCheck2 size={28} />
           <div>
-            <p>Central Veterinary Hospital</p>
+            <p>{clinic.name}</p>
             <h1>Approvals</h1>
           </div>
         </div>

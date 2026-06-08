@@ -3,8 +3,10 @@ import {
   getRecipientProfileByPasscode,
   MissingDatabaseUrlError,
   recordAuthAttempt,
+  resolveClinicForHostname,
   type Actor,
   type AppRole,
+  type ClinicContext,
   type Task
 } from "@central-vet/db";
 import { NextResponse } from "next/server";
@@ -55,7 +57,15 @@ function passcodeMatches(input: string | undefined, ...allowed: Array<string | n
   return Boolean(passcode && allowed.some((candidate) => candidate === passcode));
 }
 
-async function normalizeActor(actor: z.infer<typeof actorSchema>): Promise<Actor | null> {
+export async function resolveClinicFromRequest(request: Request): Promise<ClinicContext> {
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
+  return resolveClinicForHostname(host);
+}
+
+async function normalizeActor(
+  actor: z.infer<typeof actorSchema>,
+  clinic: ClinicContext
+): Promise<Actor | null> {
   const name = actor.name?.trim() || "";
   if (actor.role === "staff") {
     return name ? { name, role: "staff" } : null;
@@ -71,7 +81,9 @@ async function normalizeActor(actor: z.infer<typeof actorSchema>): Promise<Actor
     return name ? { name, role: "admin" } : null;
   }
   if (actor.role === "veterinarian") {
-    const profile = await getRecipientProfileByPasscode(actor.passcode);
+    const profile = await getRecipientProfileByPasscode(actor.passcode, {
+      clinicId: clinic.clinicId
+    });
     if (profile) {
       return {
         name: profile.displayName,
@@ -106,11 +118,15 @@ function clientIdentity(request: Request, role: AppRole) {
 
 export async function authenticateActor(
   actor: RawActor,
-  request: Request
+  request: Request,
+  clinic?: ClinicContext
 ): Promise<{ actor: Actor } | { response: NextResponse }> {
+  const clinicContext = clinic ?? await resolveClinicFromRequest(request);
   if (actor.role !== "staff") {
     const identity = clientIdentity(request, actor.role);
-    const limit = await checkAuthAttemptLimit(identity);
+    const limit = await checkAuthAttemptLimit(identity, {
+      clinicId: clinicContext.clinicId
+    });
     if (!limit.allowed) {
       logWarn("auth_rate_limited", {
         actorRole: actor.role,
@@ -127,8 +143,9 @@ export async function authenticateActor(
       };
     }
 
-    const normalized = await normalizeActor(actor);
+    const normalized = await normalizeActor(actor, clinicContext);
     await recordAuthAttempt({
+      clinicId: clinicContext.clinicId,
       identity,
       role: actor.role,
       success: Boolean(normalized)
@@ -141,7 +158,7 @@ export async function authenticateActor(
     return { actor: normalized };
   }
 
-  const normalized = await normalizeActor(actor);
+  const normalized = await normalizeActor(actor, clinicContext);
   if (!normalized) {
     return {
       response: NextResponse.json({ error: "Invalid role or name." }, { status: 403 })
@@ -150,7 +167,11 @@ export async function authenticateActor(
   return { actor: normalized };
 }
 
-export async function authenticateActorFromQuery(url: URL, request: Request) {
+export async function authenticateActorFromQuery(
+  url: URL,
+  request: Request,
+  clinic?: ClinicContext
+) {
   const role = roleSchema.safeParse(url.searchParams.get("role") ?? "staff");
   const name = url.searchParams.get("name") || "";
   const passcode = passcodeFromRequest(url, request);
@@ -159,7 +180,7 @@ export async function authenticateActorFromQuery(url: URL, request: Request) {
       response: NextResponse.json({ error: "Invalid role or passcode." }, { status: 403 })
     };
   }
-  return authenticateActor({ name, role: role.data, passcode }, request);
+  return authenticateActor({ name, role: role.data, passcode }, request, clinic);
 }
 
 function staffSafeActorName(role: AppRole | null, name: string | null) {

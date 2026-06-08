@@ -18,7 +18,8 @@ import {
   dbError,
   logInfo,
   logWarn,
-  noStoreHeaders
+  noStoreHeaders,
+  resolveClinicFromRequest
 } from "../_shared";
 import { canUseNotificationSettings } from "../../lib/taskWorkflow";
 
@@ -57,8 +58,8 @@ function doctorName(name: string) {
   return /^dr\.?\s/i.test(name) ? name : `Dr. ${name}`;
 }
 
-async function profilesForActor(actor: Actor) {
-  const profiles = await listRecipientProfiles({ includeInactive: false });
+async function profilesForActor(actor: Actor, clinicId: string) {
+  const profiles = await listRecipientProfiles({ clinicId, includeInactive: false });
   if (actor.role === "admin") return profiles;
   if (actor.role === "veterinarian" && actor.profileId) {
     return profiles.filter((profile) => profile.profileId === actor.profileId);
@@ -68,7 +69,8 @@ async function profilesForActor(actor: Actor) {
 
 export async function GET(request: Request) {
   try {
-    const auth = await authenticateActorFromQuery(new URL(request.url), request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActorFromQuery(new URL(request.url), request, clinic);
     if ("response" in auth) {
       logWarn("settings_read_rejected", { reason: "unauthorized" });
       return auth.response;
@@ -81,8 +83,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        priorityAlertsEnabled: await isPriorityAlertsEnabled(),
-        recipientProfiles: await profilesForActor(actor),
+        clinic,
+        priorityAlertsEnabled: await isPriorityAlertsEnabled({ clinicId: clinic.clinicId }),
+        recipientProfiles: await profilesForActor(actor, clinic.clinicId),
         canEditAllProfiles: actor.role === "admin",
         currentProfileId: actor.profileId ?? null
       },
@@ -101,7 +104,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Settings require Admin or Veterinarian." }, { status: 403 });
     }
 
-    const auth = await authenticateActor(parsed.data.actor, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(parsed.data.actor, request, clinic);
     if ("response" in auth) {
       logWarn("settings_update_rejected", { reason: "unauthorized_or_invalid" });
       return auth.response;
@@ -111,14 +115,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Settings require Admin or Veterinarian." }, { status: 403 });
     }
     const actor = auth.actor;
-    let priorityAlertsEnabled = await isPriorityAlertsEnabled();
+    let priorityAlertsEnabled = await isPriorityAlertsEnabled({ clinicId: clinic.clinicId });
     if (typeof parsed.data.priorityAlertsEnabled === "boolean") {
       if (!canAdmin(actor.role)) {
         return NextResponse.json({ error: "Only Admin can change the end-of-day alert." }, { status: 403 });
       }
       priorityAlertsEnabled = await setPriorityAlertsEnabled(
         parsed.data.priorityAlertsEnabled,
-        actor
+        actor,
+        { clinicId: clinic.clinicId }
       );
     }
     let updatedProfile = null;
@@ -126,7 +131,7 @@ export async function PATCH(request: Request) {
       if (actor.role !== "veterinarian" || !actor.profileId) {
         return NextResponse.json({ error: "Only veterinarians can change their own profile name." }, { status: 403 });
       }
-      const existing = await getRecipientProfile(actor.profileId);
+      const existing = await getRecipientProfile(actor.profileId, { clinicId: clinic.clinicId });
       if (!existing) {
         return NextResponse.json({ error: "Veterinarian profile not found." }, { status: 404 });
       }
@@ -136,19 +141,21 @@ export async function PATCH(request: Request) {
           ...existing,
           displayName: nextName
         },
-        actor
+        actor,
+        { clinicId: clinic.clinicId }
       );
       await renameActorReferences({
         actor,
         oldName: actor.name,
-        newName: nextName
+        newName: nextName,
+        clinicId: clinic.clinicId
       });
     }
     if (parsed.data.recipientProfile) {
       const profileId =
         parsed.data.recipientProfile.profileId ||
         profileIdFromName(parsed.data.recipientProfile.displayName);
-      const existing = await getRecipientProfile(profileId);
+      const existing = await getRecipientProfile(profileId, { clinicId: clinic.clinicId });
       if (actor.role !== "admin" && actor.profileId !== profileId) {
         return NextResponse.json({ error: "Veterinarians can only edit their own profile." }, { status: 403 });
       }
@@ -171,13 +178,15 @@ export async function PATCH(request: Request) {
               ? parsed.data.recipientProfile.active
               : existing?.active ?? true
         },
-        actor
+        actor,
+        { clinicId: clinic.clinicId }
       );
       if (actor.role === "veterinarian" && existing && existing.displayName !== nextName) {
         await renameActorReferences({
           actor,
           oldName: existing.displayName,
-          newName: nextName
+          newName: nextName,
+          clinicId: clinic.clinicId
         });
       }
     }
@@ -185,7 +194,11 @@ export async function PATCH(request: Request) {
       if (!canAdmin(actor.role)) {
         return NextResponse.json({ error: "Only Admin can deactivate veterinarian profiles." }, { status: 403 });
       }
-      updatedProfile = await deactivateRecipientProfile(parsed.data.deactivateProfileId, actor);
+      updatedProfile = await deactivateRecipientProfile(
+        parsed.data.deactivateProfileId,
+        actor,
+        { clinicId: clinic.clinicId }
+      );
     }
     logInfo("settings_updated", {
       actorRole: parsed.data.actor.role,
@@ -195,7 +208,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json(
       {
         priorityAlertsEnabled,
-        recipientProfiles: await profilesForActor(actor),
+        recipientProfiles: await profilesForActor(actor, clinic.clinicId),
         canEditAllProfiles: actor.role === "admin",
         currentProfileId: actor.profileId ?? null
       },

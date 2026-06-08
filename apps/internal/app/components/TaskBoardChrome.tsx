@@ -4,6 +4,7 @@ import type { AppRole } from "@central-vet/db";
 import { Check, Pencil, ShieldCheck } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { readJson } from "./taskBoardClient";
+import { useClinicBrand } from "./ClinicContext";
 import { roleLabel } from "./taskBoardDisplay";
 import type { TaskBoardSession as Session } from "./taskBoardTypes";
 
@@ -67,10 +68,11 @@ export function SessionNameTag({
 }
 
 export function BootScreen() {
+  const clinic = useClinicBrand();
   return (
     <main className="entryShell">
       <section className="entryPanel bootPanel">
-        <p className="eyebrow">Central Veterinary Hospital</p>
+        <p className="eyebrow">{clinic.name}</p>
         <h1>Clinic Tasks</h1>
         <div className="bootLine">Opening board</div>
         <div className="bootBar" aria-hidden="true" />
@@ -80,6 +82,7 @@ export function BootScreen() {
 }
 
 export function EntryScreen({ onSave }: { onSave: (session: Session) => void }) {
+  const clinic = useClinicBrand();
   const [name, setName] = useState("");
   const [role, setRole] = useState<AppRole>("staff");
   const [passcode, setPasscode] = useState("");
@@ -131,7 +134,7 @@ export function EntryScreen({ onSave }: { onSave: (session: Session) => void }) 
   return (
     <main className="entryShell">
       <form className="entryPanel" onSubmit={submit}>
-        <p className="eyebrow">Central Veterinary Hospital</p>
+        <p className="eyebrow">{clinic.name}</p>
         <h1>Clinic Tasks</h1>
         <label>
           {role === "veterinarian" ? "Name (optional)" : "Name"}

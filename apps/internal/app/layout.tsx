@@ -16,8 +16,8 @@ const hankenGrotesk = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Central Veterinary Hospital",
-  description: "Internal task board for Central Veterinary Hospital",
+  title: "Clinic Task Board",
+  description: "Internal task board for clinic operations",
   robots: { index: false, follow: false },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

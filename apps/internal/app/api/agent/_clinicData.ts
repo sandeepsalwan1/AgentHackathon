@@ -6,12 +6,12 @@ import {
   listTasks
 } from "@central-vet/db";
 
-export async function loadAgentClinicData(): Promise<MockClinicData> {
+export async function loadAgentClinicData(clinicId: string): Promise<MockClinicData> {
   const [clinic, tasks, approvals, reports] = await Promise.all([
-    listMockClinic(),
-    listTasks({ role: "admin", includeArchived: false }),
-    listApprovals({ status: "pending", limit: 50 }),
-    listAgentReports({ limit: 50 })
+    listMockClinic({ clinicId }),
+    listTasks({ clinicId, role: "admin", includeArchived: false }),
+    listApprovals({ clinicId, status: "pending", limit: 50 }),
+    listAgentReports({ clinicId, limit: 50 })
   ]);
   return {
     clients: clinic.clients.map((client) => ({

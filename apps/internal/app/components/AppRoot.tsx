@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSession, logout, type AccountSession } from "../lib/accountStore";
 import { AdminDashboard } from "./admin/AdminDashboard";
 import { AuthScreen } from "./auth/AuthScreen";
+import { ClinicProvider, useClinicBrand } from "./ClinicContext";
 import { CustomerExperience } from "./customer/CustomerExperience";
 import { TaskBoard } from "./TaskBoard";
 
@@ -25,8 +26,9 @@ function viewForSession(session: AccountSession): View {
   return { kind: "board" };
 }
 
-export function AppRoot() {
+function AppRootContent() {
   const [view, setView] = useState<View>({ kind: "loading" });
+  const clinic = useClinicBrand();
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -53,7 +55,7 @@ export function AppRoot() {
     return (
       <main className="entryShell">
         <section className="entryPanel bootPanel">
-          <p className="eyebrow">Central Veterinary Hospital</p>
+          <p className="eyebrow">{clinic.name}</p>
           <h1>Opening…</h1>
           <div className="bootBar" aria-hidden="true" />
         </section>
@@ -85,4 +87,12 @@ export function AppRoot() {
 
   logout();
   return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
+}
+
+export function AppRoot() {
+  return (
+    <ClinicProvider>
+      <AppRootContent />
+    </ClinicProvider>
+  );
 }

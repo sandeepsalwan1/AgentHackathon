@@ -1,7 +1,15 @@
 import { sendSmokeEmail } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticateActor, actorSchema, canManage, dbError, logInfo, logWarn } from "../../_shared";
+import {
+  authenticateActor,
+  actorSchema,
+  canManage,
+  dbError,
+  logInfo,
+  logWarn,
+  resolveClinicFromRequest
+} from "../../_shared";
 
 const bodySchema = z.object({
   actor: actorSchema,
@@ -15,7 +23,8 @@ export async function POST(request: Request) {
       logWarn("smoke_notification_rejected", { reason: "unauthorized" });
       return NextResponse.json({ error: "Authorized passcode required." }, { status: 403 });
     }
-    const auth = await authenticateActor(body.data.actor, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(body.data.actor, request, clinic);
     if ("response" in auth) {
       logWarn("smoke_notification_rejected", { reason: "unauthorized" });
       return auth.response;
@@ -28,7 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Authorized passcode required." }, { status: 403 });
     }
 
-    const result = await sendSmokeEmail({ modeOverride: body.data.mode });
+    const result = await sendSmokeEmail({
+      clinicId: clinic.clinicId,
+      timeZone: clinic.timeZone,
+      modeOverride: body.data.mode
+    });
     logInfo("smoke_notification_checked", {
       mode: body.data.mode || "env",
       resultCount: result.results.length

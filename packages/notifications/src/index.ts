@@ -1,370 +1,56 @@
 import { randomUUID } from "node:crypto";
 import {
   archiveCompletedTasksBefore,
-  createNotificationAttempt,
+  getClinicById,
   listIncompletePriorityTasks,
-  listRecipientProfiles,
-  markNotificationFailed,
-  markNotificationSent,
-  markNotificationSkipped,
   type Task
 } from "@central-vet/db";
-import { Resend } from "resend";
+import {
+  agentExampleHtml,
+  agentExampleText,
+  escalationHtml,
+  escalationText,
+  overdueHtml,
+  overdueText,
+  priorityTaskHtml,
+  priorityTaskText,
+  smokeTestHtml
+} from "./notificationContent";
+import {
+  localNotificationParts,
+  notificationEmailFrom,
+  notificationMode,
+  veterinarianDeliveries,
+  type NotificationChannel,
+  type NotificationMode
+} from "./notificationDelivery";
+import { sendNotification, type SendResult } from "./notificationSend";
 
-export type NotificationMode = "disabled" | "test" | "production";
-export type NotificationChannel = "email" | "sms" | "both";
 export type AgentEmailCadence = "once" | "monthly";
+export { notificationEmailFrom };
+export type { NotificationChannel, NotificationMode };
 
-type SendResult = {
-  recipient: string;
-  status: "sent" | "skipped" | "duplicate" | "failed";
-  channel: "email" | "sms";
-  resendId?: string | null;
-  error?: string;
-};
-
-type Delivery = { channel: "email" | "sms"; recipients: string[] };
-type ProfileAlertKind = "escalation" | "dailyPriority";
-
-const defaultEmailFrom = "Central Veterinary Hospital <notifications@eepish.com>";
 const systemActor = { name: "System", role: "admin" as const };
+const defaultClinicName = "Central Veterinary Hospital";
 
-export function notificationEmailFrom() {
-  return process.env.EMAIL_FROM || defaultEmailFrom;
-}
-
-function mode(): NotificationMode {
-  const value = process.env.NOTIFICATION_MODE;
-  if (value === "test" || value === "production") return value;
-  return "disabled";
-}
-
-function channel(): NotificationChannel {
-  const value = process.env.NOTIFICATION_CHANNEL;
-  if (value === "sms" || value === "both") return value;
-  return "email";
-}
-
-function envList(value: string | undefined) {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function emailRecipientsFor(currentMode: NotificationMode) {
-  if (currentMode === "test") return envList(process.env.TEST_NOTIFICATION_EMAIL);
-  if (currentMode === "production") {
-    return envList(process.env.DOCTOR_NOTIFICATION_EMAILS);
-  }
-  return envList(process.env.TEST_NOTIFICATION_EMAIL || process.env.DOCTOR_NOTIFICATION_EMAILS);
-}
-
-function smsRecipientsFor(currentMode: NotificationMode) {
-  if (currentMode === "test") {
-    return envList(process.env.TEST_SMS_NOTIFICATION_RECIPIENTS || process.env.SMS_NOTIFICATION_RECIPIENTS);
-  }
-  if (currentMode === "production") {
-    return envList(process.env.SMS_NOTIFICATION_RECIPIENTS);
-  }
-  return envList(process.env.TEST_SMS_NOTIFICATION_RECIPIENTS || process.env.SMS_NOTIFICATION_RECIPIENTS);
-}
-
-function deliveriesFor(currentMode: NotificationMode, currentChannel: NotificationChannel) {
-  const deliveries: Delivery[] = [];
-  if (currentChannel === "email" || currentChannel === "both") {
-    deliveries.push({ channel: "email", recipients: emailRecipientsFor(currentMode) });
-  }
-  if (currentChannel === "sms" || currentChannel === "both") {
-    deliveries.push({ channel: "sms", recipients: smsRecipientsFor(currentMode) });
-  }
-  return deliveries;
-}
-
-function localParts(
-  timeZone = process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"
-) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return {
-    date: `${get("year")}-${get("month")}-${get("day")}`,
-    month: `${get("year")}-${get("month")}`,
-    hour: Number(get("hour"))
-  };
-}
-
-function escapeHtml(value: string | null | undefined) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function sourceLabel(source: Task["source"]) {
-  return source
-    .replace("_form", " form")
-    .replace("_request", " request")
-    .replace("_", " ");
-}
-
-function formatPhone(value: string | null) {
-  const clean = value?.trim();
-  if (!clean) return "Not listed";
-  if (clean.includes("@")) return clean;
-  const digits = clean.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  if (local.length === 10) {
-    const formatted = `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-    return digits.length === 11 ? `+1 ${formatted}` : formatted;
-  }
-  if (local.length === 7) return `${local.slice(0, 3)}-${local.slice(3)}`;
-  return clean;
-}
-
-function overdueHtml(tasks: Task[], localDate: string) {
-  const rows = tasks
-    .map(
-      (task) => `
-        <li style="margin:0 0 12px 0;">
-          <strong>${escapeHtml(task.petName || task.clientName || "Task")}</strong>
-          <span style="color:#64748b;">(${escapeHtml(task.status)} · ${escapeHtml(sourceLabel(task.source))})</span><br />
-          <span>${escapeHtml(task.request)}</span><br />
-          <span style="color:#64748b;">Client: ${escapeHtml(task.clientName || "Not listed")} · Phone: ${escapeHtml(formatPhone(task.clientPhone))} · Due: ${escapeHtml(task.dueDate)}</span>
-        </li>`
-    )
-    .join("");
-
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital overdue task summary</h1>
-      <p style="margin:0 0 16px;">${tasks.length} medium/high priority task${tasks.length === 1 ? "" : "s"} are still open at end of day ${escapeHtml(localDate)}.</p>
-      <ul style="padding-left:20px;margin:0;">${rows}</ul>
-    </div>
-  `;
-}
-
-function priorityTaskHtml(task: Task) {
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital ${escapeHtml(task.priority)} priority task</h1>
-      <p style="margin:0 0 12px;">A ${escapeHtml(task.priority)} priority task was added and is ready for review/action.</p>
-      <p style="margin:0 0 8px;"><strong>${escapeHtml(task.petName || task.clientName || "Task")}</strong></p>
-      <p style="margin:0 0 8px;">${escapeHtml(task.request)}</p>
-      <p style="margin:0;color:#64748b;">Client: ${escapeHtml(task.clientName || "Not listed")} · Phone: ${escapeHtml(formatPhone(task.clientPhone))} · Due: ${escapeHtml(task.dueDate)} · Source: ${escapeHtml(sourceLabel(task.source))}</p>
-    </div>
-  `;
-}
-
-function agentExampleHtml(message: string, sentBy: string | undefined, localDate: string) {
-  const byline = sentBy ? `<p style="margin:0 0 12px;color:#64748b;">Sent by ${escapeHtml(sentBy)} via VetAgent.</p>` : "";
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital agent email</h1>
-      ${byline}
-      <p style="margin:0 0 12px;">${escapeHtml(message)}</p>
-      <p style="margin:0;color:#64748b;">Example send verified for ${escapeHtml(localDate)}.</p>
-    </div>
-  `;
-}
-
-function agentExampleText(message: string, sentBy: string | undefined, localDate: string) {
-  const byline = sentBy ? ` Sent by ${sentBy} via VetAgent.` : "";
-  return truncateText(`Central Veterinary Hospital agent email.${byline} ${message} Example send verified for ${localDate}.`);
-}
-
-function truncateText(value: string, maxLength = 480) {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (compact.length <= maxLength) return compact;
-  return `${compact.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
-function overdueText(tasks: Task[], localDate: string) {
-  const firstTasks = tasks
-    .slice(0, 3)
-    .map((task) => {
-      const name = task.petName || task.clientName || "Task";
-      const phone = task.clientPhone ? ` ${formatPhone(task.clientPhone)}` : "";
-      return `${name}: ${task.request}${phone}`;
-    })
-    .join(" | ");
-  const more = tasks.length > 3 ? ` +${tasks.length - 3} more.` : "";
-  return truncateText(`Central Veterinary Hospital end-of-day medium/high ${localDate}: ${tasks.length} open task${tasks.length === 1 ? "" : "s"}. ${firstTasks}${more}`);
-}
-
-function priorityTaskText(task: Task) {
-  const name = task.petName || task.clientName || "Task";
-  const phone = task.clientPhone ? ` Phone: ${formatPhone(task.clientPhone)}.` : "";
-  return truncateText(`Central Veterinary Hospital ${task.priority} priority: ${name}. ${task.request}.${phone}`);
-}
-
-function escalationHtml(task: Task) {
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital escalated task</h1>
-      <p style="margin:0 0 8px;"><strong>${escapeHtml(task.petName || task.clientName || "Task")}</strong></p>
-      <p style="margin:0 0 8px;">${escapeHtml(task.request)}</p>
-      <p style="margin:0;color:#64748b;">Client: ${escapeHtml(task.clientName || "Not listed")} · Phone: ${escapeHtml(formatPhone(task.clientPhone))} · Due: ${escapeHtml(task.dueDate)}</p>
-    </div>
-  `;
-}
-
-function escalationText(task: Task) {
-  const name = task.petName || task.clientName || "Task";
-  const phone = task.clientPhone ? ` Phone: ${formatPhone(task.clientPhone)}.` : "";
-  return truncateText(`Central Veterinary Hospital escalated: ${name}. ${task.request}.${phone}`);
-}
-
-function smsAddressFor(phone: string) {
-  const clean = phone.trim();
-  if (clean.includes("@")) return clean;
-  const digits = clean.replace(/\D/g, "");
-  if (digits.length === 10) return `${digits}@vtext.com`;
-  if (digits.length === 11 && digits.startsWith("1")) return `${digits.slice(1)}@vtext.com`;
-  return "";
-}
-
-async function veterinarianDeliveries(kind: ProfileAlertKind) {
-  const profiles = await listRecipientProfiles({ includeInactive: false });
-  const enabledForKind = (profile: Awaited<ReturnType<typeof listRecipientProfiles>>[number]) =>
-    kind === "escalation" ? profile.escalationOptIn : profile.dailyPriorityOptIn;
-  const emailRecipients = profiles
-    .filter((profile) => enabledForKind(profile) && profile.emailOptIn && profile.email)
-    .map((profile) => profile.email);
-  const smsRecipients = profiles
-    .filter((profile) => enabledForKind(profile) && profile.smsOptIn && profile.phone)
-    .map((profile) => smsAddressFor(profile.phone))
-    .filter(Boolean);
-  return [
-    { channel: "email" as const, recipients: emailRecipients },
-    { channel: "sms" as const, recipients: smsRecipients }
-  ].filter((delivery) => delivery.recipients.length > 0);
-}
-
-async function sendNotification(args: {
-  notificationType: string;
-  subject: string;
-  html: string;
-  text: string;
-  idempotencyKeyBase: string;
-  taskId?: string | null;
-  modeOverride?: NotificationMode;
-  channelOverride?: NotificationChannel;
-  deliveriesOverride?: Delivery[];
-}) {
-  const currentMode = args.modeOverride ?? mode();
-  const currentChannel = args.channelOverride ?? channel();
-  const deliveries = args.deliveriesOverride ?? deliveriesFor(currentMode, currentChannel);
-  const from = notificationEmailFrom();
-  const recipientCount = deliveries.reduce((count, delivery) => count + delivery.recipients.length, 0);
-
-  if (recipientCount === 0) {
-    return [
-      {
-        recipient: "",
-        status: "failed" as const,
-        channel: currentChannel === "both" ? "sms" as const : currentChannel,
-        error: "No notification recipients configured."
-      }
-    ];
-  }
-
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const resend = currentMode === "disabled" || !resendApiKey ? null : new Resend(resendApiKey);
-  const results: SendResult[] = [];
-
-  for (const delivery of deliveries) {
-    for (const recipient of delivery.recipients) {
-      const idempotencyKey = `${args.idempotencyKeyBase}/${currentMode}/${delivery.channel}/${recipient}`;
-      const notificationId = await createNotificationAttempt({
-        taskId: args.taskId,
-        notificationType: `${args.notificationType}_${delivery.channel}`,
-        recipient,
-        idempotencyKey
-      });
-
-      if (!notificationId) {
-        results.push({ recipient, status: "duplicate", channel: delivery.channel });
-        continue;
-      }
-
-      if (currentMode === "disabled") {
-        await markNotificationSkipped(notificationId, "NOTIFICATION_MODE=disabled");
-        results.push({ recipient, status: "skipped", channel: delivery.channel });
-        continue;
-      }
-
-      if (!resend) {
-        await markNotificationFailed(notificationId, "RESEND_API_KEY is required.");
-        results.push({
-          recipient,
-          status: "failed",
-          channel: delivery.channel,
-          error: "RESEND_API_KEY is required."
-        });
-        continue;
-      }
-
-      try {
-        const emailPayload =
-          delivery.channel === "sms"
-            ? {
-                from,
-                to: [recipient],
-                subject: "Central Veterinary Hospital",
-                text: args.text
-              }
-            : {
-                from,
-                to: [recipient],
-                subject: args.subject,
-                html: args.html
-              };
-        const { data, error } = await resend!.emails.send(
-          emailPayload,
-          { idempotencyKey }
-        );
-
-        if (error) {
-          const message = error.message || "Resend send failed.";
-          await markNotificationFailed(notificationId, message);
-          results.push({ recipient, status: "failed", channel: delivery.channel, error: message });
-        } else {
-          await markNotificationSent(notificationId, data?.id ?? null);
-          results.push({
-            recipient,
-            status: "sent",
-            channel: delivery.channel,
-            resendId: data?.id ?? null
-          });
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown send error.";
-        await markNotificationFailed(notificationId, message);
-        results.push({ recipient, status: "failed", channel: delivery.channel, error: message });
-      }
-    }
-  }
-
-  return results;
+async function clinicNameFor(clinicId: string | null | undefined) {
+  if (!clinicId) return process.env.HOSPITAL_NAME || defaultClinicName;
+  const clinic = await getClinicById(clinicId);
+  return clinic?.name || process.env.HOSPITAL_NAME || defaultClinicName;
 }
 
 export async function sendPriorityTaskAlert(task: Task, options?: {
   modeOverride?: NotificationMode;
   channelOverride?: NotificationChannel;
 }) {
+  const clinicName = await clinicNameFor(task.clinicId);
   const results = await sendNotification({
+    clinicId: task.clinicId,
+    clinicName,
     notificationType: "priority_task",
-    subject: `Central Veterinary Hospital ${task.priority} priority task: ${task.petName || task.clientName || "New task"}`,
-    html: priorityTaskHtml(task),
-    text: priorityTaskText(task),
+    subject: `${clinicName} ${task.priority} priority task: ${task.petName || task.clientName || "New task"}`,
+    html: priorityTaskHtml(task, clinicName),
+    text: priorityTaskText(task, clinicName),
     idempotencyKeyBase: `priority-task/${task.id}/${task.priority}`,
     taskId: task.id,
     modeOverride: options?.modeOverride,
@@ -376,7 +62,8 @@ export async function sendPriorityTaskAlert(task: Task, options?: {
 export async function sendEscalationAlert(task: Task, options?: {
   modeOverride?: NotificationMode;
 }) {
-  const deliveries = await veterinarianDeliveries("escalation");
+  const deliveries = await veterinarianDeliveries("escalation", { clinicId: task.clinicId });
+  const clinicName = await clinicNameFor(task.clinicId);
 
   if (deliveries.length === 0) {
     return {
@@ -388,10 +75,12 @@ export async function sendEscalationAlert(task: Task, options?: {
   }
 
   const results = await sendNotification({
+    clinicId: task.clinicId,
+    clinicName,
     notificationType: "escalation",
-    subject: `Central Veterinary Hospital escalated task: ${task.petName || task.clientName || "Task"}`,
-    html: escalationHtml(task),
-    text: escalationText(task),
+    subject: `${clinicName} escalated task: ${task.petName || task.clientName || "Task"}`,
+    html: escalationHtml(task, clinicName),
+    text: escalationText(task, clinicName),
     idempotencyKeyBase: `escalation/${task.id}/${task.escalatedAt || "new"}`,
     taskId: task.id,
     modeOverride: options?.modeOverride,
@@ -401,16 +90,21 @@ export async function sendEscalationAlert(task: Task, options?: {
 }
 
 export async function sendOverdueSummary(options?: {
+  clinicId?: string | null;
+  timeZone?: string;
   modeOverride?: NotificationMode;
   channelOverride?: NotificationChannel;
   force?: boolean;
 }) {
-  const { date, hour } = localParts();
+  const timeZone = options?.timeZone || process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles";
+  const clinicName = await clinicNameFor(options?.clinicId);
+  const { date, hour } = localNotificationParts(timeZone);
   const requiredHour = Number(process.env.OVERDUE_CHECK_HOUR ?? 18);
   const archivedCompleted = await archiveCompletedTasksBefore(
     date,
     systemActor,
-    process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"
+    timeZone,
+    { clinicId: options?.clinicId }
   );
   if (!options?.force && hour < requiredHour) {
     return {
@@ -423,7 +117,7 @@ export async function sendOverdueSummary(options?: {
     };
   }
 
-  const tasks = await listIncompletePriorityTasks(date);
+  const tasks = await listIncompletePriorityTasks(date, { clinicId: options?.clinicId });
   if (tasks.length === 0) {
     return {
       skipped: false,
@@ -435,8 +129,8 @@ export async function sendOverdueSummary(options?: {
     };
   }
 
-  const currentMode = options?.modeOverride ?? mode();
-  const deliveries = await veterinarianDeliveries("dailyPriority");
+  const currentMode = options?.modeOverride ?? notificationMode();
+  const deliveries = await veterinarianDeliveries("dailyPriority", { clinicId: options?.clinicId });
   if (deliveries.length === 0) {
     return {
       skipped: true,
@@ -449,10 +143,12 @@ export async function sendOverdueSummary(options?: {
   }
 
   const results = await sendNotification({
+    clinicId: options?.clinicId,
+    clinicName,
     notificationType: "daily_priority_summary",
-    subject: `Central Veterinary Hospital medium/high tasks still open: ${tasks.length}`,
-    html: overdueHtml(tasks, date),
-    text: overdueText(tasks, date),
+    subject: `${clinicName} medium/high tasks still open: ${tasks.length}`,
+    html: overdueHtml(tasks, date, clinicName),
+    text: overdueText(tasks, date, clinicName),
     idempotencyKeyBase: `daily-priority-summary/${date}`,
     modeOverride: currentMode,
     channelOverride: options?.channelOverride,
@@ -469,21 +165,21 @@ export async function sendOverdueSummary(options?: {
 }
 
 export async function sendSmokeEmail(options?: {
+  clinicId?: string | null;
+  timeZone?: string;
   modeOverride?: NotificationMode;
   channelOverride?: NotificationChannel;
 }) {
-  const { date } = localParts();
+  const clinicName = await clinicNameFor(options?.clinicId);
+  const { date } = localNotificationParts(options?.timeZone);
   const stamp = new Date().toISOString().slice(0, 16);
   const results = await sendNotification({
+    clinicId: options?.clinicId,
+    clinicName,
     notificationType: "smoke_test",
-    subject: "Central Veterinary Hospital notification smoke test",
-    html: `
-      <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-        <h1 style="font-size:20px;margin:0 0 12px;">Central Veterinary Hospital notification smoke test</h1>
-        <p style="margin:0;">Email path is working for ${escapeHtml(date)}.</p>
-      </div>
-    `,
-    text: `Central Veterinary Hospital notification smoke test for ${date}.`,
+    subject: `${clinicName} notification smoke test`,
+    html: smokeTestHtml(date, clinicName),
+    text: `${clinicName} notification smoke test for ${date}.`,
     idempotencyKeyBase: `smoke-test/${stamp}`,
     modeOverride: options?.modeOverride,
     channelOverride: options?.channelOverride
@@ -492,6 +188,8 @@ export async function sendSmokeEmail(options?: {
 }
 
 export async function sendAgentExampleEmail(options?: {
+  clinicId?: string | null;
+  timeZone?: string;
   modeOverride?: NotificationMode;
   recipients?: string[];
   subject?: string;
@@ -501,12 +199,13 @@ export async function sendAgentExampleEmail(options?: {
   period?: string;
   idempotencyKeyBase?: string;
 }) {
-  const { date, month } = localParts();
+  const clinicName = await clinicNameFor(options?.clinicId);
+  const { date, month } = localNotificationParts(options?.timeZone);
   const requestedRecipients = Array.from(
     new Set((options?.recipients ?? []).map((recipient) => recipient.trim()).filter(Boolean))
   );
-  const message = options?.message?.trim() || "This is an example email from the Central Veterinary Hospital agent.";
-  const subject = options?.subject?.trim() || "Central Veterinary Hospital agent email";
+  const message = options?.message?.trim() || `This is an example email from the ${clinicName} agent.`;
+  const subject = options?.subject?.trim() || `${clinicName} agent email`;
   const currentMode = options?.modeOverride ?? "test";
   const deliveryRecipients = currentMode === "test" ? [] : requestedRecipients;
   const cadence = options?.cadence ?? "once";
@@ -516,10 +215,12 @@ export async function sendAgentExampleEmail(options?: {
       ? `agent-example-email/monthly/${period}`
       : `agent-example-email/${randomUUID()}`);
   const results = await sendNotification({
+    clinicId: options?.clinicId,
+    clinicName,
     notificationType: "agent_example_email",
     subject,
-    html: agentExampleHtml(message, options?.actorName, date),
-    text: agentExampleText(message, options?.actorName, date),
+    html: agentExampleHtml(message, options?.actorName, date, clinicName),
+    text: agentExampleText(message, options?.actorName, date, clinicName),
     idempotencyKeyBase,
     modeOverride: currentMode,
     channelOverride: "email",

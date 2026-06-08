@@ -1,2 +1,0 @@
-veterinaryai70@gmail.com
-veterinaryai123

@@ -1,12 +1,13 @@
 import { listTasks } from "@central-vet/db";
 import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders } from "../../_shared";
+import { dbError, noStoreHeaders, resolveClinicFromRequest } from "../../_shared";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const tasks = await listTasks({ role: "veterinarian" });
+    const clinic = await resolveClinicFromRequest(request);
+    const tasks = await listTasks({ clinicId: clinic.clinicId, role: "veterinarian" });
 
     const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
     const toDateStr = (val: unknown) =>

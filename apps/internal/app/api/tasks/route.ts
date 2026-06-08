@@ -1,17 +1,9 @@
 import {
   archiveCompletedTasksBefore,
   createTask,
-  getSql,
-  listTasks,
-  type Actor,
-  type CreateTaskInput,
-  type TaskSource,
-  type TaskStatus
+  listTasks
 } from "@central-vet/db";
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { createStatusForActor, sourceForActor } from "../../lib/taskWorkflow";
 import {
   authenticateActor,
   authenticateActorFromQuery,
@@ -20,58 +12,16 @@ import {
   logInfo,
   logWarn,
   noStoreHeaders,
+  resolveClinicFromRequest,
   sanitizeTaskForActor
 } from "../_shared";
+import {
+  internalTaskCreateGuard,
+  taskCreateInputForActor,
+  taskCreateSchema
+} from "./_taskCreateRequest";
 
-const taskSchema = z.object({
-  status: z
-    .enum(["pending_review", "due", "pending", "completed", "invalid"])
-    .default("pending_review"),
-  clientName: z.string().trim().min(1).max(120),
-  clarityId: z.string().trim().max(120).optional().nullable(),
-  clientPhone: z.string().trim().min(7).max(80),
-  clientDateOfBirth: z.string().trim().optional().nullable(),
-  petName: z.string().trim().min(1).max(120),
-  petWeight: z.string().trim().max(80).optional().nullable(),
-  lastVisit: z.string().optional().nullable(),
-  request: z.string().trim().min(10).max(4000),
-  requestType: z
-    .enum(["prescription", "labs_xrays", "records_request", "scheduling", "patient_update"])
-    .default("labs_xrays"),
-  notes: z.string().trim().max(4000).optional().nullable(),
-  assignedTo: z.string().trim().max(120).optional().nullable(),
-  priority: z.enum(["low", "medium", "high"]).default("medium"),
-  dueDate: z.string().optional().nullable(),
-  dueTime: z.string().optional().nullable()
-});
-
-const staffCreateMaxPerHour = 15;
-const duplicateWindow = "2 minutes";
 const systemActor = { name: "System", role: "admin" as const };
-
-function hashValue(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function clientKey(request: Request, actor: Actor) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "local";
-  return hashValue(
-    [
-      "internal",
-      actor.role,
-      actor.name.toLowerCase().trim(),
-      ip,
-      request.headers.get("user-agent") || "unknown"
-    ].join("|")
-  );
-}
-
-function contentHash(value: unknown) {
-  return hashValue(JSON.stringify(value).toLowerCase().replace(/\s+/g, " ").trim());
-}
 
 function localDateString(
   timeZone = process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"
@@ -86,67 +36,11 @@ function localDateString(
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-async function internalCreateGuard(args: {
-  request: Request;
-  actor: Actor;
-  task: z.infer<typeof taskSchema>;
-}) {
-  const sql = getSql();
-  const clientHash = clientKey(args.request, args.actor);
-  const requestHash = contentHash({
-    actorRole: args.actor.role,
-    actorName: args.actor.name,
-    clientName: args.task.clientName,
-    clientPhone: args.task.clientPhone,
-    petName: args.task.petName,
-    requestType: args.task.requestType,
-    request: args.task.request,
-    dueDate: args.task.dueDate,
-    dueTime: args.task.dueTime
-  });
-  const rows = await sql<{ client_count: number; duplicate_count: number }[]>`
-    select
-      (
-        select count(*)::int
-        from request_guard_events
-        where client_key_hash = ${clientHash}
-          and status = 'internal_staff_created'
-          and created_at > now() - interval '1 hour'
-      ) as client_count,
-      (
-        select count(*)::int
-        from request_guard_events
-        where content_hash = ${requestHash}
-          and status like 'internal_%_created'
-          and created_at > now() - ${sql.unsafe(`interval '${duplicateWindow}'`)}
-      ) as duplicate_count
-  `;
-  const row = rows[0];
-  if (args.actor.role === "staff" && (row?.client_count ?? 0) >= staffCreateMaxPerHour) {
-    await sql`
-      insert into request_guard_events (client_key_hash, content_hash, status)
-      values (${clientHash}, ${requestHash}, 'internal_staff_rate_limited')
-    `;
-    return "Staff task limit reached. Ask an Admin or Veterinarian if this is urgent.";
-  }
-  if ((row?.duplicate_count ?? 0) > 0) {
-    await sql`
-      insert into request_guard_events (client_key_hash, content_hash, status)
-      values (${clientHash}, ${requestHash}, 'internal_staff_duplicate')
-    `;
-    return "That task already looks submitted.";
-  }
-  await sql`
-    insert into request_guard_events (client_key_hash, content_hash, status)
-    values (${clientHash}, ${requestHash}, ${`internal_${args.actor.role}_created`})
-  `;
-  return null;
-}
-
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const auth = await authenticateActorFromQuery(url, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActorFromQuery(url, request, clinic);
     if ("response" in auth) {
       logWarn("tasks_list_rejected", { reason: "invalid_actor" });
       return auth.response;
@@ -157,9 +51,14 @@ export async function GET(request: Request) {
     await archiveCompletedTasksBefore(
       localDateString(),
       systemActor,
-      process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"
+      clinic.timeZone || process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles",
+      { clinicId: clinic.clinicId }
     );
-    const tasks = await listTasks({ role: actor.role, includeArchived });
+    const tasks = await listTasks({
+      clinicId: clinic.clinicId,
+      role: actor.role,
+      includeArchived
+    });
     return NextResponse.json(
       {
         tasks: tasks.map((task) => sanitizeTaskForActor(task, actor.role))
@@ -175,14 +74,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const actorResult = actorSchema.safeParse(body.actor);
-    const taskResult = taskSchema.safeParse(body.task);
+    const taskResult = taskCreateSchema.safeParse(body.task);
+    const clinic = await resolveClinicFromRequest(request);
 
     if (!actorResult.success || !taskResult.success) {
       logWarn("task_create_rejected", { reason: "invalid_payload" });
       return NextResponse.json({ error: "Invalid task request." }, { status: 400 });
     }
 
-    const auth = await authenticateActor(actorResult.data, request);
+    const auth = await authenticateActor(actorResult.data, request, clinic);
     if ("response" in auth) {
       logWarn("task_create_rejected", {
         reason: "invalid_passcode",
@@ -195,22 +95,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Enter your real name." }, { status: 400 });
     }
 
-    const assignedTo = taskResult.data.assignedTo?.trim() || null;
-    const source: TaskSource = sourceForActor(actor.role);
-    const status: TaskStatus = createStatusForActor({
-      role: actor.role,
-      requestedStatus: taskResult.data.status,
-      assignedTo
+    const input = taskCreateInputForActor({
+      clinicId: clinic.clinicId,
+      hospitalName: clinic.name,
+      actor,
+      task: taskResult.data
     });
 
-    const input: CreateTaskInput = {
-      ...taskResult.data,
-      assignedTo,
-      source,
-      status
-    };
-
-    const guardError = await internalCreateGuard({
+    const guardError = await internalTaskCreateGuard({
+      clinicId: clinic.clinicId,
       request,
       actor,
       task: taskResult.data

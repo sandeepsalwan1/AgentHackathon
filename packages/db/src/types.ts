@@ -32,6 +32,7 @@ export type Actor = {
 
 export type Task = {
   id: string;
+  clinicId: string;
   hospitalName: string;
   status: TaskStatus;
   source: TaskSource;
@@ -80,6 +81,7 @@ export type TaskEvent = {
 };
 
 export type CreateTaskInput = {
+  clinicId?: string | null;
   status: TaskStatus;
   source: TaskSource;
   clientName?: string | null;

@@ -1,14 +1,18 @@
 import { getSql } from "./connection";
+import { resolveClinicId } from "./clinics";
 
 export async function createNotificationAttempt(args: {
+  clinicId?: string | null;
   notificationType: string;
   recipient: string;
   idempotencyKey: string;
   taskId?: string | null;
 }) {
   const sql = getSql();
+  const clinicId = await resolveClinicId(args.clinicId);
   const rows = await sql<{ id: string }[]>`
     insert into notification_events (
+      clinic_id,
       task_id,
       notification_type,
       recipient,
@@ -16,13 +20,14 @@ export async function createNotificationAttempt(args: {
       idempotency_key
     )
     values (
+      ${clinicId},
       ${args.taskId ?? null},
       ${args.notificationType},
       ${args.recipient},
       'pending',
       ${args.idempotencyKey}
     )
-    on conflict (idempotency_key) where idempotency_key is not null do nothing
+    on conflict (clinic_id, idempotency_key) where idempotency_key is not null do nothing
     returning id
   `;
   return rows[0]?.id ?? null;

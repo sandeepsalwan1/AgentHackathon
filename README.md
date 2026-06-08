@@ -12,6 +12,17 @@ One deployed Render app in an npm workspace monorepo, backed by Supabase Postgre
 - `packages/request-form`: shared public request form UI used by both request surfaces.
 - `packages/request-intake`: shared public request guard, validation, dedupe, and task creation.
 
+Docs:
+
+- `docs/README.md`: docs index.
+- `docs/implementation-notes.md`: current implementation and behavior notes.
+- `docs/agent-api-contracts.md`: public/internal agent route contracts.
+- `docs/two-agent-architecture-plan.md`: current two-agent architecture and capability backlog.
+- `docs/deployment.md`: Render, Supabase, Opsera, and smoke setup.
+- `docs/pims-integration.md`: PIMS/lab integration access plan.
+- `docs/oldplans/`: archived dated implementation plans.
+- `docs/proof/`: generated verification output; `npm run verify:agents` recreates it when needed.
+
 Local commands:
 
 - `npm install`

@@ -8,6 +8,7 @@ import {
   dbError,
   logInfo,
   logWarn,
+  resolveClinicFromRequest,
   sanitizeTaskForActor
 } from "../../../_shared";
 
@@ -27,7 +28,8 @@ export async function POST(
     }
 
     const { id } = await context.params;
-    const auth = await authenticateActor(body.data.actor, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(body.data.actor, request, clinic);
     if ("response" in auth) {
       logWarn("task_undo_rejected", {
         taskId: id,
@@ -46,7 +48,7 @@ export async function POST(
     }
     const actor = auth.actor;
 
-    const task = await undoLastStatusChange(id, actor);
+    const task = await undoLastStatusChange(id, actor, { clinicId: clinic.clinicId });
     if (task) {
       logInfo("task_updated", {
         taskId: id,

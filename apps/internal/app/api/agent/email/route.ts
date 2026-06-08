@@ -82,10 +82,12 @@ export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id") || randomUUID();
   const started = Date.now();
   let runId: string | null = null;
+  let clinicId: string | null = null;
 
   try {
     const auth = await requireManagerFromBody(request);
     if ("response" in auth) return auth.response;
+    clinicId = auth.clinic.clinicId;
 
     const parsed = emailBodySchema.safeParse(auth.body);
     if (!parsed.success) {
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
       }
     };
     const run = await createAgentRun({
+      clinicId,
       agent: "internal",
       intent: "email",
       mode,
@@ -123,6 +126,8 @@ export async function POST(request: Request) {
     runId = run.id;
 
     const sent = await sendAgentExampleEmail({
+      clinicId,
+      timeZone: auth.clinic.timeZone,
       modeOverride: mode,
       recipients,
       subject: parsed.data.subject,
@@ -135,6 +140,7 @@ export async function POST(request: Request) {
     const message = statusMessage(stats, mode);
     const durationMs = Date.now() - started;
     const toolCall = await createAgentToolCall({
+      clinicId,
       runId,
       traceId,
       sequence: 1,
@@ -153,6 +159,7 @@ export async function POST(request: Request) {
       durationMs
     });
     const event = await createWorkflowEvent({
+      clinicId,
       runId,
       workflowType: "email",
       eventType: "agent_email_checked",
@@ -169,6 +176,7 @@ export async function POST(request: Request) {
       }
     });
     await updateAgentRun(runId, {
+      clinicId,
       status: "completed",
       output: {
         ok: true,
@@ -216,12 +224,14 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Agent email workflow failed.";
     if (runId) {
       await failAgentRun(runId, {
+        clinicId,
         error: message,
         errorKind: error instanceof Error ? error.name : "agent_email_error",
         durationMs,
         toolCallCount: 0
       }).catch(() => null);
       await createWorkflowEvent({
+        clinicId,
         runId,
         workflowType: "email",
         eventType: "run_failed",

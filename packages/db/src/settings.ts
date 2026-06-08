@@ -1,4 +1,5 @@
 import { getSql } from "./connection";
+import { resolveClinicId } from "./clinics";
 import type { Actor } from "./types";
 
 export type RecipientProfile = {
@@ -42,6 +43,15 @@ const defaultProfiles: RecipientProfile[] = [
 ];
 
 const profileKeyPrefix = "recipient_profile:";
+const priorityAlertsKey = "priority_alerts_enabled";
+
+function scopedKey(clinicId: string, key: string) {
+  return `clinic:${clinicId}:${key}`;
+}
+
+function scopedProfileKeyPrefix(clinicId: string) {
+  return scopedKey(clinicId, profileKeyPrefix);
+}
 
 function cleanText(value: unknown) {
   if (typeof value !== "string") return "";
@@ -93,27 +103,49 @@ function profileKey(profileId: string) {
   return `${profileKeyPrefix}${profileId}`;
 }
 
-export async function isPriorityAlertsEnabled() {
+export async function isPriorityAlertsEnabled(options?: { clinicId?: string | null }) {
   const sql = getSql();
+  const clinicId = await resolveClinicId(options?.clinicId);
   const rows = await sql<{ value: string }[]>`
     select value
     from app_settings
-    where key = 'priority_alerts_enabled'
+    where key = ${scopedKey(clinicId, priorityAlertsKey)}
     limit 1
   `;
-  return rows[0]?.value === "true";
+  if (rows[0]) return rows[0].value === "true";
+  const fallback = await sql<{ value: string }[]>`
+    select value
+    from app_settings
+    where key = ${priorityAlertsKey}
+    limit 1
+  `;
+  return fallback[0]?.value === "true";
 }
 
-export async function listRecipientProfiles(options?: { includeInactive?: boolean }) {
+export async function listRecipientProfiles(options?: {
+  clinicId?: string | null;
+  includeInactive?: boolean;
+}) {
   const sql = getSql();
-  const rows = await sql<{ key: string; value: string }[]>`
+  const clinicId = await resolveClinicId(options?.clinicId);
+  const scopedPrefix = scopedProfileKeyPrefix(clinicId);
+  let rows = await sql<{ key: string; value: string }[]>`
     select key, value
     from app_settings
-    where key like ${`${profileKeyPrefix}%`}
+    where key like ${`${scopedPrefix}%`}
   `;
+  let keyPrefix = scopedPrefix;
+  if (rows.length === 0) {
+    rows = await sql<{ key: string; value: string }[]>`
+      select key, value
+      from app_settings
+      where key like ${`${profileKeyPrefix}%`}
+    `;
+    keyPrefix = profileKeyPrefix;
+  }
   const byId = new Map<string, unknown>();
   for (const row of rows) {
-    const profileId = row.key.replace(profileKeyPrefix, "");
+    const profileId = row.key.replace(keyPrefix, "");
     try {
       byId.set(profileId, JSON.parse(row.value));
     } catch {
@@ -140,24 +172,32 @@ export async function listRecipientProfiles(options?: { includeInactive?: boolea
     });
 }
 
-export async function getRecipientProfile(profileId: string) {
-  const profiles = await listRecipientProfiles();
+export async function getRecipientProfile(profileId: string, options?: { clinicId?: string | null }) {
+  const profiles = await listRecipientProfiles({ clinicId: options?.clinicId });
   return profiles.find((profile) => profile.profileId === profileId) ?? null;
 }
 
-export async function getRecipientProfileByPasscode(passcode: string | undefined) {
+export async function getRecipientProfileByPasscode(
+  passcode: string | undefined,
+  options?: { clinicId?: string | null }
+) {
   const clean = cleanText(passcode);
   if (!clean) return null;
-  const profiles = await listRecipientProfiles({ includeInactive: false });
+  const profiles = await listRecipientProfiles({
+    clinicId: options?.clinicId,
+    includeInactive: false
+  });
   return profiles.find((profile) => profile.passcode === clean) ?? null;
 }
 
 export async function setRecipientProfile(
   profile: RecipientProfile,
-  actor: Actor
+  actor: Actor,
+  options?: { clinicId?: string | null }
 ) {
+  const clinicId = await resolveClinicId(options?.clinicId);
   const existing =
-    (await getRecipientProfile(profile.profileId)) ??
+    (await getRecipientProfile(profile.profileId, { clinicId })) ??
     fallbackProfile(profile.profileId, profile);
 
   const normalized = normalizeProfile(profile, existing);
@@ -165,7 +205,7 @@ export async function setRecipientProfile(
   const value = JSON.stringify(normalized);
   await sql`
     insert into app_settings (key, value, updated_by_name, updated_at)
-    values (${profileKey(normalized.profileId)}, ${value}, ${actor.name}, now())
+    values (${scopedKey(clinicId, profileKey(normalized.profileId))}, ${value}, ${actor.name}, now())
     on conflict (key) do update
       set value = excluded.value,
           updated_by_name = excluded.updated_by_name,
@@ -174,8 +214,13 @@ export async function setRecipientProfile(
   return normalized;
 }
 
-export async function deactivateRecipientProfile(profileId: string, actor: Actor) {
-  const profile = await getRecipientProfile(profileId);
+export async function deactivateRecipientProfile(
+  profileId: string,
+  actor: Actor,
+  options?: { clinicId?: string | null }
+) {
+  const clinicId = await resolveClinicId(options?.clinicId);
+  const profile = await getRecipientProfile(profileId, { clinicId });
   if (!profile) throw new Error("Unknown recipient profile.");
   return setRecipientProfile({
     ...profile,
@@ -184,14 +229,19 @@ export async function deactivateRecipientProfile(profileId: string, actor: Actor
     smsOptIn: false,
     escalationOptIn: false,
     dailyPriorityOptIn: false
-  }, actor);
+  }, actor, { clinicId });
 }
 
-export async function setPriorityAlertsEnabled(enabled: boolean, actor: Actor) {
+export async function setPriorityAlertsEnabled(
+  enabled: boolean,
+  actor: Actor,
+  options?: { clinicId?: string | null }
+) {
   const sql = getSql();
+  const clinicId = await resolveClinicId(options?.clinicId);
   const rows = await sql<{ value: string }[]>`
     insert into app_settings (key, value, updated_by_name, updated_at)
-    values ('priority_alerts_enabled', ${enabled ? "true" : "false"}, ${actor.name}, now())
+    values (${scopedKey(clinicId, priorityAlertsKey)}, ${enabled ? "true" : "false"}, ${actor.name}, now())
     on conflict (key) do update
       set value = excluded.value,
           updated_by_name = excluded.updated_by_name,

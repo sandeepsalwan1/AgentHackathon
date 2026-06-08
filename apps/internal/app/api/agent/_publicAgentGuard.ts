@@ -95,7 +95,12 @@ function memoryRateLimited(key: string) {
   return false;
 }
 
-async function publicAgentGuard(request: Request, body: Record<string, unknown>, route: string) {
+async function publicAgentGuard(
+  request: Request,
+  body: Record<string, unknown>,
+  route: string,
+  clinicId: string
+) {
   const clientHash = publicClientKey(request, route);
   const requestHash = contentHash(route, body);
   if (memoryRateLimited(clientHash)) {
@@ -108,14 +113,16 @@ async function publicAgentGuard(request: Request, body: Record<string, unknown>,
       (
         select count(*)::int
         from request_guard_events
-        where client_key_hash = ${clientHash}
+        where clinic_id = ${clinicId}
+          and client_key_hash = ${clientHash}
           and status = 'public_agent_started'
           and created_at > now() - interval '1 hour'
       ) as client_count,
       (
         select count(*)::int
         from request_guard_events
-        where content_hash = ${requestHash}
+        where clinic_id = ${clinicId}
+          and content_hash = ${requestHash}
           and status = 'public_agent_started'
           and created_at > now() - interval '5 minutes'
       ) as duplicate_count
@@ -123,8 +130,9 @@ async function publicAgentGuard(request: Request, body: Record<string, unknown>,
   const row = rows[0];
   if ((row?.client_count ?? 0) >= publicAgentMaxPerHour || (row?.duplicate_count ?? 0) > 0) {
     await sql`
-      insert into request_guard_events (client_key_hash, content_hash, status)
+      insert into request_guard_events (clinic_id, client_key_hash, content_hash, status)
       values (
+        ${clinicId},
         ${clientHash},
         ${requestHash},
         ${(row?.duplicate_count ?? 0) > 0 ? "public_agent_duplicate" : "public_agent_rate_limited"}
@@ -137,13 +145,13 @@ async function publicAgentGuard(request: Request, body: Record<string, unknown>,
   }
 
   await sql`
-    insert into request_guard_events (client_key_hash, content_hash, status)
-    values (${clientHash}, ${requestHash}, 'public_agent_started')
+    insert into request_guard_events (clinic_id, client_key_hash, content_hash, status)
+    values (${clinicId}, ${clientHash}, ${requestHash}, 'public_agent_started')
   `;
   return null;
 }
 
-export async function readPublicAgentBody(request: Request, route: string) {
+export async function readPublicAgentBody(request: Request, route: string, clinicId: string) {
   const body = await request.json().catch(() => null);
   const parsed = publicAgentSchema.safeParse(body);
   if (!parsed.success) {
@@ -157,7 +165,7 @@ export async function readPublicAgentBody(request: Request, route: string) {
       response: NextResponse.json({ error: validationError }, { status: 400 })
     };
   }
-  const response = await publicAgentGuard(request, parsed.data, route);
+  const response = await publicAgentGuard(request, parsed.data, route, clinicId);
   if (response) return { response };
   return { body: parsed.data };
 }

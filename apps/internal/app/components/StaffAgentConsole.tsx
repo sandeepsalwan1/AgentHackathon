@@ -2,15 +2,10 @@
 
 import { Bot, ClipboardList, FileCheck2, Loader2, Mail, ReceiptText, Search, Stethoscope } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { AppRole } from "@central-vet/db";
 import { canManage } from "../lib/taskWorkflow";
-
-type Session = {
-  name: string;
-  role: AppRole;
-  passcode?: string;
-  profileId?: string | null;
-};
+import { useClinicBrand } from "./ClinicContext";
+import { readStoredTaskBoardSession } from "./taskBoardBrowserState";
+import type { TaskBoardSession as Session } from "./taskBoardTypes";
 
 type AgentResult = {
   message?: string;
@@ -33,7 +28,6 @@ type AgentResult = {
   };
 };
 
-const sessionKey = "central-vet-session";
 const quickActions = [
   { intent: "daily_ops", label: "Daily ops", icon: ClipboardList, endpoint: "/api/agent/daily-ops" },
   { intent: "pricing", label: "Pricing", icon: Search, endpoint: "/api/agent/pricing" },
@@ -49,15 +43,6 @@ const quickActions = [
   { intent: "sick_pet", label: "Sick pet", icon: Stethoscope, endpoint: "/api/agent/internal" }
 ] as const;
 
-function readSession() {
-  if (typeof window === "undefined") return null;
-  try {
-    return JSON.parse(window.localStorage.getItem(sessionKey) || "null") as Session | null;
-  } catch {
-    return null;
-  }
-}
-
 async function readJson(response: Response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Request failed.");
@@ -65,6 +50,7 @@ async function readJson(response: Response) {
 }
 
 export function StaffAgentConsole() {
+  const clinic = useClinicBrand();
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState("Summarize what front desk should do next.");
   const [loading, setLoading] = useState("");
@@ -73,7 +59,7 @@ export function StaffAgentConsole() {
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setSession(readSession());
+      setSession(readStoredTaskBoardSession());
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
@@ -147,7 +133,7 @@ export function StaffAgentConsole() {
         <div className="staffToolHeader">
           <Bot size={28} />
           <div>
-            <p>Central Veterinary Hospital</p>
+            <p>{clinic.name}</p>
             <h1>Internal Agent</h1>
           </div>
         </div>

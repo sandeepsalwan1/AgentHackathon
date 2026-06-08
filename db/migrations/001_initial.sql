@@ -75,6 +75,3 @@ create table if not exists notification_events (
 create index if not exists idx_tasks_status_due_date on tasks(status, due_date);
 create index if not exists idx_tasks_archived_at on tasks(archived_at);
 create index if not exists idx_task_events_task_created on task_events(task_id, created_at desc);
-create unique index if not exists idx_notification_events_idempotency_key
-  on notification_events(idempotency_key)
-  where idempotency_key is not null;

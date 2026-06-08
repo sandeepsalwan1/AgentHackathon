@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { actorSchema, authenticateActor, dbError, logWarn, noStoreHeaders } from "../_shared";
+import {
+  actorSchema,
+  authenticateActor,
+  dbError,
+  logWarn,
+  noStoreHeaders,
+  resolveClinicFromRequest
+} from "../_shared";
 
 export async function POST(request: Request) {
   try {
@@ -10,13 +17,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid role or passcode." }, { status: 403 });
     }
 
-    const auth = await authenticateActor(parsed.data, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(parsed.data, request, clinic);
     if ("response" in auth) {
       logWarn("auth_rejected", { reason: "invalid_passcode", actorRole: parsed.data.role });
       return auth.response;
     }
 
-    return NextResponse.json({ actor: auth.actor }, { headers: noStoreHeaders });
+    return NextResponse.json({ actor: auth.actor, clinic }, { headers: noStoreHeaders });
   } catch (error) {
     return dbError(error, { route: "auth.validate" });
   }

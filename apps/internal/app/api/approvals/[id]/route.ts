@@ -1,7 +1,14 @@
 import { decideApproval } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { actorSchema, authenticateActor, canManage, dbError, noStoreHeaders } from "../../_shared";
+import {
+  actorSchema,
+  authenticateActor,
+  canManage,
+  dbError,
+  noStoreHeaders,
+  resolveClinicFromRequest
+} from "../../_shared";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +28,15 @@ export async function PATCH(
     if (!actorResult.success || !decisionResult.success) {
       return NextResponse.json({ error: "Invalid approval decision." }, { status: 400 });
     }
-    const auth = await authenticateActor(actorResult.data, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(actorResult.data, request, clinic);
     if ("response" in auth) return auth.response;
     if (!canManage(auth.actor.role)) {
       return NextResponse.json({ error: "Manager access required." }, { status: 403 });
     }
     const { id } = await context.params;
     const approval = await decideApproval(id, {
+      clinicId: clinic.clinicId,
       status: decisionResult.data.status,
       actor: auth.actor,
       note: decisionResult.data.note

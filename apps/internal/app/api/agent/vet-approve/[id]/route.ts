@@ -1,7 +1,7 @@
 import { decideApproval } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { dbError, noStoreHeaders } from "../../../_shared";
+import { dbError, noStoreHeaders, resolveClinicFromRequest } from "../../../_shared";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid decision. Provide status: 'approved' | 'rejected'." }, { status: 400 });
     }
     const { id } = await context.params;
+    const clinic = await resolveClinicFromRequest(request);
     const approval = await decideApproval(id, {
+      clinicId: clinic.clinicId,
       status: parsed.data.status,
       actor: systemActor,
       note: parsed.data.note,

@@ -14,6 +14,7 @@ import {
   type Actor,
   type AgentReport,
   type Approval,
+  type ClinicContext,
   type Task,
   type WorkflowEvent
 } from "@central-vet/db";
@@ -45,9 +46,10 @@ function replaceDraftIds(value: unknown, ids: Map<string, string>): unknown {
   );
 }
 
-async function persistTask(draft: AgentTaskDraft, actor: Actor) {
+async function persistTask(draft: AgentTaskDraft, actor: Actor, clinic: ClinicContext) {
   return createTask({
-    hospitalName: process.env.HOSPITAL_NAME || "Central Veterinary Hospital",
+    clinicId: clinic.clinicId,
+    hospitalName: clinic.name,
     source: "admin",
     status: draft.status,
     priority: draft.priority,
@@ -66,7 +68,8 @@ export async function persistAgentEffects(
   runId: string,
   traceId: string,
   result: AgentWorkflowResult,
-  actor: Actor
+  actor: Actor,
+  clinic: ClinicContext
 ): Promise<PersistedAgentEffects> {
   const draftIds = new Map<string, string>();
   const seen = new Set<string>();
@@ -78,7 +81,7 @@ export async function persistAgentEffects(
   for (const effect of result.effects.filter((effect) => "kind" in effect && effect.kind === "task") as AgentTaskDraft[]) {
     if (seen.has(effect.id)) continue;
     seen.add(effect.id);
-    const persisted = await persistTask(effect, actor);
+    const persisted = await persistTask(effect, actor, clinic);
     draftIds.set(effect.id, persisted.id);
     if (result.task?.id === effect.id || !task) task = persisted;
   }
@@ -87,6 +90,7 @@ export async function persistAgentEffects(
     if (seen.has(effect.id)) continue;
     seen.add(effect.id);
     const persisted = await createApproval({
+      clinicId: clinic.clinicId,
       runId,
       taskId: effect.taskId ? draftIds.get(effect.taskId) ?? effect.taskId : null,
       approvalType: effect.approvalType,
@@ -102,6 +106,7 @@ export async function persistAgentEffects(
     if (seen.has(effect.id)) continue;
     seen.add(effect.id);
     const persisted = await createAgentReport({
+      clinicId: clinic.clinicId,
       runId,
       taskId: effect.taskId ? draftIds.get(effect.taskId) ?? effect.taskId : null,
       reportType: effect.reportType,
@@ -117,6 +122,7 @@ export async function persistAgentEffects(
     if (seen.has(effect.id)) continue;
     seen.add(effect.id);
     workflowEvents.push(await createWorkflowEvent({
+      clinicId: clinic.clinicId,
       runId,
       workflowType: effect.workflowType,
       eventType: effect.eventType,
@@ -128,6 +134,7 @@ export async function persistAgentEffects(
 
   for (const [sequence, toolCall] of result.toolCalls.entries()) {
     await createAgentToolCall({
+      clinicId: clinic.clinicId,
       runId,
       traceId,
       sequence: sequence + 1,
@@ -140,6 +147,6 @@ export async function persistAgentEffects(
     });
   }
 
-  const mutationEvents = await persistOperationalMutations(runId, traceId, result.toolCalls);
+  const mutationEvents = await persistOperationalMutations(runId, traceId, result.toolCalls, clinic.clinicId);
   return { task, approval, report, workflowEvents: [...workflowEvents, ...mutationEvents] };
 }

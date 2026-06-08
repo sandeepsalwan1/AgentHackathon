@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { logout, type AccountSession } from "../../lib/accountStore";
 import { sendVetMessage, type ChatHistoryItem } from "../../lib/agentClient";
 import { ChatPanel, type ChatMessage } from "../ChatPanel";
+import { useClinicBrand } from "../ClinicContext";
 import { CreateVetPanel } from "./CreateVetPanel";
 
 type Props = {
@@ -112,6 +113,7 @@ function TaskItem({ task }: { task: TaskRow }) {
 }
 
 export function AdminDashboard({ session, onLogout, onOpenBoard }: Props) {
+  const clinic = useClinicBrand();
   const [tab, setTab] = useState<Tab>("tasks");
 
   // Tasks tab state
@@ -259,7 +261,7 @@ export function AdminDashboard({ session, onLogout, onOpenBoard }: Props) {
         <div className="vetHeaderLeft">
           <ShieldMark />
           <div>
-            <p className="vetHeaderEyebrow">Central Veterinary Hospital</p>
+            <p className="vetHeaderEyebrow">{clinic.name}</p>
             <h1 className="vetHeaderTitle">{session.name}</h1>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbError } from "../../_shared";
+import { dbError, resolveClinicFromRequest } from "../../_shared";
 import { requireManagerFromBody } from "../_auth";
 import { readPublicAgentBody } from "../_publicAgentGuard";
 import { executeVetAgentWorkflow, getAgentWorkflowRoute } from "../_runner";
@@ -15,6 +15,7 @@ export async function POST(
   if (!route) return NextResponse.json({ error: "Agent workflow not found." }, { status: 404 });
 
   try {
+    const clinic = await resolveClinicFromRequest(request);
     if (route.auth === "manager") {
       const auth = await requireManagerFromBody(request);
       if ("response" in auth) return auth.response;
@@ -23,16 +24,18 @@ export async function POST(
         routeIntent: route.routeIntent,
         input: auth.body,
         actor: auth.actor,
+        clinic,
         request
       });
     }
 
-    const parsed = await readPublicAgentBody(request, route.routeIntent);
+    const parsed = await readPublicAgentBody(request, route.routeIntent, clinic.clinicId);
     if ("response" in parsed) return parsed.response;
     return executeVetAgentWorkflow({
       agent: route.agent,
       routeIntent: route.routeIntent,
       input: parsed.body,
+      clinic,
       request
     });
   } catch (error) {

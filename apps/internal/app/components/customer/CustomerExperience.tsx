@@ -16,6 +16,7 @@ import { useCallback, useState } from "react";
 import { sendCustomerMessage, type ChatHistoryItem, type CustomerContext } from "../../lib/agentClient";
 import { logout, type AccountSession } from "../../lib/accountStore";
 import { ChatPanel, type ChatMessage } from "../ChatPanel";
+import { useClinicBrand } from "../ClinicContext";
 
 type Props = {
   session: AccountSession;
@@ -38,6 +39,7 @@ const QUICK_ACTIONS = [
 ] as const;
 
 export function CustomerExperience({ session, onLogout }: Props) {
+  const clinic = useClinicBrand();
   const firstName = session.name.split(" ")[0];
   const petName = session.petName ?? "your pet";
 
@@ -123,7 +125,7 @@ export function CustomerExperience({ session, onLogout }: Props) {
       <header className="customerHeader">
         <div className="customerHeaderBrand">
           <PawPrint size={20} strokeWidth={2} />
-          <span className="customerHeaderName">Central Vet</span>
+          <span className="customerHeaderName">{clinic.shortName}</span>
         </div>
         <div className="customerHeaderUser">
           <div className="customerHeaderUserInfo">

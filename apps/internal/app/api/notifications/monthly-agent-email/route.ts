@@ -1,6 +1,6 @@
 import { sendAgentExampleEmail, type NotificationMode } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
-import { dbError, logInfo, logWarn } from "../../_shared";
+import { dbError, logInfo, logWarn, resolveClinicFromRequest } from "../../_shared";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,7 @@ async function handler(request: Request) {
     }
 
     const url = new URL(request.url);
+    const clinic = await resolveClinicFromRequest(request);
     const mode = notificationMode(
       url.searchParams.get("mode") ||
       process.env.MONTHLY_AGENT_EMAIL_MODE ||
@@ -43,11 +44,13 @@ async function handler(request: Request) {
     }
 
     const result = await sendAgentExampleEmail({
+      clinicId: clinic.clinicId,
+      timeZone: clinic.timeZone,
       modeOverride: mode,
       cadence: "monthly",
       period,
       recipients: envList(process.env.MONTHLY_AGENT_EMAIL_RECIPIENTS),
-      subject: process.env.MONTHLY_AGENT_EMAIL_SUBJECT || "Central Veterinary Hospital monthly agent email",
+      subject: process.env.MONTHLY_AGENT_EMAIL_SUBJECT || `${clinic.name} monthly agent email`,
       message: process.env.MONTHLY_AGENT_EMAIL_MESSAGE ||
         "This is the monthly VetAgent email path check."
     });

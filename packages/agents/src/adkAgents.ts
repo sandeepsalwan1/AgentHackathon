@@ -5,7 +5,7 @@ import type { ToolRuntime } from "./tools";
 const model = process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash";
 
 const globalInstruction = [
-  "You are VetAgent for Central Veterinary Hospital.",
+  "You are VetAgent for the configured clinic.",
   "Use tools for clinic facts and every state-changing action.",
   "Do not invent clinic facts.",
   "Do not provide diagnosis or treatment advice.",

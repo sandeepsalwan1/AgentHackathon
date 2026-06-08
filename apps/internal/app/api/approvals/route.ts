@@ -7,7 +7,8 @@ import {
   authenticateActorFromQuery,
   canManage,
   dbError,
-  noStoreHeaders
+  noStoreHeaders,
+  resolveClinicFromRequest
 } from "../_shared";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +25,14 @@ const approvalSchema = z.object({
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const auth = await authenticateActorFromQuery(url, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActorFromQuery(url, request, clinic);
     if ("response" in auth) return auth.response;
     if (!canManage(auth.actor.role)) {
       return NextResponse.json({ error: "Manager access required." }, { status: 403 });
     }
     const status = url.searchParams.get("status") || "pending";
-    const approvals = await listApprovals({ status });
+    const approvals = await listApprovals({ clinicId: clinic.clinicId, status });
     return NextResponse.json({ ok: true, approvals }, { headers: noStoreHeaders });
   } catch (error) {
     return dbError(error, { route: "approvals.list" });
@@ -44,7 +46,8 @@ export async function POST(request: Request) {
     if (!actorResult.success) {
       return NextResponse.json({ error: "Actor credentials are required." }, { status: 403 });
     }
-    const auth = await authenticateActor(actorResult.data, request);
+    const clinic = await resolveClinicFromRequest(request);
+    const auth = await authenticateActor(actorResult.data, request, clinic);
     if ("response" in auth) return auth.response;
     if (!canManage(auth.actor.role)) {
       return NextResponse.json({ error: "Manager access required." }, { status: 403 });
@@ -53,7 +56,10 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid approval request." }, { status: 400 });
     }
-    const approval = await createApproval(parsed.data);
+    const approval = await createApproval({
+      ...parsed.data,
+      clinicId: clinic.clinicId
+    });
     return NextResponse.json({ ok: true, approval }, { headers: noStoreHeaders, status: 201 });
   } catch (error) {
     return dbError(error, { route: "approvals.create" });

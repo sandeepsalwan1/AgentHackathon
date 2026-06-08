@@ -1,10 +1,10 @@
 "use client";
 
 import type { RecipientProfile } from "@central-vet/db";
-import { UserX } from "lucide-react";
+import { Settings, UserPlus, UserX } from "lucide-react";
 import { useState } from "react";
 
-export const blankVeterinarianProfile: RecipientProfile = {
+const blankVeterinarianProfile: RecipientProfile = {
   profileId: "",
   displayName: "Dr. ",
   email: "",
@@ -17,6 +17,109 @@ export const blankVeterinarianProfile: RecipientProfile = {
   dailyPriorityOptIn: false
 };
 
+type NotificationSettingsMenuProps = {
+  open: boolean;
+  saving: boolean;
+  priorityAlertsEnabled: boolean;
+  recipientProfiles: RecipientProfile[];
+  canEditAllProfiles: boolean;
+  currentProfileId: string | null;
+  addingProfile: boolean;
+  onToggleOpen: () => void;
+  onTogglePriorityAlerts: () => void;
+  onSaveProfile: (profile: RecipientProfile) => void;
+  onDeactivateProfile: (profile: RecipientProfile) => void;
+  onAddProfile: () => void;
+};
+
+export function NotificationSettingsMenu({
+  open,
+  saving,
+  priorityAlertsEnabled,
+  recipientProfiles,
+  canEditAllProfiles,
+  currentProfileId,
+  addingProfile,
+  onToggleOpen,
+  onTogglePriorityAlerts,
+  onSaveProfile,
+  onDeactivateProfile,
+  onAddProfile
+}: NotificationSettingsMenuProps) {
+  const activeProfiles = recipientProfiles.filter((profile) => profile.active);
+
+  return (
+    <div className="settingsMenu">
+      <button
+        type="button"
+        className="plainButton compact"
+        onClick={onToggleOpen}
+      >
+        <Settings size={16} />
+        Settings
+      </button>
+      {open ? (
+        <div className="settingsPanel">
+          {canEditAllProfiles ? (
+            <label className="toggleLine strongToggle">
+              <input
+                type="checkbox"
+                checked={priorityAlertsEnabled}
+                disabled={saving}
+                onChange={() => void onTogglePriorityAlerts()}
+              />
+              End-of-day alert
+            </label>
+          ) : null}
+          <p className="settingsHelp">
+            Sends once daily when any medium or high priority task is still open or overdue.
+          </p>
+          <div className="settingsDivider" />
+          <div className="settingsTitle">
+            <strong>Veterinarian notifications</strong>
+            <span>
+              Choose delivery channels and alert types separately. Escalated tasks appear for veterinarians and Admin.
+            </span>
+          </div>
+          {activeProfiles.map((profile) => (
+            <ProfileSettings
+              key={`${profile.profileId}:${profile.displayName}:${profile.email}:${profile.phone}:${profile.passcode}:${profile.active}:${profile.emailOptIn}:${profile.smsOptIn}:${profile.escalationOptIn}:${profile.dailyPriorityOptIn}`}
+              profile={profile}
+              saving={saving}
+              canEditAll={canEditAllProfiles}
+              currentProfileId={currentProfileId}
+              onChange={onSaveProfile}
+              onDeactivate={onDeactivateProfile}
+            />
+          ))}
+          {addingProfile ? (
+            <ProfileSettings
+              profile={blankVeterinarianProfile}
+              saving={saving}
+              canEditAll={canEditAllProfiles}
+              currentProfileId={currentProfileId}
+              onChange={onSaveProfile}
+              onDeactivate={onDeactivateProfile}
+              isNew
+            />
+          ) : null}
+          {canEditAllProfiles ? (
+            <button
+              type="button"
+              className="plainButton compact"
+              disabled={saving}
+              onClick={onAddProfile}
+            >
+              <UserPlus size={16} />
+              Add veterinarian
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type ProfileSettingsProps = {
   profile: RecipientProfile;
   saving: boolean;
@@ -27,7 +130,7 @@ type ProfileSettingsProps = {
   isNew?: boolean;
 };
 
-export function ProfileSettings({
+function ProfileSettings({
   profile,
   saving,
   canEditAll,
