@@ -1,5 +1,5 @@
-import { TaskBoard } from "../components/TaskBoard";
+import { AppRoot } from "../components/AppRoot";
 
 export default function StaffPage() {
-  return <TaskBoard />;
+  return <AppRoot audience="staff" />;
 }

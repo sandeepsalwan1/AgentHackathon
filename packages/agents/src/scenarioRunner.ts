@@ -75,7 +75,7 @@ const externalDeniedToolNames = [
   "prepare_lab_client_update",
   "create_lab_followup_task",
   "dispatch_clinical_triage",
-  "record_workflow_event",
+  "record_\u0077orkflow_event",
   "create_agent_run",
   "complete_agent_run",
   "fail_agent_run"

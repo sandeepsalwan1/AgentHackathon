@@ -222,6 +222,31 @@ export async function redeemOtp(
   return updated;
 }
 
+export async function requestPasswordReset(email: string): Promise<{ email: string; otp: string }> {
+  seedDemoAccounts();
+  const accounts = loadAccounts();
+  const idx = accounts.findIndex((a) => a.email === email.toLowerCase().trim());
+  if (idx === -1) throw new Error("No account found with this email.");
+  const otp = generateOtp();
+  const updated: Account = {
+    ...accounts[idx],
+    mustResetPassword: true,
+    otp,
+  };
+  const next = [...accounts];
+  next[idx] = updated;
+  persistAccounts(next);
+  return { email: updated.email, otp };
+}
+
+export async function resetPasswordWithOtp(
+  email: string,
+  otp: string,
+  newPassword: string
+): Promise<Account> {
+  return redeemOtp(email, otp, newPassword);
+}
+
 export function getSession(): AccountSession | null {
   if (typeof window === "undefined") return null;
   try {

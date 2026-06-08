@@ -1,10 +1,12 @@
 "use client";
 
-import { LogIn, UserPlus } from "lucide-react";
+import { KeyRound, LogIn, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import {
   getDemoAccounts,
   login,
+  requestPasswordReset,
+  resetPasswordWithOtp,
   saveSession,
   signupCustomer,
   type AccountSession
@@ -17,8 +19,12 @@ type CustomerAuthProps = {
 };
 
 export function CustomerLogin({ onAuth, onSwitch }: CustomerAuthProps) {
+  const [view, setView] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [issuedOtp, setIssuedOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const demoCustomer = getDemoAccounts().find((account) => account.role === "customer")!;
@@ -36,6 +42,91 @@ export function CustomerLogin({ onAuth, onSwitch }: CustomerAuthProps) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function startReset() {
+    if (loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const reset = await requestPasswordReset(email);
+      setIssuedOtp(reset.otp);
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Password reset failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitReset(event: FormEvent) {
+    event.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const account = await resetPasswordWithOtp(email, otp, newPassword);
+      onAuth(saveSession(account));
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Password reset failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (view === "forgot") {
+    return (
+      <form className="authForm" onSubmit={submitReset}>
+        <h2 className="authFormTitle">Reset password</h2>
+        <p className="authFormSubtitle">Use the code sent to your email or phone</p>
+        <label className="authLabel">
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setIssuedOtp("");
+            }}
+            placeholder="you@example.com"
+            autoFocus
+            required
+          />
+        </label>
+        <button className="authGhostBtn" type="button" onClick={startReset} disabled={loading || !email.trim()}>
+          <KeyRound size={16} />
+          {loading ? "Sending..." : "Send code"}
+        </button>
+        {issuedOtp ? (
+          <div className="authDemoHint">
+            <span className="authDemoLabel">Mock code:</span>
+            <code>{issuedOtp}</code>
+          </div>
+        ) : null}
+        <label className="authLabel">
+          Code
+          <input
+            value={otp}
+            onChange={(event) => setOtp(event.target.value.toUpperCase())}
+            placeholder="A1B2C3D4"
+            style={{ fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}
+            required
+          />
+        </label>
+        <label className="authLabel">
+          New password
+          <AuthPasswordInput value={newPassword} onChange={setNewPassword} name="new-password" />
+        </label>
+        {error && <div className="authError">{error}</div>}
+        <button className="authPrimaryBtn" type="submit" disabled={loading || !issuedOtp}>
+          {loading ? "Resetting..." : "Reset and sign in"}
+        </button>
+        <p className="authSwitch">
+          <button type="button" onClick={() => { setView("login"); setError(""); }}>
+            Back to sign in
+          </button>
+        </p>
+      </form>
+    );
   }
 
   return (
@@ -66,6 +157,11 @@ export function CustomerLogin({ onAuth, onSwitch }: CustomerAuthProps) {
         <LogIn size={16} />
         {loading ? "Signing in..." : "Sign in"}
       </button>
+      <p className="authSwitch">
+        <button type="button" onClick={() => { setView("forgot"); setError(""); }}>
+          Forgot password?
+        </button>
+      </p>
       <p className="authSwitch">
         Don&apos;t have an account?{" "}
         <button type="button" onClick={onSwitch}>

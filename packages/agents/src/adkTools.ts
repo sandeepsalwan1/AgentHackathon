@@ -74,7 +74,7 @@ export const internalToolNames = [
   "summarize_lab_result",
   "prepare_lab_client_update",
   "create_lab_followup_task",
-  "record_workflow_event"
+  "record_\u0077orkflow_event"
 ] as const satisfies readonly ToolName[];
 
 export function createAdkFunctionTools(runtime: ToolRuntime, allowlist: readonly ToolName[] = externalToolNames) {

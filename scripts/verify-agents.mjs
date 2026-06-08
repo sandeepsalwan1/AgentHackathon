@@ -103,12 +103,18 @@ async function duplicateAudits() {
     ok: noRouteRuns.status === 1,
     detail: noRouteRuns.status === 1 ? "none" : (noRouteRuns.stdout || noRouteRuns.stderr).trim()
   });
+  const allowedPersistenceFiles = [
+    "apps/internal/app/api/agent/_runner.ts:",
+    "apps/internal/app/api/agent/_effectPersistence.ts:"
+  ];
   for (const fn of ["createTask(", "createApproval(", "createAgentReport("]) {
     const result = await grep(["-R", fn, "apps/internal/app/api/agent"]);
     const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
     audits.push({
-      label: `${fn} only in runner`,
-      ok: result.status === 0 && lines.length > 0 && lines.every((line) => line.startsWith("apps/internal/app/api/agent/_runner.ts:")),
+      label: `${fn} only in runner/persistence`,
+      ok: result.status === 0 && lines.length > 0 && lines.every((line) =>
+        allowedPersistenceFiles.some((prefix) => line.startsWith(prefix))
+      ),
       detail: lines.length ? lines.join(" | ") : (result.stderr || "no matches").trim()
     });
   }

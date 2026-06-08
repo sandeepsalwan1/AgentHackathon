@@ -257,7 +257,6 @@ export function PublicAgentFlow({
         <a href="/records">Records</a>
         <a href="/followup">Follow-up</a>
         <a href="/request">Request</a>
-        <a href="/staff">Staff</a>
       </nav>
     </main>
   );

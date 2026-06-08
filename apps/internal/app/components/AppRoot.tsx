@@ -3,42 +3,83 @@
 import { useEffect, useState } from "react";
 import { getSession, logout, type AccountSession } from "../lib/accountStore";
 import { AdminDashboard } from "./admin/AdminDashboard";
-import { AuthScreen } from "./auth/AuthScreen";
+import { AuthScreen, type Audience } from "./auth/AuthScreen";
 import { ClinicProvider, useClinicBrand } from "./ClinicContext";
 import { CustomerExperience } from "./customer/CustomerExperience";
 import { TaskBoard } from "./TaskBoard";
+import {
+  clearStoredTaskBoardSession,
+  writeStoredTaskBoardSession
+} from "./taskBoardBrowserState";
 
-// One app, clear surfaces:
-// - pet owners get the chat portal
-// - staff, VAs, and vets share the clinic task board (the simple, proven work queue)
-// - admins get the tabbed dashboard: tasks, AI assistant, and team accounts
+// Two doors, one app:
+// - "/"      → pet owners (the chat portal)
+// - "/staff" → the clinic team (task board for staff/vets, dashboard for admins)
+// Each door only signs in its own audience; a session for the other door is
+// bounced to where it belongs so the two surfaces never blur together.
 type View =
   | { kind: "loading" }
   | { kind: "auth" }
+  | { kind: "redirecting" }
   | { kind: "board" } // staff / VA / veterinarian on the shared task board
   | { kind: "customer"; session: AccountSession }
   | { kind: "admin"; session: AccountSession };
 
+const HOME_PATH = "/";
+const STAFF_PATH = "/staff";
+
+function audienceForRole(role: AccountSession["role"]): Audience {
+  return role === "customer" ? "customer" : "staff";
+}
+
+// A staff/vet/admin account drives the task board through the legacy passcode
+// session it shares with the API. Mirror the account into that session so the
+// team never has to sign in twice.
+function bridgeToBoardSession(session: AccountSession) {
+  if (session.role === "customer") return;
+  const role = session.role === "veterinarian" ? "veterinarian" : session.role;
+  writeStoredTaskBoardSession({
+    name: session.name,
+    role,
+    passcode: session.passcode,
+    profileId: null
+  });
+}
+
 function viewForSession(session: AccountSession): View {
   if (session.role === "customer") return { kind: "customer", session };
   if (session.role === "admin") return { kind: "admin", session };
-  // staff, VA, and veterinarian all work from the shared task board
+  bridgeToBoardSession(session);
   return { kind: "board" };
 }
 
-function AppRootContent() {
+function AppRootContent({ audience }: { audience: Audience }) {
   const [view, setView] = useState<View>({ kind: "loading" });
   const clinic = useClinicBrand();
 
   useEffect(() => {
     const id = window.setTimeout(() => {
       const session = getSession();
-      setView(session ? viewForSession(session) : { kind: "auth" });
+      if (!session) {
+        setView({ kind: "auth" });
+        return;
+      }
+      if (audienceForRole(session.role) !== audience) {
+        setView({ kind: "redirecting" });
+        window.location.replace(audience === "customer" ? STAFF_PATH : HOME_PATH);
+        return;
+      }
+      setView(viewForSession(session));
     }, 0);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [audience]);
 
   function handleAuth(session: AccountSession) {
+    if (audienceForRole(session.role) !== audience) {
+      setView({ kind: "redirecting" });
+      window.location.replace(audienceForRole(session.role) === "customer" ? HOME_PATH : STAFF_PATH);
+      return;
+    }
     setView(viewForSession(session));
   }
 
@@ -48,15 +89,16 @@ function AppRootContent() {
 
   function handleLogout() {
     logout();
+    clearStoredTaskBoardSession();
     setView({ kind: "auth" });
   }
 
-  if (view.kind === "loading") {
+  if (view.kind === "loading" || view.kind === "redirecting") {
     return (
       <main className="entryShell">
         <section className="entryPanel bootPanel">
           <p className="eyebrow">{clinic.name}</p>
-          <h1>Opening…</h1>
+          <h1>{view.kind === "redirecting" ? "Taking you there…" : "Opening…"}</h1>
           <div className="bootBar" aria-hidden="true" />
         </section>
       </main>
@@ -64,7 +106,7 @@ function AppRootContent() {
   }
 
   if (view.kind === "auth") {
-    return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
+    return <AuthScreen audience={audience} onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
   }
 
   if (view.kind === "board") {
@@ -85,14 +127,14 @@ function AppRootContent() {
     );
   }
 
-  logout();
-  return <AuthScreen onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
+  handleLogout();
+  return <AuthScreen audience={audience} onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
 }
 
-export function AppRoot() {
+export function AppRoot({ audience = "customer" }: { audience?: Audience }) {
   return (
     <ClinicProvider>
-      <AppRootContent />
+      <AppRootContent audience={audience} />
     </ClinicProvider>
   );
 }

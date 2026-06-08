@@ -36,9 +36,7 @@ export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
     setError("");
     try {
       const account = await login(email, password);
-      if (account.role === "customer") {
-        throw new Error("Use the Pet Owner tab to sign in.");
-      }
+      // Pet-owner accounts are bounced to the owner door by the router.
       onAuth(saveSession(account));
     } catch (loginError) {
       const message = loginError instanceof Error ? loginError.message : "Login failed.";
@@ -107,8 +105,8 @@ export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
 
   return (
     <form className="authForm" onSubmit={submitLogin}>
-      <h2 className="authFormTitle">Clinic portal</h2>
-      <p className="authFormSubtitle">Staff, vets, and admins</p>
+      <h2 className="authFormTitle">Welcome back</h2>
+      <p className="authFormSubtitle">Sign in to your clinic account</p>
       <div className="authDemoHint">
         <span className="authDemoLabel">Demo admin:</span>
         <code>{demo.email}</code> / <code>{demo.password}</code>
@@ -149,7 +147,7 @@ export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
       </p>
       <div className="authDivider" />
       <button type="button" className="authGhostBtn" onClick={onLegacyStaff}>
-        Open the clinic task board
+        Use a clinic passcode instead
       </button>
     </form>
   );

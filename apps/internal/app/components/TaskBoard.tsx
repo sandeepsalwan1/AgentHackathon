@@ -16,6 +16,7 @@ import {
   isOpenPriorityTask
 } from "../lib/taskWorkflow";
 import { TaskActivityPanel, TaskLaneGrid } from "./TaskBoardPanels";
+import { ArrivalDeskPanel } from "./ArrivalDeskPanel";
 import { useClinicBrand } from "./ClinicContext";
 import { TaskForm, type TaskFormState } from "./TaskForm";
 import { BootScreen, EntryScreen, MiniConfetti, SessionNameTag } from "./TaskBoardChrome";
@@ -344,6 +345,12 @@ export function TaskBoard() {
       </section>
 
       {error ? <div className="alertLine">{error}</div> : null}
+
+      <ArrivalDeskPanel
+        session={session}
+        actorQuery={actorQuery}
+        onError={setError}
+      />
 
       <TaskLaneGrid
         tasks={tasks}

@@ -319,6 +319,365 @@ button {
   text-decoration: none;
 }
 
+.arrivalShell {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(320px, 1fr);
+  gap: 22px;
+  padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background:
+    linear-gradient(90deg, rgba(29, 95, 145, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(22, 131, 74, 0.04) 1px, transparent 1px),
+    #f7faf7;
+  background-size: 28px 28px;
+}
+
+.arrivalHero,
+.arrivalCard {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.arrivalHero {
+  min-height: calc(100vh - 36px);
+  min-height: calc(100svh - 36px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(22px, 5vw, 44px);
+  background:
+    linear-gradient(145deg, rgba(29, 95, 145, 0.1), transparent 44%),
+    linear-gradient(20deg, rgba(255, 231, 163, 0.5), transparent 36%),
+    #ffffff;
+}
+
+.arrivalBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.arrivalHeroText p {
+  margin: 0 0 10px;
+  color: var(--green-strong);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.arrivalHeroText h1 {
+  max-width: 560px;
+  margin: 0;
+  color: #10243a;
+  font-size: clamp(38px, 7vw, 76px);
+  line-height: 0.94;
+  letter-spacing: 0;
+}
+
+.arrivalStepRail {
+  display: grid;
+  gap: 8px;
+}
+
+.arrivalStepRail span {
+  border-left: 5px solid var(--line);
+  padding: 10px 12px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.arrivalStepRail span.active {
+  border-left-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.arrivalStepRail span.done {
+  border-left-color: var(--green-strong);
+  color: var(--green-strong);
+}
+
+.arrivalCard {
+  align-self: center;
+  padding: clamp(18px, 4vw, 34px);
+}
+
+.arrivalForm {
+  display: grid;
+  gap: 16px;
+}
+
+.arrivalCardHeader,
+.arrivalMiniHeader,
+.arrivalRoomTop,
+.arrivalListTop,
+.arrivalDoneMeta,
+.arrivalSignin,
+.arrivalLockedBox {
+  display: flex;
+  align-items: center;
+}
+
+.arrivalCardHeader {
+  gap: 12px;
+  border-left: 6px solid var(--green-strong);
+  padding-left: 14px;
+}
+
+.arrivalCardHeader h2,
+.arrivalCardHeader p,
+.arrivalDone h2,
+.arrivalDone p,
+.arrivalRoomCard p,
+.arrivalListItem p {
+  margin: 0;
+}
+
+.arrivalCardHeader h2 {
+  font-size: 24px;
+}
+
+.arrivalCardHeader p,
+.arrivalRoomCard p,
+.arrivalListItem p,
+.arrivalDone p {
+  color: var(--muted);
+}
+
+.arrivalSignin,
+.arrivalLockedBox {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  gap: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--blue);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.arrivalLockedBox {
+  background: var(--green);
+  color: #164a2d;
+}
+
+.arrivalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.arrivalGrid label:last-child {
+  grid-column: 1 / -1;
+}
+
+.arrivalForm label,
+.arrivalSettingsPanel label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.arrivalForm input,
+.arrivalForm textarea,
+.arrivalSettingsPanel input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  outline: none;
+  padding: 12px 13px;
+}
+
+.arrivalForm input:disabled {
+  background: #edf2ef;
+  color: #40514b;
+}
+
+.arrivalForm textarea {
+  resize: vertical;
+}
+
+.arrivalForm input:focus,
+.arrivalForm textarea:focus,
+.arrivalSettingsPanel input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.15);
+}
+
+.arrivalPrimary {
+  min-height: 50px;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--blue);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.arrivalPrimary:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.arrivalReasonPicker,
+.arrivalChecklist {
+  min-width: 0;
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.arrivalReasonPicker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.arrivalReasonPicker legend,
+.arrivalChecklist legend {
+  grid-column: 1 / -1;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.arrivalReasonPicker button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.arrivalReasonPicker button.selected {
+  border-color: var(--green-strong);
+  background: var(--green);
+  color: #164a2d;
+}
+
+.arrivalQuestionBlock {
+  display: grid;
+  gap: 14px;
+}
+
+.arrivalChecklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.arrivalChecklist label {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.arrivalDone {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 30px 12px;
+  text-align: center;
+}
+
+.arrivalDoneIcon {
+  width: 76px;
+  height: 76px;
+  border: 1px solid #9dcfad;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--green);
+  color: #0d5f35;
+}
+
+.arrivalException .arrivalDoneIcon {
+  border-color: #e6c36c;
+  background: var(--amber);
+  color: #6b4d00;
+}
+
+.arrivalDone h2 {
+  max-width: 520px;
+  font-size: clamp(24px, 4vw, 36px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.arrivalDoneMeta {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.arrivalDoneMeta span {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+@media (max-width: 980px) {
+  .arrivalShell {
+    grid-template-columns: 1fr;
+  }
+
+  .arrivalHero {
+    min-height: auto;
+    gap: 26px;
+  }
+
+  .arrivalStepRail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .arrivalGrid,
+  .arrivalReasonPicker {
+    grid-template-columns: 1fr;
+  }
+
+  .arrivalStepRail {
+    grid-template-columns: 1fr;
+  }
+}
+
 .requestTypePicker {
   border: 0;
   padding: 0;
@@ -419,6 +778,28 @@ button {
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.staffAgentControls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.staffAgentControls label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.staffAgentControls .toggleLine {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
 }
 
 .staffAgentPrompt {
@@ -605,6 +986,275 @@ h3 {
   margin: 18px 0;
   padding: 12px;
   border-radius: 8px;
+}
+
+.arrivalDeskPanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(251, 252, 251, 0.92);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.arrivalDeskHeader,
+.arrivalMiniHeader,
+.arrivalRoomTop,
+.arrivalListTop,
+.arrivalListActions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.arrivalDeskHeader {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.arrivalDeskHeader h2,
+.arrivalMiniHeader h3,
+.arrivalRoomTop strong,
+.arrivalListTop strong {
+  margin: 0;
+}
+
+.arrivalRoomGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.arrivalRoomCard {
+  min-height: 174px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  align-content: space-between;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.arrivalRoomCard.room-open {
+  border-color: #9dcfad;
+  background: #f5fff8;
+}
+
+.arrivalRoomCard.room-occupied {
+  border-color: #9fbfe0;
+  background: #f5faff;
+}
+
+.arrivalRoomCard.room-cleaning {
+  border-color: #e2c35f;
+  background: #fffaf0;
+}
+
+.arrivalRoomCard.room-closed {
+  border-color: #e9aaa5;
+  background: #fff8f7;
+}
+
+.arrivalRoomTop {
+  gap: 9px;
+}
+
+.arrivalRoomTop svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.arrivalRoomTop div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.arrivalRoomTop span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.arrivalRoomCard p,
+.arrivalListItem p {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.arrivalRoomActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.arrivalRoomActions button,
+.arrivalListActions button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.arrivalRoomActions button.selected {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.arrivalOpsGrid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 420px);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.arrivalListPanel,
+.arrivalSettingsPanel {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.arrivalSettingsPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.arrivalMiniHeader {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.arrivalMiniHeader span {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: auto;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.arrivalList {
+  display: grid;
+  gap: 8px;
+  max-height: 440px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.arrivalListItem {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.arrivalListItem.arrival-exception {
+  border-color: #e2c35f;
+  background: #fffaf0;
+}
+
+.arrivalListTop {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arrivalListTop div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.arrivalListTop span,
+.arrivalListTop em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.arrivalListTop em {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--paper);
+}
+
+.arrivalListActions {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.arrivalListActions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.arrivalListActions button {
+  padding: 0 10px;
+}
+
+.arrivalToggleLine {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 0 10px;
+  color: var(--ink) !important;
+  background: var(--green);
+}
+
+.arrivalToggleLine input {
+  width: auto;
+}
+
+@media (max-width: 1280px) {
+  .arrivalRoomGrid {
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .arrivalOpsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .arrivalDeskHeader,
+  .arrivalListTop {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .arrivalRoomGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .arrivalRoomCard {
+    min-height: 156px;
+  }
 }
 
 .settingsMenu {
@@ -2044,45 +2694,24 @@ textarea:focus {
   overflow: hidden;
 }
 
-.authFormFooter {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-}
-
-/* Tabs: segmented control */
-.authTabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 6px;
-  margin: 16px 16px 0;
-  background: #eef2ee;
-  border-radius: 12px;
-}
-
-.authTab {
-  padding: 10px 12px;
-  font-size: 13.5px;
+/* Cross-door link: send the other audience to its own sign-in */
+.authCrossLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
-}
-
-.authTab:hover:not(.authTab--active) {
-  color: var(--auth-green-deep);
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.authTab--active {
   color: var(--auth-green);
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 51, 39, 0.1), 0 2px 6px rgba(15, 51, 39, 0.06);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  transition: gap 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.authCrossLink:hover {
+  gap: 9px;
+  color: var(--auth-green-deep);
+  background: rgba(15, 51, 39, 0.05);
 }
 
 /* Form content */

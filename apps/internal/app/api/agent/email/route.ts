@@ -285,7 +285,7 @@ export async function POST(request: Request) {
         outputSummary: message,
         toolCallCount: 1
       });
-      logInfo("agent_email_blocked", { mode, cadence, blockers });
+      logInfo("agent_email_blocked", { mode, cadence, blockers: blockers.join(", ") });
 
       return NextResponse.json(
         {

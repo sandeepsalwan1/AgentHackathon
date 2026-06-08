@@ -11,11 +11,22 @@ type AgentResult = {
   message?: string;
   mode?: string;
   intent?: string;
+  capability?: string;
   runId?: string;
   task?: { id: string };
   approval?: { id: string };
   report?: { id: string; title?: string; summary?: string };
+  decision?: { kind?: string; status?: string; ttl?: string };
+  confirmation?: {
+    cadence?: string;
+    audience?: string;
+    recipientCount?: number;
+    templateReviewed?: boolean;
+    postAppointmentDelayDays?: number | null;
+  };
   result?: {
+    blocked?: boolean;
+    blockers?: string[];
     from?: string;
     subject?: string;
     results?: Array<{
@@ -56,6 +67,11 @@ export function StaffAgentConsole() {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<AgentResult | null>(null);
+  const [emailMode, setEmailMode] = useState<"disabled" | "test" | "production">("disabled");
+  const [emailCadence, setEmailCadence] = useState<"once" | "monthly" | "post_appointment">("monthly");
+  const [templateReviewed, setTemplateReviewed] = useState(false);
+  const [productionConfirmed, setProductionConfirmed] = useState(false);
+  const [postAppointmentDelayDays, setPostAppointmentDelayDays] = useState(7);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -78,6 +94,15 @@ export function StaffAgentConsole() {
   async function run(endpoint: string, intent?: string, promptOverride?: string) {
     if (!actor) return;
     const requestMessage = promptOverride ?? message;
+    const emailPayload = intent === "email"
+      ? {
+          mode: emailMode,
+          cadence: emailCadence,
+          templateReviewed,
+          confirmed: productionConfirmed,
+          postAppointmentDelayDays
+        }
+      : {};
     setLoading(intent || "freeform");
     setError("");
     setResult(null);
@@ -87,7 +112,7 @@ export function StaffAgentConsole() {
           await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message: requestMessage })
+            body: JSON.stringify({ actor, ...(intent ? { intent } : {}), message: requestMessage, ...emailPayload })
           })
         )
       );
@@ -154,6 +179,52 @@ export function StaffAgentConsole() {
             );
           })}
         </div>
+        <div className="staffAgentControls">
+          <label>
+            Email mode
+            <select value={emailMode} onChange={(event) => setEmailMode(event.target.value as typeof emailMode)}>
+              <option value="disabled">disabled</option>
+              <option value="test">test</option>
+              <option value="production">production</option>
+            </select>
+          </label>
+          <label>
+            Cadence
+            <select value={emailCadence} onChange={(event) => setEmailCadence(event.target.value as typeof emailCadence)}>
+              <option value="once">once</option>
+              <option value="monthly">monthly</option>
+              <option value="post_appointment">post-appointment</option>
+            </select>
+          </label>
+          {emailCadence === "post_appointment" ? (
+            <label>
+              Delay days
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={postAppointmentDelayDays}
+                onChange={(event) => setPostAppointmentDelayDays(Number(event.target.value) || 7)}
+              />
+            </label>
+          ) : null}
+          <label className="toggleLine">
+            <input
+              type="checkbox"
+              checked={templateReviewed}
+              onChange={(event) => setTemplateReviewed(event.target.checked)}
+            />
+            Template reviewed
+          </label>
+          <label className="toggleLine">
+            <input
+              type="checkbox"
+              checked={productionConfirmed}
+              onChange={(event) => setProductionConfirmed(event.target.checked)}
+            />
+            Production confirmed
+          </label>
+        </div>
         <form className="staffAgentPrompt" onSubmit={submit}>
           <label>
             Agent request
@@ -194,6 +265,24 @@ export function StaffAgentConsole() {
                     <dd>{result.report.id}</dd>
                   </div>
                 ) : null}
+                {result.capability ? (
+                  <div>
+                    <dt>capability</dt>
+                    <dd>{result.capability}</dd>
+                  </div>
+                ) : null}
+                {result.decision?.status ? (
+                  <div>
+                    <dt>decision</dt>
+                    <dd>{result.decision.status}</dd>
+                  </div>
+                ) : null}
+                {result.confirmation?.cadence ? (
+                  <div>
+                    <dt>cadence</dt>
+                    <dd>{result.confirmation.cadence}</dd>
+                  </div>
+                ) : null}
                 {result.intent === "email" && result.result?.from ? (
                   <div>
                     <dt>from</dt>
@@ -201,6 +290,16 @@ export function StaffAgentConsole() {
                   </div>
                 ) : null}
               </dl>
+              {result.result?.blockers?.length ? (
+                <div className="agentEmailResults">
+                  {result.result.blockers.map((blocker) => (
+                    <div key={blocker}>
+                      <span>{blocker}</span>
+                      <strong>blocked</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {emailResults.length > 0 ? (
                 <div className="agentEmailResults">
                   {emailResults.map((item) => (
