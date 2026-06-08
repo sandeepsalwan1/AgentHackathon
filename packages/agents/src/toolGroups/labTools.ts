@@ -1,22 +1,20 @@
 import { z } from "zod";
-import type { MockClinicData, MockLabOrder } from "../contracts";
+import type { MockLabOrder } from "../contracts";
 import {
   clientFor,
   defineTool,
-  looseMatch,
   petFor,
   recordEvent,
   type ToolRuntime
 } from "../toolCore";
 
-function firstLabOrder(data: MockClinicData, args: { clientId?: string; petId?: string; status?: string; patientName?: string }) {
-  return (data.labOrders ?? []).find((order) => {
-    if (args.clientId && order.clientId !== args.clientId) return false;
-    if (args.petId && order.petId !== args.petId) return false;
-    if (args.status && order.status !== args.status) return false;
-    if (args.patientName && !looseMatch(order.patientName, args.patientName)) return false;
-    return true;
-  }) ?? null;
+async function firstLabOrder(runtime: ToolRuntime, args: { clientId?: string; petId?: string; status?: string; patientName?: string }) {
+  const orders = await runtime.adapters.labs.findOrders(args);
+  return orders[0] ?? null;
+}
+
+async function labOrderById(runtime: ToolRuntime, labOrderId: string) {
+  return (await runtime.adapters.labs.findOrders({})).find((item) => item.id === labOrderId) ?? null;
 }
 
 function prepareLabClientUpdate(order: MockLabOrder | null, runtime: ToolRuntime) {
@@ -56,9 +54,7 @@ export const labTools = {
       active: z.boolean().optional()
     }),
     execute: async (args, runtime) => {
-      const catalog = (runtime.data.labCatalog ?? []).filter((item) =>
-        typeof args.active === "boolean" ? item.active === args.active : true
-      );
+      const catalog = await runtime.adapters.labs.listCatalog(args);
       return { labVendor: "antech_mock", catalog };
     }
   }),
@@ -71,13 +67,7 @@ export const labTools = {
       status: z.enum(["ordered", "in_progress", "partial", "final", "cancelled"]).optional()
     }),
     execute: async (args, runtime) => {
-      const orders = (runtime.data.labOrders ?? []).filter((order) => {
-        if (args.clientId && order.clientId !== args.clientId) return false;
-        if (args.petId && order.petId !== args.petId) return false;
-        if (args.patientName && !looseMatch(order.patientName, args.patientName)) return false;
-        if (args.status && order.status !== args.status) return false;
-        return true;
-      });
+      const orders = await runtime.adapters.labs.findOrders(args);
       return { labVendor: "antech_mock", orders };
     }
   }),
@@ -88,13 +78,7 @@ export const labTools = {
       externalOrderId: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const result = (runtime.data.labResults ?? []).find((item) =>
-        (args.labOrderId && item.labOrderId === args.labOrderId) ||
-        (args.externalOrderId && item.externalOrderId === args.externalOrderId)
-      ) ?? null;
-      const order = result
-        ? (runtime.data.labOrders ?? []).find((item) => item.id === result.labOrderId) ?? null
-        : null;
+      const { order, result } = await runtime.adapters.labs.getResult(args);
       return { labVendor: "antech_mock", order, result };
     }
   }),
@@ -105,13 +89,9 @@ export const labTools = {
       externalOrderId: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const result = (runtime.data.labResults ?? []).find((item) =>
-        (args.labOrderId && item.labOrderId === args.labOrderId) ||
-        (args.externalOrderId && item.externalOrderId === args.externalOrderId)
-      ) ?? null;
-      const order = result
-        ? (runtime.data.labOrders ?? []).find((item) => item.id === result.labOrderId) ?? null
-        : firstLabOrder(runtime.data, { status: "final" });
+      const match = await runtime.adapters.labs.getResult(args);
+      const result = match.result;
+      const order = match.order ?? await firstLabOrder(runtime, { status: "final" });
       const summary = result
         ? {
             labVendor: result.labVendor,
@@ -142,7 +122,7 @@ export const labTools = {
       reason: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const order = (runtime.data.labOrders ?? []).find((item) => item.id === args.labOrderId) ?? null;
+      const order = await labOrderById(runtime, args.labOrderId);
       return { ...prepareLabClientUpdate(order, runtime), medicalAdviceGiven: false };
     }
   }),
@@ -153,7 +133,7 @@ export const labTools = {
       reason: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const order = (runtime.data.labOrders ?? []).find((item) => item.id === args.labOrderId) ?? null;
+      const order = await labOrderById(runtime, args.labOrderId);
       return { ...prepareLabClientUpdate(order, runtime), task: null, medicalAdviceGiven: false };
     }
   })

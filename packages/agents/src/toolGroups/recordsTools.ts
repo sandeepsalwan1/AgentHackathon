@@ -1,21 +1,5 @@
 import { z } from "zod";
-import { defineTool, id, recordEvent } from "../toolCore";
-
-function recordsTransfer(args: {
-  clientName?: string | null;
-  petName?: string | null;
-  destination?: string | null;
-}, sentAt: string) {
-  return {
-    status: args.destination?.trim() ? "sent" : "blocked",
-    delivery: "secure_portal_mock",
-    clientName: args.clientName ?? null,
-    petName: args.petName ?? null,
-    destination: args.destination ?? null,
-    confirmationId: id("records-transfer", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.destination ?? "destination"}`),
-    sentAt: args.destination?.trim() ? sentAt : null
-  };
-}
+import { defineTool, recordEvent } from "../toolCore";
 
 export const recordsTools = {
   request_records_transfer: defineTool({
@@ -26,7 +10,7 @@ export const recordsTools = {
       destination: z.string().optional().nullable()
     }),
     execute: async (args, runtime) => {
-      const transfer = recordsTransfer(args, runtime.now.toISOString());
+      const transfer = await runtime.adapters.records.completeTransfer(args);
       recordEvent(runtime, {
         eventType: "records_transfer_sent",
         title: "Records transfer sent",
@@ -46,19 +30,7 @@ export const recordsTools = {
       destination: z.string().optional().nullable()
     }),
     execute: async (args, runtime) => {
-      const missingDestination = !args.destination?.trim();
-      const audit = {
-        status: missingDestination ? "blocked" : "passed",
-        source: "local_records_policy",
-        reason: missingDestination
-          ? "Destination is missing; transfer is blocked until a destination is provided."
-          : "Client identity and destination fields passed demo transfer policy.",
-        checkedAt: runtime.now.toISOString(),
-        requiresApproval: false,
-        clientName: args.clientName ?? null,
-        petName: args.petName ?? null,
-        destination: args.destination ?? null
-      };
+      const audit = await runtime.adapters.records.auditTransfer(args);
       recordEvent(runtime, {
         eventType: "records_audit_passed",
         title: "Records transfer audited locally",
@@ -75,15 +47,7 @@ export const recordsTools = {
       petName: z.string().optional().nullable(),
       destination: z.string().optional().nullable()
     }),
-    execute: async (args) => ({
-      packet: {
-        clientName: args.clientName ?? null,
-        petName: args.petName ?? null,
-        destination: args.destination ?? null,
-        requiresApproval: false,
-        attachments: ["vaccine-summary.pdf", "visit-notes.pdf"]
-      }
-    })
+    execute: async (args, runtime) => ({ packet: await runtime.adapters.records.preparePacket(args) })
   }),
   complete_records_transfer: defineTool({
     description: "Submit a secure mock records transfer after the local audit passes.",
@@ -94,7 +58,7 @@ export const recordsTools = {
       request: z.string().optional().nullable()
     }),
     execute: async (args, runtime) => {
-      const transfer = recordsTransfer(args, runtime.now.toISOString());
+      const transfer = await runtime.adapters.records.completeTransfer(args);
       recordEvent(runtime, {
         eventType: "records_transfer_sent",
         title: "Records transfer sent",

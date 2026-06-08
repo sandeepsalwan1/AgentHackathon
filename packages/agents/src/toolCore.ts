@@ -13,10 +13,12 @@ import type {
   TaskRequestType,
   WorkflowEventDraft
 } from "./contracts";
+import { createMockClinicAdapters, type VetAgentAdapters } from "./adapters";
 import { mockClinicData } from "./mockData";
 
 export type ToolRuntime = {
   data: MockClinicData;
+  adapters: VetAgentAdapters;
   now: Date;
   input: AgentInput;
   workflowType: AgentIntent;
@@ -231,9 +233,12 @@ export function createToolRuntime(input: AgentInput, workflowType: AgentIntent, 
   clinicData?: MockClinicData;
   now?: Date;
 } = {}): ToolRuntime {
+  const data = options.clinicData ?? mockClinicData;
+  const now = options.now ?? new Date("2026-05-31T12:00:00.000Z");
   return {
-    data: options.clinicData ?? mockClinicData,
-    now: options.now ?? new Date("2026-05-31T12:00:00.000Z"),
+    data,
+    adapters: createMockClinicAdapters({ data, now }),
+    now,
     input,
     workflowType,
     effects: [],

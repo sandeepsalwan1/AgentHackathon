@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  defineTool,
-  firstClient,
-  firstPet,
-  isTodayOrLiteralToday,
-  looseMatch
-} from "../toolCore";
+import { defineTool } from "../toolCore";
 
 export const clinicLookupTools = {
   lookup_client: defineTool({
@@ -15,10 +9,7 @@ export const clinicLookupTools = {
       phone: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const clients = runtime.data.clients.filter((client) => {
-        if (!args.clientName && !args.phone) return true;
-        return client === firstClient(runtime.data, args.clientName, args.phone);
-      });
+      const clients = await runtime.adapters.clients.findClients(args);
       return { clients };
     }
   }),
@@ -29,9 +20,7 @@ export const clinicLookupTools = {
       petName: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const pets = runtime.data.pets.filter((pet) =>
-        pet.clientId === args.clientId && (!args.petName || looseMatch(pet.name, args.petName))
-      );
+      const pets = await runtime.adapters.pets.findPets(args);
       return { pets };
     }
   }),
@@ -44,13 +33,7 @@ export const clinicLookupTools = {
       date: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const appointments = runtime.data.appointments.filter((appointment) => {
-        if (args.clientId && appointment.clientId !== args.clientId) return false;
-        if (args.petId && appointment.petId !== args.petId) return false;
-        if (args.status && appointment.status !== args.status) return false;
-        if (args.date && appointment.appointmentDate !== args.date && !(args.date === "today" && isTodayOrLiteralToday(appointment.appointmentDate, runtime))) return false;
-        return true;
-      });
+      const appointments = await runtime.adapters.appointments.findAppointments(args);
       return { appointments };
     }
   }),
@@ -60,9 +43,7 @@ export const clinicLookupTools = {
       appointmentType: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const slots = runtime.data.slots.filter((slot) =>
-        slot.available && (!args.appointmentType || looseMatch(slot.appointmentType, args.appointmentType))
-      );
+      const slots = await runtime.adapters.appointments.listSlots(args);
       return { slots };
     }
   }),
@@ -74,17 +55,7 @@ export const clinicLookupTools = {
       petName: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const client = firstClient(runtime.data, args.clientName, args.clientPhone);
-      const pet = client ? firstPet(runtime.data, client.id, args.petName) : null;
-      const appointment = pet
-        ? runtime.data.appointments.find((candidate) =>
-            candidate.petId === pet.id &&
-            candidate.clientId === pet.clientId &&
-            isTodayOrLiteralToday(candidate.appointmentDate, runtime) &&
-            (candidate.status === "scheduled" || candidate.status === "arrived")
-          ) ?? null
-        : null;
-      return { client, pet, appointment };
+      return runtime.adapters.appointments.matchArrival(args);
     }
   }),
   get_wait_status: defineTool({
@@ -94,19 +65,8 @@ export const clinicLookupTools = {
       petId: z.string().optional()
     }),
     execute: async (args, runtime) => {
-      const appointment = runtime.data.appointments.find((candidate) =>
-        (args.appointmentId && candidate.id === args.appointmentId) ||
-        (args.petId && candidate.petId === args.petId)
-      ) ?? null;
       return {
-        waitStatus: appointment
-          ? {
-              appointmentId: appointment.id,
-              waitMinutes: appointment.waitMinutes,
-              queuePosition: appointment.waitMinutes > 0 ? 2 : 0,
-              roomStatus: appointment.roomStatus
-            }
-          : null
+        waitStatus: await runtime.adapters.appointments.getWaitStatus(args)
       };
     }
   })

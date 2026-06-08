@@ -1,10 +1,7 @@
 import { z } from "zod";
-import type { MockAppointment } from "../contracts";
 import {
-  clientFor,
   defineTool,
   id,
-  petFor,
   recordEvent,
   type ToolRuntime
 } from "../toolCore";
@@ -15,47 +12,22 @@ async function createBookingHold(args: {
   petId: string;
   reason?: string;
 }, runtime: ToolRuntime) {
-  const slot = runtime.data.slots.find((candidate) => candidate.id === args.slotId && candidate.available) ?? null;
-  const client = clientFor(runtime.data, args.clientId);
-  const pet = petFor(runtime.data, args.petId);
-  if (!slot || !client || !pet) return { booked: false, action: "booking_not_completed", slot, client, pet };
-  slot.available = false;
-  const appointment: MockAppointment = {
-    id: id("appointment", `${slot.id}-${pet.id}`),
-    clientId: client.id,
-    petId: pet.id,
-    appointmentDate: slot.slotDate,
-    appointmentTime: slot.slotTime,
-    appointmentType: slot.appointmentType,
-    doctor: slot.doctor,
-    status: "scheduled",
-    waitMinutes: 0,
-    roomStatus: "waiting",
-    notes: args.reason ?? "Booked by VetAgent."
-  };
-  runtime.data.appointments.push(appointment);
-  recordEvent(runtime, {
-    eventType: "appointment_booked",
-    title: "Appointment booked",
-    detail: `${pet.name} booked for ${slot.appointmentType} on ${slot.slotDate} at ${slot.slotTime}.`,
-    metadata: {
-      slotId: slot.id,
-      appointmentId: appointment.id,
-      clientId: client.id,
-      petId: pet.id,
-      action: "appointment_booked"
-    }
-  });
-  return {
-    booked: true,
-    action: "appointment_booked",
-    confirmationId: appointment.id,
-    appointment,
-    slot: { ...slot, available: false },
-    client,
-    pet,
-    task: null
-  };
+  const result = await runtime.adapters.appointments.createBookingHold(args);
+  if (result.booked && result.appointment && result.slot && result.client && result.pet) {
+    recordEvent(runtime, {
+      eventType: "appointment_booked",
+      title: "Appointment booked",
+      detail: `${result.pet.name} booked for ${result.slot.appointmentType} on ${result.slot.slotDate} at ${result.slot.slotTime}.`,
+      metadata: {
+        slotId: result.slot.id,
+        appointmentId: result.appointment.id,
+        clientId: result.client.id,
+        petId: result.pet.id,
+        action: "appointment_booked"
+      }
+    });
+  }
+  return result;
 }
 
 export const clinicBookingTools = {

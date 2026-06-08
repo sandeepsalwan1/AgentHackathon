@@ -122,7 +122,7 @@ export const pricingTools = {
   list_service_catalog: defineTool({
     description: "List service catalog prices for pricing review.",
     parameters: z.object({}),
-    execute: async (_args, runtime) => ({ services: runtime.data.services })
+    execute: async (_args, runtime) => ({ services: await runtime.adapters.pricing.listServices() })
   }),
   run_competitor_scan: defineTool({
     description: "Read sample or Apify-normalized competitor pricing observations.",
@@ -131,9 +131,10 @@ export const pricingTools = {
     }),
     execute: async (args, runtime) => {
       if (args.source === "apify") {
-        const live = await fetchApifyPricing(runtime.data.services);
+        const services = await runtime.adapters.pricing.listServices();
+        const live = await fetchApifyPricing(services);
         if (live?.length) {
-          runtime.data.pricingObservations = live;
+          await runtime.adapters.pricing.replaceObservations(live);
           recordEvent(runtime, {
             eventType: "apify_scan",
             title: "Apify pricing scan completed",
@@ -143,7 +144,7 @@ export const pricingTools = {
           return { mode: "apify", observations: live };
         }
         const fallback = samplePricing(runtime.data);
-        runtime.data.pricingObservations = fallback;
+        await runtime.adapters.pricing.replaceObservations(fallback);
         recordEvent(runtime, {
           eventType: "apify_fallback",
           title: "Apify pricing fallback used",
@@ -152,19 +153,22 @@ export const pricingTools = {
         });
         return { mode: "mock", observations: fallback };
       }
-      const observations = args.source
-        ? runtime.data.pricingObservations.filter((item) => item.source === args.source)
-        : runtime.data.pricingObservations;
-      runtime.data.pricingObservations = observations.length ? observations : samplePricing(runtime.data);
-      return { mode: "mock", observations: runtime.data.pricingObservations };
+      const observations = await runtime.adapters.pricing.listObservations({ source: args.source });
+      const selected = observations.length ? observations : samplePricing(runtime.data);
+      await runtime.adapters.pricing.replaceObservations(selected);
+      return { mode: "mock", observations: selected };
     }
   }),
   compare_service_prices: defineTool({
     description: "Compare service catalog to competitor pricing observations.",
     parameters: z.object({}),
-    execute: async (_args, runtime) => ({
-      comparisons: comparePrices(runtime.data.services, runtime.data.pricingObservations)
-    })
+    execute: async (_args, runtime) => {
+      const [services, observations] = await Promise.all([
+        runtime.adapters.pricing.listServices(),
+        runtime.adapters.pricing.listObservations()
+      ]);
+      return { comparisons: comparePrices(services, observations) };
+    }
   }),
   create_price_review_report: defineTool({
     description: "Create a pricing report without changing prices or creating a review task.",

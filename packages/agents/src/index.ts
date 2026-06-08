@@ -1,4 +1,5 @@
 export * from "./contracts";
+export * from "./adapters";
 export * from "./capabilityRouting";
 export * from "./mockData";
 export * from "./externalAgent";

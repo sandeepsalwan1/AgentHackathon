@@ -1,25 +1,15 @@
 import { z } from "zod";
-import type { MockClinicData } from "../contracts";
 import {
   addEffect,
-  clientFor,
   defineTool,
   firstClient,
   firstPet,
   makeReport,
-  petFor,
   recordEvent
 } from "../toolCore";
 
-function invoiceContext(data: MockClinicData, invoiceId: string) {
-  const invoice = data.invoices.find((candidate) => candidate.id === invoiceId) ?? null;
-  const client = invoice ? clientFor(data, invoice.clientId) : null;
-  const pet = invoice ? petFor(data, invoice.petId) : null;
-  return { invoice, client, pet };
-}
-
-function createInvoiceReview(invoiceId: string, issueDetails: string, runtime: Parameters<typeof recordEvent>[0]) {
-  const { invoice, client, pet } = invoiceContext(runtime.data, invoiceId);
+async function createInvoiceReview(invoiceId: string, issueDetails: string, runtime: Parameters<typeof recordEvent>[0]) {
+  const { invoice, client, pet } = await runtime.adapters.invoices.getInvoiceContext(invoiceId);
   const report = addEffect(runtime, makeReport({
     reportType: "invoice",
     title: "Invoice review",
@@ -46,9 +36,10 @@ export const billingTools = {
     execute: async (args, runtime) => {
       const client = firstClient(runtime.data, args.clientName);
       const pet = client ? firstPet(runtime.data, client.id, args.petName) : null;
-      const invoices = runtime.data.invoices.filter((invoice) =>
-        (!client || invoice.clientId === client.id) && (!pet || invoice.petId === pet.id)
-      );
+      const invoices = await runtime.adapters.invoices.findInvoices({
+        clientId: client?.id ?? null,
+        petId: pet?.id ?? null
+      });
       return { client, pet, invoices };
     }
   }),
