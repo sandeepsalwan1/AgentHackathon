@@ -124,6 +124,14 @@ function reasonKey(reason: string) {
   return "routine";
 }
 
+function railState(step: Step, target: number) {
+  if (step === "exception") return target === 0 ? "active" : "";
+  const index = step === "identity" ? 0 : step === "questions" ? 1 : 2;
+  if (target < index) return "done";
+  if (target === index) return step === "done" ? "done" : "active";
+  return "";
+}
+
 function publicSettings(data: { settings?: ArrivalSettings }): ArrivalSettings {
   return {
     roomAssignmentEnabled: data.settings?.roomAssignmentEnabled ?? true,
@@ -309,9 +317,9 @@ export function ArrivalIntake() {
           <h1>Check in before the front desk line.</h1>
         </div>
         <div className="arrivalStepRail" aria-label="Check-in steps">
-          <span className={step !== "identity" ? "done" : "active"}>Match</span>
-          <span className={step === "questions" ? "active" : step === "done" ? "done" : ""}>Questions</span>
-          <span className={step === "done" ? "active" : ""}>Room</span>
+          <span className={railState(step, 0)}>Match</span>
+          <span className={railState(step, 1)}>Questions</span>
+          <span className={railState(step, 2)}>Room</span>
         </div>
       </section>
 
