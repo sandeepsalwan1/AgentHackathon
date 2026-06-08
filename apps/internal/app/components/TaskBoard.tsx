@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Task, TaskStatus } from "@central-vet/db";
+import { logout as clearAccountSession } from "../lib/accountStore";
 import {
   canManage,
   canSeeEscalations,
@@ -109,6 +110,8 @@ export function TaskBoard() {
 
   function logout() {
     clearSession();
+    clearAccountSession();
+    window.location.assign("/staff");
   }
 
   async function updateSessionName(nextName: string) {

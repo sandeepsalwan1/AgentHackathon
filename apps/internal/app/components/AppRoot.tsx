@@ -84,6 +84,10 @@ function AppRootContent({ audience }: { audience: Audience }) {
   }
 
   function handleOpenBoard() {
+    // Admins jump to the board from their dashboard; signed-out users reach it
+    // through the passcode link. Bridge the account session when there is one.
+    const session = getSession();
+    if (session) bridgeToBoardSession(session);
     setView({ kind: "board" });
   }
 
