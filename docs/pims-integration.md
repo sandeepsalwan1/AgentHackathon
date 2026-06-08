@@ -196,6 +196,8 @@ Sikka OneAPI is a single API to over 400 practice management systems across dent
 
 Select Cornerstone (and optionally Neo and ezyVet). Replace every value marked TODO with a real, accurate fact. Keep numbers modest and true, since IDEXX can verify them.
 
+Named pilot clinic (the biggest accelerator): **Tricity Veterinary Hospital**, a Cornerstone practice, ready to authorize the integration. Reference it wherever the form asks about mutual clinics or IDEXX-PIMS customers.
+
 Company Name: VetAgent (use the real registered entity if different).
 
 Company Overview: VetAgent helps veterinary clinics handle everyday front desk work. We make it easier for staff to take in client requests, send follow ups, and keep their tasks in one place. The goal is simple: save the team time on routine admin so they can spend more time with patients. We use automation, including AI, to draft routine notes and messages, and staff always review them before anything is saved or sent. Staff stay in control of what the software does.
@@ -205,7 +207,7 @@ Address: TODO.
 Regions where product is available: United States.
 
 Name: Sandeep Salwan.
-Position or Title: TODO (for example Founder).
+Position or Title: Founder.
 Email: TODO (a company email reads better than a personal one).
 Phone Number: TODO.
 Referred by: blank, or a name if someone pointed us here.
@@ -223,7 +225,7 @@ How is the product currently used by practices (non integrated): Right now, clin
 
 Number of customers currently using your product: TODO (a modest, honest number).
 Number of customers in the veterinary space: TODO (same number, since we only serve veterinary clinics).
-Number of customers with IDEXX PIMS using your product: TODO (the smaller number on Cornerstone, Neo, or ezyVet).
+Number of customers with IDEXX PIMS using your product: TODO (the smaller number on Cornerstone, Neo, or ezyVet — Tricity Veterinary Hospital, our Cornerstone pilot, counts here).
 
 What problem are you solving for veterinary practices with your integration: Today, staff copy information by hand between VetAgent and Cornerstone. We want to remove that double entry. If VetAgent can see the day's basic schedule and the matching client and patient details, staff get the right context for each request without looking it up. And if a staff approved note can be saved back to the record, they no longer have to retype it. The goal is to save the team a few minutes on each request and keep records accurate.
 
