@@ -1,10 +1,4 @@
-do $$
-begin
-  create extension if not exists vector;
-exception
-  when undefined_file then
-    raise notice 'pgvector extension is unavailable; install vector before using agent_memories.embedding';
-end $$;
+create extension if not exists vector;
 
 create table if not exists agent_decisions (
   id uuid primary key default gen_random_uuid(),
