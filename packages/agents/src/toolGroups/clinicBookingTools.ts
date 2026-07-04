@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mockDeliveryChannels } from "../agentVocabulary";
 import {
   defineTool,
   id,
@@ -6,13 +7,13 @@ import {
   type ToolRuntime
 } from "../toolCore";
 
-async function createBookingHold(args: {
+async function bookAppointment(args: {
   slotId: string;
   clientId: string;
   petId: string;
   reason?: string;
 }, runtime: ToolRuntime) {
-  const result = await runtime.adapters.appointments.createBookingHold(args);
+  const result = await runtime.adapters.appointments.bookAppointment(args);
   if (result.booked && result.appointment && result.slot && result.client && result.pet) {
     recordEvent(runtime, {
       eventType: "appointment_booked",
@@ -31,16 +32,6 @@ async function createBookingHold(args: {
 }
 
 export const clinicBookingTools = {
-  create_booking_hold: defineTool({
-    description: "Reserve an available appointment slot for a matched client and pet.",
-    parameters: z.object({
-      slotId: z.string(),
-      clientId: z.string(),
-      petId: z.string(),
-      reason: z.string().optional()
-    }),
-    execute: async (args, runtime) => createBookingHold(args, runtime)
-  }),
   book_appointment: defineTool({
     description: "Book an available appointment slot for a matched client and pet.",
     parameters: z.object({
@@ -49,7 +40,7 @@ export const clinicBookingTools = {
       petId: z.string(),
       reason: z.string().optional()
     }),
-    execute: async (args, runtime) => createBookingHold(args, runtime)
+    execute: async (args, runtime) => bookAppointment(args, runtime)
   }),
   capture_booking_request: defineTool({
     description: "Capture an appointment request in a mock scheduler intake, without creating a pending review task.",
@@ -64,7 +55,7 @@ export const clinicBookingTools = {
       const intake = {
         action: "booking_request_captured",
         status: "captured",
-        delivery: "scheduler_intake_mock",
+        delivery: mockDeliveryChannels.schedulerIntake,
         intakeId: id("booking-intake", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.appointmentType ?? "appointment"}-${args.request}`),
         clientName: args.clientName ?? null,
         clientPhone: args.clientPhone ?? null,

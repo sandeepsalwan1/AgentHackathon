@@ -1,15 +1,13 @@
 import { sendSmokeEmail } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { dbError, logInfo, logWarn } from "../../_apiResponse";
 import {
   authenticateActor,
   actorSchema,
-  canManage,
-  dbError,
-  logInfo,
-  logWarn,
   resolveClinicFromRequest
 } from "../../_shared";
+import { canManage } from "../../../lib/taskWorkflow";
 
 const bodySchema = z.object({
   actor: actorSchema,

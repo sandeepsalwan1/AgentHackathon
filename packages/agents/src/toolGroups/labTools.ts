@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mockDeliveryChannels, mockLabDataSource, mockLabVendor } from "../agentVocabulary";
 import type { MockLabOrder } from "../contracts";
 import {
   clientFor,
@@ -25,11 +26,11 @@ function prepareLabClientUpdate(order: MockLabOrder | null, runtime: ToolRuntime
   const update = {
     action: abnormal ? "lab_client_update_held" : "lab_client_update_prepared",
     status: abnormal ? "held_for_doctor" : "prepared",
-    delivery: "client_portal_mock",
+    delivery: mockDeliveryChannels.clientPortal,
     clientName: client?.fullName ?? null,
     clientPhone: client?.phone ?? null,
     petName: pet?.name ?? order?.patientName ?? null,
-    labVendor: order?.labVendor ?? "antech_mock",
+    labVendor: order?.labVendor ?? mockLabVendor,
     externalOrderId: order?.externalOrderId ?? null,
     abnormalFlags: result?.abnormalFlags ?? [],
     message: abnormal
@@ -49,13 +50,13 @@ function prepareLabClientUpdate(order: MockLabOrder | null, runtime: ToolRuntime
 
 export const labTools = {
   list_lab_catalog: defineTool({
-    description: "List mock lab catalog entries shaped like a future Antech adapter.",
+    description: "List mock lab catalog entries shaped like a future lab adapter.",
     parameters: z.object({
       active: z.boolean().optional()
     }),
     execute: async (args, runtime) => {
       const catalog = await runtime.adapters.labs.listCatalog(args);
-      return { labVendor: "antech_mock", catalog };
+      return { labVendor: mockLabVendor, catalog };
     }
   }),
   lookup_lab_orders: defineTool({
@@ -68,7 +69,7 @@ export const labTools = {
     }),
     execute: async (args, runtime) => {
       const orders = await runtime.adapters.labs.findOrders(args);
-      return { labVendor: "antech_mock", orders };
+      return { labVendor: mockLabVendor, orders };
     }
   }),
   get_lab_result: defineTool({
@@ -79,7 +80,7 @@ export const labTools = {
     }),
     execute: async (args, runtime) => {
       const { order, result } = await runtime.adapters.labs.getResult(args);
-      return { labVendor: "antech_mock", order, result };
+      return { labVendor: mockLabVendor, order, result };
     }
   }),
   summarize_lab_result: defineTool({
@@ -95,7 +96,7 @@ export const labTools = {
       const summary = result
         ? {
             labVendor: result.labVendor,
-            source: "mock lab data",
+            source: mockLabDataSource,
             externalOrderId: result.externalOrderId,
             status: result.status,
             resultSummary: result.resultSummary,
@@ -104,8 +105,8 @@ export const labTools = {
             medicalAdviceGiven: false
           }
         : {
-            labVendor: "antech_mock",
-            source: "mock lab data",
+            labVendor: mockLabVendor,
+            source: mockLabDataSource,
             status: order?.status ?? "not_found",
             resultSummary: "No finalized mock lab result matched.",
             abnormalFlags: [],
@@ -124,17 +125,6 @@ export const labTools = {
     execute: async (args, runtime) => {
       const order = await labOrderById(runtime, args.labOrderId);
       return { ...prepareLabClientUpdate(order, runtime), medicalAdviceGiven: false };
-    }
-  }),
-  create_lab_followup_task: defineTool({
-    description: "Legacy alias for prepare_lab_client_update; no task is created.",
-    parameters: z.object({
-      labOrderId: z.string(),
-      reason: z.string().optional()
-    }),
-    execute: async (args, runtime) => {
-      const order = await labOrderById(runtime, args.labOrderId);
-      return { ...prepareLabClientUpdate(order, runtime), task: null, medicalAdviceGiven: false };
     }
   })
 };

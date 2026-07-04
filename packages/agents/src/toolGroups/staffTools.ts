@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   addEffect,
   defineTool,
-  makeApproval,
   makeReport,
   makeTask,
   recordEvent
@@ -69,75 +68,6 @@ export const staffTools = {
         metadata: { taskId: task.id, priority: task.priority }
       });
       return { task };
-    }
-  }),
-  create_approval: defineTool({
-    description: "Legacy approval draft helper. Current agents should prefer direct audited mock actions over HITL approvals.",
-    parameters: z.object({
-      approvalType: z.enum(["records_transfer", "billing_review", "pricing_review"]),
-      title: z.string(),
-      summary: z.string(),
-      taskId: z.string().optional().nullable(),
-      requestedAction: z.record(z.string(), z.unknown()).optional()
-    }),
-    execute: async (args, runtime) => {
-      const approval = addEffect(runtime, makeApproval({
-        approvalType: args.approvalType,
-        title: args.title,
-        summary: args.summary,
-        taskId: args.taskId ?? null,
-        requestedAction: args.requestedAction ?? {}
-      }));
-      recordEvent(runtime, {
-        eventType: "approval_created",
-        title: args.title,
-        detail: args.summary,
-        metadata: { approvalId: approval.id, taskId: args.taskId ?? null }
-      });
-      return { approval };
-    }
-  }),
-  decide_approval: defineTool({
-    description: "Legacy approval decision marker. Current agents should not rely on HITL approvals.",
-    parameters: z.object({
-      approvalId: z.string(),
-      decision: z.enum(["approved", "rejected", "needs_review"]),
-      note: z.string().optional()
-    }),
-    execute: async (args, runtime) => {
-      recordEvent(runtime, {
-        eventType: "approval_decision_requested",
-        title: "Approval decision requested",
-        detail: args.note ?? null,
-        metadata: { approvalId: args.approvalId, decision: args.decision }
-      });
-      return { decided: true, requiresHuman: false, ...args };
-    }
-  }),
-  create_agent_report: defineTool({
-    description: "Create a generic report draft.",
-    parameters: z.object({
-      reportType: z.enum(["daily_ops", "followup", "invoice", "pricing"]),
-      title: z.string(),
-      summary: z.string(),
-      taskId: z.string().optional().nullable(),
-      data: z.record(z.string(), z.unknown()).optional()
-    }),
-    execute: async (args, runtime) => {
-      const report = addEffect(runtime, makeReport({
-        reportType: args.reportType,
-        title: args.title,
-        summary: args.summary,
-        taskId: args.taskId ?? null,
-        data: args.data ?? {}
-      }));
-      recordEvent(runtime, {
-        eventType: "report_created",
-        title: args.title,
-        detail: args.summary,
-        metadata: { reportId: report.id, taskId: args.taskId ?? null }
-      });
-      return { report };
     }
   }),
   create_daily_ops_report: defineTool({

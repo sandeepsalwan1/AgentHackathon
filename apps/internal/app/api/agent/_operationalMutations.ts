@@ -96,7 +96,7 @@ async function persistBookingMutations(
 
 async function persistFollowupMutations(toolCalls: ToolCallTrace[], clinicId: string) {
   const outreach = toolCalls.find((call) =>
-    (call.toolName === "send_followup_outreach" || call.toolName === "create_followup_task") &&
+    call.toolName === "send_followup_outreach" &&
     call.result?.outreach &&
     typeof call.result.outreach === "object" &&
     "status" in call.result.outreach &&

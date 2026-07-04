@@ -13,21 +13,15 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { sendCustomerMessage, type ChatHistoryItem, type CustomerContext } from "../../lib/agentClient";
 import { logout, type AccountSession } from "../../lib/accountStore";
-import { ChatPanel, type ChatMessage } from "../ChatPanel";
+import { ChatPanel } from "../ChatPanel";
 import { useClinicBrand } from "../ClinicContext";
+import { useCustomerAgentChat } from "./useCustomerAgentChat";
 
 type Props = {
   session: AccountSession;
   onLogout: () => void;
 };
-
-function uid() {
-  return typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-}
 
 const QUICK_ACTIONS = [
   { label: "Book appointment", prompt: "I'd like to book an appointment for my pet", icon: Calendar, color: "customerQuickBtn--blue" },
@@ -43,69 +37,15 @@ export function CustomerExperience({ session, onLogout }: Props) {
   const firstName = session.name.split(" ")[0];
   const petName = session.petName ?? "your pet";
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: uid(),
-      role: "assistant",
-      content: `Hi ${firstName}. I can book a visit, handle a refill, check you in, or pull up ${petName}'s records. What do you need?`,
-      status: "completed",
-      timestamp: new Date(),
-    },
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { messages, isLoading, sendMessage } = useCustomerAgentChat(session);
   const [chatStarted, setChatStarted] = useState(false);
 
   const handleSend = useCallback(
     async (text: string) => {
       setChatStarted(true);
-      const userMessage: ChatMessage = {
-        id: uid(),
-        role: "user",
-        content: text,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMessage]);
-      setIsLoading(true);
-
-      const history: ChatHistoryItem[] = messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      try {
-        const ctx: CustomerContext = {
-          name: session.name,
-          phone: session.phone,
-          petName: session.petName,
-        };
-        const response = await sendCustomerMessage(ctx, history, text);
-        const assistantMessage: ChatMessage = {
-          id: uid(),
-          role: "assistant",
-          content: response.message,
-          status: response.status,
-          taskIds: response.taskIds,
-          approvalIds: response.approvalIds,
-          report: response.report,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      } catch {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: uid(),
-            role: "assistant",
-            content: "I'm having trouble connecting right now. Please try again in a moment.",
-            status: "failed",
-            timestamp: new Date(),
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
+      await sendMessage(text);
     },
-    [messages, session]
+    [sendMessage]
   );
 
   function handleLogout() {

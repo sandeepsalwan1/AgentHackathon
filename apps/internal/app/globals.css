@@ -150,6 +150,77 @@ button {
   box-shadow: 0 0 0 3px rgba(197, 60, 53, 0.12);
 }
 
+.cvRequestTypePicker {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+}
+
+.cvRequestTypePicker legend {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0;
+}
+
+.cvRequestTypePicker button {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 900;
+  padding: 0 10px;
+  white-space: normal;
+}
+
+.cvRequestTypePicker button.selected {
+  border-color: var(--blue);
+  background: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.12);
+}
+
+.cvRequestLabelText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  width: fit-content;
+}
+
+.cvRequestRequiredStar,
+.cvRequestFieldError {
+  color: var(--red);
+}
+
+.cvRequestFieldError {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cvRequestFieldInvalid {
+  border-color: var(--red) !important;
+  background: #fff8f7 !important;
+  box-shadow: 0 0 0 3px rgba(185, 45, 40, 0.12) !important;
+}
+
+.cvRequestRequiredStar {
+  font-weight: 900;
+}
+
+.cvRequestRequiredNote {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .sendButton,
 .successBox button {
   min-height: 46px;
@@ -764,67 +835,6 @@ button {
   .arrivalGrid {
     grid-template-columns: 1fr;
   }
-}
-
-.requestTypePicker {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
-  min-inline-size: 0;
-  max-width: 100%;
-}
-
-.requestTypePicker legend {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 900;
-  padding: 0;
-}
-
-.requestTypePicker button {
-  min-height: 52px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--ink);
-  font-weight: 900;
-  padding: 0 10px;
-  white-space: normal;
-}
-
-.requestTypePicker button.selected {
-  border-color: var(--blue);
-  background: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(29, 95, 145, 0.12);
-}
-
-.labelText {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  width: fit-content;
-}
-
-.requiredStar,
-.fieldError {
-  color: var(--red);
-}
-
-.fieldError {
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.requiredNote {
-  margin: -4px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .staffToolShell {
@@ -2505,6 +2515,30 @@ textarea:focus {
   .publicPanel,
   .staffToolPanel {
     padding: 14px;
+  }
+
+  .cvRequestGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .cvRequestTypePicker {
+    grid-template-columns: repeat(4, minmax(136px, 1fr));
+    overflow-x: auto;
+    padding: 0 0 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cvRequestTypePicker legend {
+    position: sticky;
+    left: 0;
+    width: fit-content;
+  }
+
+  .cvRequestTypePicker button {
+    min-height: 46px;
+    scroll-snap-align: start;
   }
 
   .staffToolShell {

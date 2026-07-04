@@ -1,11 +1,8 @@
 import { listAgentReports } from "@central-vet/db";
 import { NextResponse } from "next/server";
+import { dbError, noStoreHeaders } from "../_apiResponse";
 import {
-  authenticateActorFromQuery,
-  canManage,
-  dbError,
-  noStoreHeaders,
-  resolveClinicFromRequest
+  requireManagerFromQuery
 } from "../_shared";
 
 type ReportRouteOptions = {
@@ -17,17 +14,12 @@ type ReportRouteOptions = {
 export function createReportGet(options: ReportRouteOptions) {
   return async function GET(request: Request) {
     try {
-      const url = new URL(request.url);
-      const clinic = await resolveClinicFromRequest(request);
-      const auth = await authenticateActorFromQuery(url, request, clinic);
+      const auth = await requireManagerFromQuery(request);
       if ("response" in auth) return auth.response;
-      if (!canManage(auth.actor.role)) {
-        return NextResponse.json({ error: "Manager access required." }, { status: 403 });
-      }
 
       const [reports, extra] = await Promise.all([
-        listAgentReports({ clinicId: clinic.clinicId, reportType: options.reportType }),
-        options.loadExtra?.(clinic.clinicId) ?? Promise.resolve({})
+        listAgentReports({ clinicId: auth.clinic.clinicId, reportType: options.reportType }),
+        options.loadExtra?.(auth.clinic.clinicId) ?? Promise.resolve({})
       ]);
       return NextResponse.json({ ok: true, reports, ...extra }, { headers: noStoreHeaders });
     } catch (error) {

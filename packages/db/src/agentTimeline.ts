@@ -24,7 +24,7 @@ function boundedLimit(limit: number | undefined, defaultLimit: number, maxLimit:
   return Math.min(Math.max(limit ?? defaultLimit, 1), maxLimit);
 }
 
-export async function getAgentRun(id: string, options?: { clinicId?: string | null }) {
+async function getAgentRun(id: string, options?: { clinicId?: string | null }) {
   const sql = getSql();
   const clinicId = await resolveClinicId(options?.clinicId);
   const rows = await sql<AgentRunRow[]>`
@@ -36,7 +36,7 @@ export async function getAgentRun(id: string, options?: { clinicId?: string | nu
   return rows[0] ? normalizeRun(rows[0]) : null;
 }
 
-export async function listAgentToolCalls(options: {
+async function listAgentToolCalls(options: {
   clinicId?: string | null;
   runId?: string | null;
   toolName?: string | null;
@@ -73,7 +73,7 @@ export async function listAgentToolCalls(options: {
   return rows.map(normalizeToolCall);
 }
 
-export async function listWorkflowEvents(options: {
+async function listWorkflowEvents(options: {
   clinicId?: string | null;
   runId?: string | null;
   workflowType?: string | null;

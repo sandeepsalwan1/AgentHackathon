@@ -1,6 +1,6 @@
 import type { AppRole, Task, TaskSource, TaskStatus } from "@central-vet/db";
 
-export type TaskAction = "edit" | "status" | "archive" | "restore" | "escalate";
+type TaskAction = "edit" | "status" | "archive" | "restore" | "escalate";
 
 type WorkflowError = {
   error: string;

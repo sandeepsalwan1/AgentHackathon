@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  googleAdkCredentialState,
+  googleAdkModel,
+  googleAdkRequested,
+  resolveAgentMode,
   runExternalAgent,
-  runGoogleAdkExternalAgent,
-  runGoogleAdkInternalAgent,
   runInternalAgent,
-  type AgentIntent,
   type AgentMode,
   type AgentWorkflowResult,
   type WorkflowEventDraft
@@ -18,29 +19,16 @@ import {
   type ClinicContext
 } from "@central-vet/db";
 import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders, resolveClinicFromRequest } from "../_shared";
+import { dbError, noStoreHeaders } from "../_apiResponse";
+import { resolveClinicFromRequest } from "../_shared";
 import { loadAgentClinicData } from "./_clinicData";
 import { persistAgentEffects, type PersistedAgentEffects } from "./_effectPersistence";
-
-type AgentKind = "external" | "internal";
-export type RouteIntent =
-  | "checkin"
-  | "booking"
-  | "pickup"
-  | "records"
-  | "followup"
-  | "call"
-  | "daily_ops"
-  | "invoice"
-  | "pricing"
-  | "external"
-  | "internal";
-
-type AgentWorkflowRoute = {
-  agent: AgentKind;
-  routeIntent: RouteIntent;
-  auth: "public" | "manager";
-};
+import {
+  normalizeAgentRouteInput,
+  workflowEventIntent,
+  type AgentKind,
+  type RouteIntent
+} from "./_workflowRoutes";
 
 type RunnerInput = {
   agent: AgentKind;
@@ -52,43 +40,6 @@ type RunnerInput = {
 };
 
 const agentActor: Actor = { name: "VetAgent", role: "admin" };
-const workflowRoutes = {
-  booking: { agent: "external", routeIntent: "booking", auth: "public" },
-  call: { agent: "external", routeIntent: "call", auth: "public" },
-  checkin: { agent: "external", routeIntent: "checkin", auth: "public" },
-  "daily-ops": { agent: "internal", routeIntent: "daily_ops", auth: "manager" },
-  external: { agent: "external", routeIntent: "external", auth: "public" },
-  followup: { agent: "external", routeIntent: "followup", auth: "public" },
-  internal: { agent: "internal", routeIntent: "internal", auth: "manager" },
-  invoice: { agent: "internal", routeIntent: "invoice", auth: "manager" },
-  pickup: { agent: "external", routeIntent: "pickup", auth: "public" },
-  pricing: { agent: "internal", routeIntent: "pricing", auth: "manager" },
-  records: { agent: "external", routeIntent: "records", auth: "public" }
-} satisfies Record<string, AgentWorkflowRoute>;
-const concreteIntents = new Set([
-  "checkin",
-  "booking",
-  "pickup",
-  "records",
-  "followup",
-  "call",
-  "daily_ops",
-  "invoice",
-  "pricing"
-]);
-
-export function getAgentWorkflowRoute(slug: string) {
-  return workflowRoutes[slug as keyof typeof workflowRoutes] ?? null;
-}
-
-function hasGoogleAdkCredentials() {
-  return Boolean(
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENAI_USE_VERTEXAI === "TRUE" ||
-    process.env.GOOGLE_GENAI_USE_VERTEXAI === "true"
-  );
-}
 
 function textFromInput(input: Record<string, unknown>) {
   return ["message", "request", "transcript", "body"]
@@ -108,30 +59,35 @@ function hashInput(value: Record<string, unknown>) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-function agentMode(): AgentMode {
-  if (process.env.AGENT_RUNTIME === "google-adk" && hasGoogleAdkCredentials()) return "google-adk";
-  return "mock";
-}
-
-function normalizeInput(routeIntent: RouteIntent, input: Record<string, unknown>) {
-  if (!concreteIntents.has(routeIntent)) return input;
-  return { ...input, intent: routeIntent };
+async function runGoogleAdkWorkflow(
+  agent: AgentKind,
+  input: Record<string, unknown>,
+  options: {
+    runId: string;
+    traceId: string;
+    routeIntent: RouteIntent;
+    mode: AgentMode;
+    model?: string;
+    clinicData: NonNullable<Parameters<typeof runExternalAgent>[1]>["clinicData"];
+    now: Date;
+  }
+) {
+  const adkRuntime = await import("@central-vet/agents/adk-runtime");
+  return agent === "internal"
+    ? adkRuntime.runGoogleAdkInternalAgent(input, options)
+    : adkRuntime.runGoogleAdkExternalAgent(input, options);
 }
 
 function fallbackEvent(routeIntent: RouteIntent, traceId: string, runId: string): WorkflowEventDraft {
   return {
     id: `event-runtime-fallback-${runId}`,
-    workflowType: concreteIntents.has(routeIntent) ? routeIntent as AgentIntent : "unknown",
+    workflowType: workflowEventIntent(routeIntent),
     eventType: "runtime_fallback",
     title: "Google ADK credentials missing",
     detail: "AGENT_RUNTIME=google-adk requested, but Google credentials were not present. Fallback registry path used.",
     metadata: {
       traceId,
-      env: {
-        GEMINI_API_KEY: Boolean(process.env.GEMINI_API_KEY),
-        GOOGLE_API_KEY: Boolean(process.env.GOOGLE_API_KEY),
-        GOOGLE_GENAI_USE_VERTEXAI: Boolean(process.env.GOOGLE_GENAI_USE_VERTEXAI)
-      }
+      env: googleAdkCredentialState()
     },
     createdAt: new Date().toISOString()
   };
@@ -168,9 +124,9 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
   const traceId = randomUUID();
   const requestId = input.request.headers.get("x-request-id") || randomUUID();
   const started = Date.now();
-  const mode = agentMode();
+  const mode = resolveAgentMode();
   const clinic = input.clinic ?? await resolveClinicFromRequest(input.request);
-  const normalizedInput = normalizeInput(input.routeIntent, input.input);
+  const normalizedInput = normalizeAgentRouteInput(input.routeIntent, input.input);
   let runId: string | null = null;
 
   try {
@@ -187,7 +143,7 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       input: normalizedInput,
       traceId,
       requestId,
-      model: mode === "google-adk" ? process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash" : null,
+      model: mode === "google-adk" ? googleAdkModel() : null,
       inputHash: hashInput(normalizedInput),
       inputSummary: summary(normalizedInput)
     });
@@ -198,19 +154,19 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       traceId,
       routeIntent: input.routeIntent,
       mode,
-      model: mode === "google-adk" ? process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash" : undefined,
+      model: mode === "google-adk" ? googleAdkModel() : undefined,
       clinicData,
       now: new Date()
     };
     let result = input.agent === "internal"
       ? mode === "google-adk"
-        ? await runGoogleAdkInternalAgent(normalizedInput, options)
+        ? await runGoogleAdkWorkflow("internal", normalizedInput, options)
         : await runInternalAgent(normalizedInput, options)
       : mode === "google-adk"
-        ? await runGoogleAdkExternalAgent(normalizedInput, options)
+        ? await runGoogleAdkWorkflow("external", normalizedInput, options)
         : await runExternalAgent(normalizedInput, options);
 
-    if (process.env.AGENT_RUNTIME === "google-adk" && mode !== "google-adk") {
+    if (googleAdkRequested() && mode !== "google-adk") {
       const event = fallbackEvent(input.routeIntent, traceId, runId);
       result = {
         ...result,
@@ -246,7 +202,7 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       durationMs,
       outputSummary: result.message.slice(0, 500),
       toolCallCount: result.toolCalls.length,
-      model: mode === "google-adk" ? process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash" : null
+      model: mode === "google-adk" ? googleAdkModel() : null
     });
     const body = withResponseFields(result, {
       runId,
@@ -272,7 +228,7 @@ export async function executeVetAgentWorkflow(input: RunnerInput) {
       await createWorkflowEvent({
         clinicId: clinic.clinicId,
         runId,
-        workflowType: concreteIntents.has(input.routeIntent) ? input.routeIntent : "unknown",
+        workflowType: workflowEventIntent(input.routeIntent),
         eventType: "run_failed",
         title: "Agent run failed",
         detail: message,

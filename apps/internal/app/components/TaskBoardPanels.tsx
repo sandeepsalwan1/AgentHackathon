@@ -11,20 +11,23 @@ import {
   ShieldCheck
 } from "lucide-react";
 import type { AppRole, Task, TaskEvent, TaskStatus } from "@central-vet/db";
-import { canSeeEscalations, taskBelongsInLane } from "../lib/taskWorkflow";
 import { TaskCard } from "./TaskCard";
-import { actorDisplay, compareTasks, requestTypeLabel } from "./taskBoardDisplay";
+import {
+  actorDisplay,
+  requestTypeLabel,
+  taskLaneItems,
+  type TaskLaneKey,
+  visibleTaskLanes
+} from "./taskBoardDisplay";
 
-const laneDefs = [
-  { key: "escalated", title: "Escalated", icon: BellRing },
-  { key: "pending_review", title: "Pending Review", icon: ClipboardList },
-  { key: "due", title: "Due Tasks", icon: Clock3 },
-  { key: "pending", title: "Pending", icon: AlertTriangle },
-  { key: "completed", title: "Completed", icon: CheckCircle2 },
-  { key: "archived", title: "Archived", icon: Archive }
-] as const;
-
-type LaneKey = (typeof laneDefs)[number]["key"];
+const laneIcons: Record<TaskLaneKey, typeof BellRing> = {
+  escalated: BellRing,
+  pending_review: ClipboardList,
+  due: Clock3,
+  pending: AlertTriangle,
+  completed: CheckCircle2,
+  archived: Archive
+};
 
 type TaskLaneGridProps = {
   tasks: Task[];
@@ -38,21 +41,6 @@ type TaskLaneGridProps = {
   onEscalate: (task: Task) => void;
   onUndo: (taskId: string) => void;
 };
-
-function visibleLanes(role: AppRole) {
-  return laneDefs.filter((lane) => {
-    if (lane.key === "escalated") return canSeeEscalations(role);
-    if (lane.key === "pending_review" && role === "staff") return false;
-    if (lane.key === "archived") return false;
-    return true;
-  });
-}
-
-function laneTasks(tasks: Task[], lane: LaneKey, role: AppRole) {
-  return tasks
-    .filter((task) => taskBelongsInLane({ task, lane, viewerRole: role }))
-    .sort(compareTasks);
-}
 
 export function TaskLaneGrid({
   tasks,
@@ -68,9 +56,9 @@ export function TaskLaneGrid({
 }: TaskLaneGridProps) {
   return (
     <section className="boardGrid">
-      {visibleLanes(role).map((lane) => {
-        const Icon = lane.icon;
-        const items = laneTasks(tasks, lane.key, role);
+      {visibleTaskLanes(role).map((lane) => {
+        const Icon = laneIcons[lane.key];
+        const items = taskLaneItems(tasks, lane.key, role);
         return (
           <div className={`lane lane-${lane.key}`} key={lane.key}>
             <div className="laneHeader">

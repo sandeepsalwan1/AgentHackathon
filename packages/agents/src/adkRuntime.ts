@@ -18,6 +18,7 @@ import type {
 import { classifyIntent, createRuntime, normalizeAgentInput } from "./mockProvider";
 import { runExternalAgent } from "./externalAgent";
 import { runInternalAgent } from "./internalAgent";
+import { googleAdkModel } from "./runtimeConfig";
 import { getInputText } from "./tools";
 
 type AgentKind = "external" | "internal";
@@ -151,7 +152,7 @@ async function contractResultFor(input: {
   } satisfies AgentWorkflowResult;
 }
 
-export async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
+async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unknown, options: RunAgentOptions = {}): Promise<AgentWorkflowResult> {
   const normalized = normalizeAgentInput(input);
   const intent = intentFor(kind, normalized, options);
   const runtime = createRuntime(normalized, intent, {
@@ -159,7 +160,7 @@ export async function runGoogleAdkAgent(kind: AgentKind, input: AgentInput | unk
     mode: "google-adk"
   });
   const maxToolCalls = kind === "internal" ? 12 : 8;
-  const model = options.model || process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash";
+  const model = options.model || googleAdkModel();
   const timeoutMs = adkTimeoutMs(kind);
   const abortController = new AbortController();
 

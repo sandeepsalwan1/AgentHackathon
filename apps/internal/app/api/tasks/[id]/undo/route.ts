@@ -1,16 +1,14 @@
 import { undoLastStatusChange } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { dbError, logInfo, logWarn } from "../../../_apiResponse";
 import {
   authenticateActor,
   actorSchema,
-  canManage,
-  dbError,
-  logInfo,
-  logWarn,
-  resolveClinicFromRequest,
-  sanitizeTaskForActor
+  resolveClinicFromRequest
 } from "../../../_shared";
+import { sanitizeTaskForActor } from "../../_taskVisibility";
+import { canManage } from "../../../../lib/taskWorkflow";
 
 const bodySchema = z.object({
   actor: actorSchema

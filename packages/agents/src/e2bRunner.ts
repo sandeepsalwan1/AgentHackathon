@@ -1,4 +1,4 @@
-export type SandboxExecutionResult<T = unknown> = {
+type SandboxExecutionResult<T = unknown> = {
   provider: "local" | "e2b";
   status: "completed" | "failed";
   stdout: string;

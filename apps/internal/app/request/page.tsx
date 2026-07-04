@@ -1,5 +1,10 @@
-import { RequestForm, internalRequestFormChrome } from "@central-vet/request-form";
+import { ClinicProvider } from "../components/ClinicContext";
+import { RequestForm } from "../components/RequestForm";
 
 export default function RequestPage() {
-  return <RequestForm chrome={internalRequestFormChrome} />;
+  return (
+    <ClinicProvider>
+      <RequestForm />
+    </ClinicProvider>
+  );
 }

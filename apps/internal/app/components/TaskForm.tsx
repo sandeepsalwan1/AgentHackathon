@@ -3,6 +3,7 @@
 import { Pencil, Plus } from "lucide-react";
 import type { AppRole, Task, TaskPriority, TaskRequestType, TaskStatus } from "@central-vet/db";
 import type { FormEvent, InputHTMLAttributes } from "react";
+import { formatPhoneInput } from "../lib/phoneText";
 import { requestTypes } from "./taskBoardDisplay";
 
 export type TaskFormState = {
@@ -32,20 +33,6 @@ type TaskFormProps = {
   onClose: () => void;
   onSubmit: (event: FormEvent) => void;
 };
-
-function formatPhoneInput(value: string) {
-  if (value.includes("@")) return value;
-  const digits = value.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  const prefix = digits.length === 11 && digits.startsWith("1") ? "+1 " : "";
-  if (local.length === 0) return "";
-  if (local.length <= 3) return `${prefix}${local}`;
-  if (local.length <= 6) return `${prefix}(${local.slice(0, 3)}) ${local.slice(3)}`;
-  if (local.length <= 10) {
-    return `${prefix}(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-  }
-  return value;
-}
 
 function requiredLabel(text: string) {
   return (

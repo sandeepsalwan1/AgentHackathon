@@ -1,4 +1,4 @@
-export type MockService = {
+type MockService = {
   id: string;
   serviceName: string;
   category: string;
@@ -6,7 +6,7 @@ export type MockService = {
   notes: string | null;
 };
 
-export type PricingObservation = {
+type PricingObservation = {
   id: string;
   source: string;
   competitorName: string;

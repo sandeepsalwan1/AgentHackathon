@@ -2,7 +2,7 @@ import { AlertTriangle, BellRing, Calendar, Clock, Search } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export interface ApprovalData {
+interface ApprovalData {
   id: string;
   runId?: string;
   title: string;
@@ -11,7 +11,7 @@ export interface ApprovalData {
   createdAt: string;
 }
 
-export interface FollowupData {
+interface FollowupData {
   id: string;
   clientId: string;
   petId: string;
@@ -21,7 +21,7 @@ export interface FollowupData {
   status: string;
 }
 
-export interface TaskData {
+interface TaskData {
   id: string;
   clientName: string | null;
   petName: string | null;
@@ -32,7 +32,7 @@ export interface TaskData {
   dueTime: string;
 }
 
-export interface PricingReportData {
+interface PricingReportData {
   id: string;
   title: string;
   summary: string;

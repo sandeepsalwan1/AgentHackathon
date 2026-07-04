@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
+import { dbError, logError, logInfo, logWarn } from "../../_apiResponse";
 import {
   authenticateActor,
   actorSchema,
-  dbError,
-  logError,
-  logInfo,
-  logWarn,
-  resolveClinicFromRequest,
-  sanitizeTaskForActor
+  resolveClinicFromRequest
 } from "../../_shared";
+import { sanitizeTaskForActor } from "../_taskVisibility";
 import {
   applyTaskUpdateAction,
   taskUpdateBodySchema

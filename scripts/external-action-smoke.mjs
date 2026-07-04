@@ -9,7 +9,8 @@ function argValue(name) {
 
 const baseUrl = (argValue("--base-url") || process.env.EXTERNAL_ACTION_BASE_URL || process.env.SCENARIO_BASE_URL || process.env.LOCAL_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const expectedMode = argValue("--expect-mode") || process.env.EXTERNAL_ACTION_EXPECT_MODE || "google-adk";
-const managerPasscode = process.env.VET_APP_ADMIN_PASSCODE || process.env.VET_ADMIN_PASSCODE || "";
+const demoAdminPasscode = process.env.DEMO_ACCOUNTS === "disabled" ? "" : "246810";
+const managerPasscode = process.env.VET_APP_ADMIN_PASSCODE || process.env.VET_ADMIN_PASSCODE || demoAdminPasscode;
 const runSalt = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 const userAgent = `vetagent-external-action-smoke/${runSalt}`;
 const skipReset = args.includes("--skip-reset") || process.env.EXTERNAL_ACTION_SKIP_RESET === "1";
@@ -109,12 +110,15 @@ function assertFlow(flow, data) {
 async function resetFixtures() {
   if (skipReset) return { skipped: true };
   if (!managerPasscode) {
-    throw new Error("VET_APP_ADMIN_PASSCODE or VET_ADMIN_PASSCODE is required for deterministic fixture reset.");
+    throw new Error("manager passcode is required for deterministic fixture reset when demo passcodes are disabled.");
   }
-  const url = `${baseUrl}/api/mock/clinic?role=admin&name=External%20Smoke&passcode=${encodeURIComponent(managerPasscode)}`;
+  const url = `${baseUrl}/api/mock/clinic?role=admin&name=External%20Smoke`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "user-agent": userAgent }
+    headers: {
+      "user-agent": userAgent,
+      "x-central-vet-passcode": managerPasscode
+    }
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`fixture reset failed: ${response.status} ${data.error ?? ""}`);

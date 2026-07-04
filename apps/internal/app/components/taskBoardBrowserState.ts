@@ -14,10 +14,17 @@ type TaskSyncPayload = {
   at: number;
 };
 
+const taskBoardRoles = new Set(["staff", "va", "task_adder", "veterinarian", "admin"]);
+
+function isTaskBoardRole(role: unknown) {
+  return typeof role === "string" && taskBoardRoles.has(role);
+}
+
 export function parseSavedTaskBoardSession(saved: string | null) {
   if (!saved) return null;
   try {
     const parsed = JSON.parse(saved) as TaskBoardSession;
+    if (!isTaskBoardRole(parsed.role)) return null;
     if (parsed.role !== "staff" && !parsed.passcode) return null;
     return parsed;
   } catch {

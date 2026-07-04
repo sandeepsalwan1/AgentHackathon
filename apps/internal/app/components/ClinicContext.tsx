@@ -1,22 +1,13 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  defaultClinicBrand,
+  readClinicBrand,
+  type ClinicBrand
+} from "../lib/clinicClient";
 
-type ClinicBrand = {
-  clinicId: string | null;
-  slug: string;
-  name: string;
-  timeZone: string;
-};
-
-const defaultBrand: ClinicBrand = {
-  clinicId: null,
-  slug: "central-vet",
-  name: "Central Veterinary Hospital",
-  timeZone: "America/Los_Angeles"
-};
-
-const ClinicContext = createContext<ClinicBrand>(defaultBrand);
+const ClinicContext = createContext<ClinicBrand>(defaultClinicBrand);
 
 function shortClinicName(name: string) {
   return name
@@ -27,22 +18,13 @@ function shortClinicName(name: string) {
 }
 
 export function ClinicProvider({ children }: { children: ReactNode }) {
-  const [brand, setBrand] = useState<ClinicBrand>(defaultBrand);
+  const [brand, setBrand] = useState<ClinicBrand>(defaultClinicBrand);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/clinic")
-      .then((response) => response.json())
-      .then((data) => {
-        const clinic = data?.clinic;
-        if (!cancelled && clinic?.name && clinic?.clinicId) {
-          setBrand({
-            clinicId: clinic.clinicId,
-            slug: clinic.slug ?? defaultBrand.slug,
-            name: clinic.name,
-            timeZone: clinic.timeZone ?? defaultBrand.timeZone
-          });
-        }
+    readClinicBrand()
+      .then((nextBrand) => {
+        if (!cancelled) setBrand(nextBrand);
       })
       .catch(() => null);
     return () => {

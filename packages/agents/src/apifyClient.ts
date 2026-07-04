@@ -14,7 +14,7 @@ export const DEFAULT_SEARCH_ACTOR = "apify/google-search-scraper";
  * falls back to APIFY_TOKEN (read by the Apify CLI). Ignores unexpanded
  * "${...}" placeholders that can leak in from shell-style .env files.
  */
-export function resolveApifyToken(): string | null {
+function resolveApifyToken(): string | null {
   for (const value of [process.env.APIFY_API_TOKEN, process.env.APIFY_TOKEN]) {
     const token = value?.trim();
     if (token && !token.startsWith("${")) return token;
@@ -26,7 +26,7 @@ export function apifyConfigured(): boolean {
   return resolveApifyToken() !== null;
 }
 
-export type ApifyRunOptions = {
+type ApifyRunOptions = {
   /** Client-side abort in ms (default 60s). */
   timeoutMs?: number;
   /** Max dataset items to return. */

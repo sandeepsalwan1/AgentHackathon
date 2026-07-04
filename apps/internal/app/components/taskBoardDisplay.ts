@@ -1,6 +1,30 @@
 import type { AppRole, Task, TaskPriority, TaskRequestType, TaskStatus } from "@central-vet/db";
+import { formatPhoneDisplay } from "../lib/phoneText";
+import { doctorName } from "../lib/veterinarianProfile";
+import { canSeeEscalations, taskBelongsInLane } from "../lib/taskWorkflow";
 
 export const defaultDueTime = "19:00";
+
+const taskLaneDefs = [
+  { key: "escalated", title: "Escalated" },
+  { key: "pending_review", title: "Pending Review" },
+  { key: "due", title: "Due Tasks" },
+  { key: "pending", title: "Pending" },
+  { key: "completed", title: "Completed" },
+  { key: "archived", title: "Archived" }
+] as const;
+
+export type TaskLaneKey = (typeof taskLaneDefs)[number]["key"];
+
+export type TaskBoardStats = {
+  dueToday: number;
+  dueTodayUrgent: number;
+  pendingReview: number;
+  pendingReviewUrgent: number;
+  escalated: number;
+  escalatedUrgent: number;
+  completed: number;
+};
 
 export const requestTypes: { value: TaskRequestType; label: string }[] = [
   { value: "prescription", label: "Prescription" },
@@ -19,12 +43,6 @@ export function today() {
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-export function doctorName(name: string | null) {
-  const clean = name?.trim();
-  if (!clean) return "Veterinarian";
-  return /^dr\.?\s/i.test(clean) ? clean : `Dr. ${clean}`;
 }
 
 export function statusLabel(status: TaskStatus) {
@@ -85,17 +103,7 @@ export function priorityLabel(value: TaskPriority) {
 }
 
 export function formatPhone(value: string | null) {
-  const clean = value?.trim();
-  if (!clean) return "Not listed";
-  if (clean.includes("@")) return clean;
-  const digits = clean.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  if (local.length === 10) {
-    const formatted = `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-    return digits.length === 11 ? `+1 ${formatted}` : formatted;
-  }
-  if (local.length === 7) return `${local.slice(0, 3)}-${local.slice(3)}`;
-  return clean;
+  return formatPhoneDisplay(value);
 }
 
 export function formatDate(value: string | null) {
@@ -137,7 +145,39 @@ export function isOverdue(task: Task) {
   );
 }
 
-export function compareTasks(a: Task, b: Task) {
+export function taskBoardStats(tasks: Task[], viewerRole: AppRole = "admin"): TaskBoardStats {
+  const currentDate = today();
+  const dueToday = (task: Task) => task.status === "due" && task.dueDate <= currentDate;
+  const urgent = (task: Task) => task.priority === "high";
+  const escalated = (task: Task) => taskBelongsInLane({ task, lane: "escalated", viewerRole });
+
+  return {
+    dueToday: tasks.filter(dueToday).length,
+    dueTodayUrgent: tasks.filter((task) => dueToday(task) && urgent(task)).length,
+    pendingReview: tasks.filter((task) => task.status === "pending_review").length,
+    pendingReviewUrgent: tasks.filter((task) => task.status === "pending_review" && urgent(task)).length,
+    escalated: tasks.filter(escalated).length,
+    escalatedUrgent: tasks.filter((task) => escalated(task) && urgent(task)).length,
+    completed: tasks.filter((task) => task.status === "completed").length,
+  };
+}
+
+export function visibleTaskLanes(role: AppRole) {
+  return taskLaneDefs.filter((lane) => {
+    if (lane.key === "escalated") return canSeeEscalations(role);
+    if (lane.key === "pending_review" && role === "staff") return false;
+    if (lane.key === "archived") return false;
+    return true;
+  });
+}
+
+export function taskLaneItems(tasks: Task[], lane: TaskLaneKey, viewerRole: AppRole) {
+  return tasks
+    .filter((task) => taskBelongsInLane({ task, lane, viewerRole }))
+    .sort(compareTasks);
+}
+
+function compareTasks(a: Task, b: Task) {
   const dueDateDelta = a.dueDate.localeCompare(b.dueDate);
   if (dueDateDelta !== 0) return dueDateDelta;
 

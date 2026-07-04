@@ -1,14 +1,13 @@
 import { LlmAgent } from "@google/adk";
 import {
   createAdkFunctionTools,
-  externalAdkFunctionTools,
   externalToolNames,
-  internalAdkFunctionTools,
   internalToolNames
 } from "./adkTools";
+import { googleAdkModel } from "./runtimeConfig";
 import type { ToolRuntime } from "./tools";
 
-const model = process.env.GOOGLE_ADK_MODEL || "gemini-2.5-flash";
+const model = googleAdkModel();
 
 const globalInstruction = [
   "You are VetAgent for the configured clinic.",
@@ -39,7 +38,7 @@ const internalInstruction = [
   "Staff-facing internal agent for authenticated managers and admins only.",
   "Rank work and explain reasons.",
   "Ask one grouped question when required fields are missing.",
-  "For daily ops use list_tasks, list_approvals, list_followup_candidates, list_reports, and create_daily_ops_report.",
+  "For daily ops use list_tasks, list_approvals, find_followup_candidates, list_reports, and create_daily_ops_report.",
   "For pricing use list_service_catalog, then run_competitor_scan with source \"apify\" to pull live competitor pricing (it auto-falls back to sample data if live data is unavailable), then compare_service_prices and create_price_review_report.",
   "For invoice audits use review_invoice_flags; never mutate invoices.",
   "For labs use lookup_lab_orders, get_lab_result, summarize_lab_result, and prepare_lab_client_update.",
@@ -71,21 +70,3 @@ export function createInternalAdkAgent(runtime: ToolRuntime) {
     disallowTransferToPeers: true
   });
 }
-
-export const externalRootAgent = new LlmAgent({
-  name: "external_vetagent",
-  model,
-  globalInstruction,
-  instruction: externalInstruction,
-  tools: externalAdkFunctionTools,
-  includeContents: "none"
-});
-
-export const internalRootAgent = new LlmAgent({
-  name: "internal_vetagent",
-  model,
-  globalInstruction,
-  instruction: internalInstruction,
-  tools: internalAdkFunctionTools,
-  includeContents: "none"
-});

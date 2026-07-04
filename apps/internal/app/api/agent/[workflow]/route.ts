@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { dbError, resolveClinicFromRequest } from "../../_shared";
-import { requireManagerFromBody } from "../_auth";
+import { dbError } from "../../_apiResponse";
+import { requireManagerFromBody, resolveClinicFromRequest } from "../../_shared";
 import { internalAgentGuard } from "../_internalAgentGuard";
 import { readPublicAgentBody } from "../_publicAgentGuard";
-import { executeVetAgentWorkflow, getAgentWorkflowRoute } from "../_runner";
+import { executeVetAgentWorkflow } from "../_runner";
+import { getAgentWorkflowRoute } from "../_workflowRoutes";
 
 export const dynamic = "force-dynamic";
 

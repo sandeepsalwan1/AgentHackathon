@@ -6,7 +6,7 @@ import type { AppRole } from "./types";
 const authWindowMinutes = 15;
 const authFailureLimit = 12;
 
-export function hashAuthIdentity(value: string) {
+function hashAuthIdentity(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 

@@ -1,28 +1,42 @@
-import type { MockLabCatalogItem, MockLabOrder, MockLabResult } from "@central-vet/db";
 import { z } from "zod";
+import {
+  agentIntentSchema,
+  agentModeSchema,
+  type AgentIntent,
+  type AgentMode,
+  type TaskPriority,
+  type TaskRequestType
+} from "./agentVocabulary";
+import type { MockClinicData } from "./mockClinicContracts";
 
-export type { MockLabCatalogItem, MockLabOrder, MockLabResult };
+export type {
+  AgentIntent,
+  AgentMode,
+  TaskPriority,
+  TaskRequestType
+} from "./agentVocabulary";
+export type {
+  MockAppointment,
+  MockApproval,
+  MockClinicData,
+  MockClient,
+  MockFollowup,
+  MockInvoice,
+  MockLabCatalogItem,
+  MockLabOrder,
+  MockLabResult,
+  MockPet,
+  MockReport,
+  MockService,
+  MockSlot,
+  MockTask,
+  PricingObservation,
+  PricingRecommendation
+} from "./mockClinicContracts";
 
-export const agentIntentSchema = z.enum([
-  "booking",
-  "call",
-  "checkin",
-  "daily_ops",
-  "followup",
-  "invoice",
-  "labs",
-  "pickup",
-  "pricing",
-  "records",
-  "sick_pet",
-  "unknown"
-]);
+const agentKindSchema = z.enum(["external", "internal"]);
 
-export const agentModeSchema = z.enum(["mock", "google-adk", "apify", "e2b-local", "e2b"]);
-
-export const agentKindSchema = z.enum(["external", "internal"]);
-
-export const agentCapabilitySchema = z.enum([
+const agentCapabilitySchema = z.enum([
   "external_booking",
   "external_records",
   "external_conversation",
@@ -36,15 +50,15 @@ export const agentCapabilitySchema = z.enum([
   "internal_invoice"
 ]);
 
-export const capabilityRiskLevelSchema = z.enum(["low", "medium", "high"]);
+const capabilityRiskLevelSchema = z.enum(["low", "medium", "high"]);
 
-export const capabilityCachePolicySchema = z.enum([
+const capabilityCachePolicySchema = z.enum([
   "none",
   "short_greeting",
   "short_run_context"
 ]);
 
-export const capabilityNextActionSchema = z.enum([
+const capabilityNextActionSchema = z.enum([
   "answer",
   "ask_once",
   "block",
@@ -52,7 +66,7 @@ export const capabilityNextActionSchema = z.enum([
   "confirm"
 ]);
 
-export const capabilityDecisionRecordSchema = z.object({
+const capabilityDecisionRecordSchema = z.object({
   kind: z.string(),
   status: z.enum(["proposed", "confirmed", "completed", "blocked"]),
   ttl: z.enum(["short", "long", "permanent"]).optional()
@@ -69,17 +83,7 @@ export const capabilityRouteDecisionSchema = z.object({
   nextAction: capabilityNextActionSchema
 });
 
-export const capabilityResultSchema = z.object({
-  ok: z.literal(true),
-  message: z.string(),
-  result: z.record(z.string(), z.unknown()),
-  decision: capabilityDecisionRecordSchema.optional(),
-  effects: z.array(z.unknown()),
-  toolCalls: z.array(z.unknown()),
-  capability: agentCapabilitySchema.optional()
-});
-
-export const actorSchema = z.object({
+const actorSchema = z.object({
   name: z.string().trim().min(1).optional(),
   role: z.enum(["staff", "va", "task_adder", "veterinarian", "admin"]).optional(),
   profileId: z.string().optional().nullable()
@@ -103,26 +107,15 @@ export const agentInputSchema = z.object({
   actor: actorSchema.optional()
 }).passthrough();
 
-export type AgentIntent = z.infer<typeof agentIntentSchema>;
-export type AgentMode = z.infer<typeof agentModeSchema>;
 export type AgentKind = z.infer<typeof agentKindSchema>;
 export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
 export type CapabilityRiskLevel = z.infer<typeof capabilityRiskLevelSchema>;
 export type CapabilityCachePolicy = z.infer<typeof capabilityCachePolicySchema>;
 export type CapabilityNextAction = z.infer<typeof capabilityNextActionSchema>;
-export type CapabilityDecisionRecord = z.infer<typeof capabilityDecisionRecordSchema>;
+type CapabilityDecisionRecord = z.infer<typeof capabilityDecisionRecordSchema>;
 export type CapabilityRouteDecision = z.infer<typeof capabilityRouteDecisionSchema>;
-export type CapabilityResult = z.infer<typeof capabilityResultSchema>;
 export type AgentInput = z.infer<typeof agentInputSchema>;
-export type Actor = z.infer<typeof actorSchema>;
-
-export type TaskPriority = "low" | "medium" | "high";
-export type TaskRequestType =
-  | "prescription"
-  | "labs_xrays"
-  | "records_request"
-  | "scheduling"
-  | "patient_update";
+type Actor = z.infer<typeof actorSchema>;
 
 export type AgentTaskDraft = {
   id: string;
@@ -211,159 +204,4 @@ export type RunAgentOptions = {
   now?: Date;
   model?: string;
   clinicData?: MockClinicData;
-};
-
-export type MockClient = {
-  id: string;
-  fullName: string;
-  phone: string;
-  email?: string;
-  notes?: string;
-};
-
-export type MockPet = {
-  id: string;
-  clientId: string;
-  name: string;
-  species: string;
-  breed?: string;
-  alerts?: string;
-};
-
-export type MockAppointment = {
-  id: string;
-  clientId: string;
-  petId: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  appointmentType: string;
-  doctor: string;
-  status: "scheduled" | "arrived" | "ready" | "completed";
-  waitMinutes: number;
-  roomStatus: "waiting" | "checked in" | "ready" | "complete";
-  notes?: string;
-};
-
-export type MockSlot = {
-  id: string;
-  slotDate: string;
-  slotTime: string;
-  doctor: string;
-  appointmentType: string;
-  available: boolean;
-};
-
-export type MockFollowup = {
-  id: string;
-  clientId: string;
-  petId: string;
-  followupType: string;
-  dueDate: string;
-  recommendedAction: string;
-  status: "open" | "contacted" | "closed";
-};
-
-export type MockInvoice = {
-  id: string;
-  clientId: string;
-  petId: string;
-  invoiceNumber: string;
-  status: "paid" | "unpaid" | "review";
-  totalCents: number;
-  flags: { reason: string; severity: TaskPriority }[];
-};
-
-export type MockService = {
-  id: string;
-  serviceName: string;
-  category: string;
-  currentPriceCents: number;
-};
-
-export type PricingObservation = {
-  id: string;
-  source: "sample" | "apify";
-  competitorName: string;
-  serviceName: string;
-  observedPriceCents: number | null;
-  observedText?: string;
-  url?: string;
-};
-
-export type PricingRecommendation = {
-  serviceId: string;
-  serviceName: string;
-  currentPriceCents: number;
-  competitorLowCents?: number | null;
-  competitorMedianCents?: number | null;
-  competitorHighCents?: number | null;
-  proposedPriceCents?: number | null;
-  confidence: "low" | "medium" | "high";
-  reason: string;
-  action: "keep" | "raise" | "lower" | "manual_review";
-};
-
-export type MockTask = {
-  id: string;
-  status: string;
-  priority: TaskPriority;
-  requestType?: TaskRequestType;
-  clientName?: string | null;
-  petName?: string | null;
-  request: string;
-  notes?: string | null;
-  dueDate?: string | null;
-  dueTime?: string | null;
-};
-
-export type MockApproval = {
-  id: string;
-  status: string;
-  approvalType: string;
-  title: string;
-  summary: string;
-  taskId?: string | null;
-};
-
-export type MockReport = {
-  id: string;
-  reportType: string;
-  title: string;
-  summary: string;
-  taskId?: string | null;
-};
-
-export type MockMessage = {
-  id: string;
-  clientId: string | null;
-  body: string;
-  intentHint?: AgentIntent;
-  urgency: "normal" | "high";
-};
-
-export type MockCallTranscript = {
-  id: string;
-  callerName: string;
-  callerPhone: string;
-  transcript: string;
-  intentHint?: AgentIntent;
-};
-
-export type MockClinicData = {
-  clients: MockClient[];
-  pets: MockPet[];
-  appointments: MockAppointment[];
-  slots: MockSlot[];
-  followups: MockFollowup[];
-  invoices: MockInvoice[];
-  services: MockService[];
-  pricingObservations: PricingObservation[];
-  messages: MockMessage[];
-  calls: MockCallTranscript[];
-  tasks?: MockTask[];
-  approvals?: MockApproval[];
-  reports?: MockReport[];
-  labCatalog?: MockLabCatalogItem[];
-  labOrders?: MockLabOrder[];
-  labResults?: MockLabResult[];
 };

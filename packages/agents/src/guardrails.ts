@@ -1,7 +1,7 @@
 import type { AgentInput, TaskPriority } from "./contracts";
 import { getInputText } from "./tools";
 
-export type GuardrailDecision = {
+type GuardrailDecision = {
   allowed: boolean;
   risk: "none" | "medical" | "records" | "billing" | "pricing";
   priority: TaskPriority;
@@ -45,17 +45,6 @@ export function checkMedicalGuardrail(input: AgentInput): GuardrailDecision {
       : "medium",
     message: "I cannot diagnose or recommend treatment. I flagged this for the clinical team. If this is an emergency, call the hospital or go to the nearest emergency clinic now.",
     reasons: matched
-  };
-}
-
-export function checkRecordsGuardrail(action: string): GuardrailDecision {
-  const risky = /(send|release|transfer|email).*record/i.test(action);
-  return {
-    allowed: true,
-    risk: risky ? "records" : "none",
-    priority: risky ? "medium" : "low",
-    message: risky ? "Records transfer can be submitted through the secure portal after local audit." : null,
-    reasons: risky ? ["client_requested_records_transfer"] : []
   };
 }
 

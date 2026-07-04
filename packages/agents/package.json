@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./adk-runtime": "./src/adkRuntime.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,6 +18,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
   }
 }

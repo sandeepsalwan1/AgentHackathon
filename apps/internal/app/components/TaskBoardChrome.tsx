@@ -3,7 +3,7 @@
 import type { AppRole } from "@central-vet/db";
 import { Check, Pencil, ShieldCheck } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { readJson } from "./taskBoardClient";
+import { authenticateActorSession } from "../lib/authClient";
 import { useClinicBrand } from "./ClinicContext";
 import { roleLabel } from "./taskBoardDisplay";
 import type { TaskBoardSession as Session } from "./taskBoardTypes";
@@ -111,18 +111,12 @@ export function EntryScreen({ onSave }: { onSave: (session: Session) => void }) 
     setSubmitting(true);
     setError("");
     try {
-      const data = await readJson(
-        await fetch("/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actor: nextSession })
-        })
-      );
+      const actor = await authenticateActorSession(nextSession);
       onSave({
         ...nextSession,
-        name: data.actor?.name ?? nextSession.name,
-        role: data.actor?.role ?? nextSession.role,
-        profileId: data.actor?.profileId ?? nextSession.profileId
+        name: actor?.name ?? nextSession.name,
+        role: actor?.role ?? nextSession.role,
+        profileId: actor?.profileId ?? nextSession.profileId
       });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Wrong passcode.");

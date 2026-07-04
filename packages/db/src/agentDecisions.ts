@@ -2,99 +2,18 @@ import { getSql } from "./connection";
 import { resolveClinicId } from "./clinics";
 import type { Actor } from "./types";
 import { jsonInput, redactedAgentObject } from "./agentJson";
-
-export type AgentDecisionStatus = "proposed" | "confirmed" | "completed" | "blocked" | "skipped" | "failed";
-export type AgentDecisionTtl = "short" | "long" | "permanent";
-
-export type AgentDecision = {
-  id: string;
-  clinicId: string;
-  runId: string | null;
-  traceId: string | null;
-  agent: string;
-  capability: string;
-  decisionKind: string;
-  status: AgentDecisionStatus;
-  ttl: AgentDecisionTtl;
-  actorName: string | null;
-  actorRole: string | null;
-  actorProfileId: string | null;
-  action: string;
-  inputSummary: string | null;
-  resultSummary: string | null;
-  metadata: Record<string, unknown>;
-  expiresAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type AgentDecisionRow = {
-  id: string;
-  clinic_id: string;
-  run_id: string | null;
-  trace_id: string | null;
-  agent: string;
-  capability: string;
-  decision_kind: string;
-  status: AgentDecisionStatus;
-  ttl: AgentDecisionTtl;
-  actor_name: string | null;
-  actor_role: string | null;
-  actor_profile_id: string | null;
-  action: string;
-  input_summary: string | null;
-  result_summary: string | null;
-  metadata: Record<string, unknown>;
-  expires_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-const decisionColumns = `
-  id,
-  clinic_id,
-  run_id,
-  trace_id,
-  agent,
-  capability,
-  decision_kind,
-  status,
-  ttl,
-  actor_name,
-  actor_role,
-  actor_profile_id,
-  action,
-  input_summary,
-  result_summary,
-  metadata,
-  expires_at,
-  created_at,
-  updated_at
-`;
-
-function normalizeDecision(row: AgentDecisionRow): AgentDecision {
-  return {
-    id: row.id,
-    clinicId: row.clinic_id,
-    runId: row.run_id,
-    traceId: row.trace_id,
-    agent: row.agent,
-    capability: row.capability,
-    decisionKind: row.decision_kind,
-    status: row.status,
-    ttl: row.ttl,
-    actorName: row.actor_name,
-    actorRole: row.actor_role,
-    actorProfileId: row.actor_profile_id,
-    action: row.action,
-    inputSummary: row.input_summary,
-    resultSummary: row.result_summary,
-    metadata: row.metadata ?? {},
-    expiresAt: row.expires_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
+import {
+  decisionColumns,
+  normalizeDecision,
+  type AgentDecisionRow,
+  type AgentDecisionStatus,
+  type AgentDecisionTtl
+} from "./agentDecisionRows";
+export type {
+  AgentDecision,
+  AgentDecisionStatus,
+  AgentDecisionTtl
+} from "./agentDecisionRows";
 
 function expiresSql(ttl: AgentDecisionTtl) {
   if (ttl === "short") return "now() + interval '3 minutes'";
@@ -183,33 +102,4 @@ export async function listAgentDecisions(options: {
     limit ${limit}
   `;
   return rows.map(normalizeDecision);
-}
-
-export async function updateAgentDecisionStatus(
-  id: string,
-  input: {
-    clinicId?: string | null;
-    status: AgentDecisionStatus;
-    actor?: Actor | null;
-    resultSummary?: string | null;
-    metadata?: Record<string, unknown>;
-  }
-) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(input.clinicId);
-  const rows = await sql<AgentDecisionRow[]>`
-    update agent_decisions
-    set
-      status = ${input.status},
-      actor_name = coalesce(${input.actor?.name ?? null}, actor_name),
-      actor_role = coalesce(${input.actor?.role ?? null}, actor_role),
-      actor_profile_id = coalesce(${input.actor?.profileId ?? null}, actor_profile_id),
-      result_summary = coalesce(${input.resultSummary ?? null}, result_summary),
-      metadata = metadata || ${sql.json(jsonInput(redactedAgentObject(input.metadata)))},
-      updated_at = now()
-    where id = ${id}
-      and clinic_id = ${clinicId}
-    returning ${sql.unsafe(decisionColumns)}
-  `;
-  return rows[0] ? normalizeDecision(rows[0]) : null;
 }

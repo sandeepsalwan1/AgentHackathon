@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { dbError, noStoreHeaders, resolveClinicFromRequest } from "../_shared";
+import { dbError, noStoreHeaders } from "../_apiResponse";
+import { resolveClinicFromRequest } from "../_shared";
 
 export const dynamic = "force-dynamic";
 

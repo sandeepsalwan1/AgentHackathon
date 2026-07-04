@@ -2,18 +2,17 @@ import { randomUUID } from "node:crypto";
 import {
   archiveCompletedTasksBefore,
   getClinicById,
+  isEndOfDayAlertsEnabled,
   listIncompletePriorityTasks,
   type Task
 } from "@central-vet/db";
 import {
   agentExampleHtml,
   agentExampleText,
+  dailyPrioritySummaryHtml,
+  dailyPrioritySummaryText,
   escalationHtml,
   escalationText,
-  overdueHtml,
-  overdueText,
-  priorityTaskHtml,
-  priorityTaskText,
   smokeTestHtml
 } from "./notificationContent";
 import {
@@ -26,9 +25,9 @@ import {
 } from "./notificationDelivery";
 import { sendNotification, type SendResult } from "./notificationSend";
 
-export type AgentEmailCadence = "once" | "monthly" | "post_appointment";
+type AgentEmailCadence = "once" | "monthly" | "post_appointment";
 export { notificationEmailFrom };
-export type { NotificationChannel, NotificationMode };
+export type { NotificationMode };
 
 const systemActor = { name: "System", role: "admin" as const };
 const defaultClinicName = "Central Veterinary Hospital";
@@ -37,26 +36,6 @@ async function clinicNameFor(clinicId: string | null | undefined) {
   if (!clinicId) return process.env.HOSPITAL_NAME || defaultClinicName;
   const clinic = await getClinicById(clinicId);
   return clinic?.name || process.env.HOSPITAL_NAME || defaultClinicName;
-}
-
-export async function sendPriorityTaskAlert(task: Task, options?: {
-  modeOverride?: NotificationMode;
-  channelOverride?: NotificationChannel;
-}) {
-  const clinicName = await clinicNameFor(task.clinicId);
-  const results = await sendNotification({
-    clinicId: task.clinicId,
-    clinicName,
-    notificationType: "priority_task",
-    subject: `${clinicName} ${task.priority} priority task: ${task.petName || task.clientName || "New task"}`,
-    html: priorityTaskHtml(task, clinicName),
-    text: priorityTaskText(task, clinicName),
-    idempotencyKeyBase: `priority-task/${task.id}/${task.priority}`,
-    taskId: task.id,
-    modeOverride: options?.modeOverride,
-    channelOverride: options?.channelOverride
-  });
-  return { taskId: task.id, priority: task.priority, results };
 }
 
 export async function sendEscalationAlert(task: Task, options?: {
@@ -89,7 +68,7 @@ export async function sendEscalationAlert(task: Task, options?: {
   return { taskId: task.id, skipped: false, results };
 }
 
-export async function sendOverdueSummary(options?: {
+export async function sendDailyPrioritySummary(options?: {
   clinicId?: string | null;
   timeZone?: string;
   modeOverride?: NotificationMode;
@@ -99,7 +78,7 @@ export async function sendOverdueSummary(options?: {
   const timeZone = options?.timeZone || process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles";
   const clinicName = await clinicNameFor(options?.clinicId);
   const { date, hour } = localNotificationParts(timeZone);
-  const requiredHour = Number(process.env.OVERDUE_CHECK_HOUR ?? 18);
+  const requiredHour = Number(process.env.DAILY_PRIORITY_SUMMARY_HOUR ?? 18);
   const archivedCompleted = await archiveCompletedTasksBefore(
     date,
     systemActor,
@@ -110,6 +89,16 @@ export async function sendOverdueSummary(options?: {
     return {
       skipped: true,
       reason: `Local hour ${hour} is before ${requiredHour}.`,
+      localDate: date,
+      archivedCompletedCount: archivedCompleted.length,
+      taskCount: 0,
+      results: [] as SendResult[]
+    };
+  }
+  if (!options?.force && !(await isEndOfDayAlertsEnabled({ clinicId: options?.clinicId }))) {
+    return {
+      skipped: true,
+      reason: "End-of-day alert is disabled.",
       localDate: date,
       archivedCompletedCount: archivedCompleted.length,
       taskCount: 0,
@@ -147,8 +136,8 @@ export async function sendOverdueSummary(options?: {
     clinicName,
     notificationType: "daily_priority_summary",
     subject: `${clinicName} medium/high tasks still open: ${tasks.length}`,
-    html: overdueHtml(tasks, date, clinicName),
-    text: overdueText(tasks, date, clinicName),
+    html: dailyPrioritySummaryHtml(tasks, date, clinicName),
+    text: dailyPrioritySummaryText(tasks, date, clinicName),
     idempotencyKeyBase: `daily-priority-summary/${date}`,
     modeOverride: currentMode,
     channelOverride: options?.channelOverride,

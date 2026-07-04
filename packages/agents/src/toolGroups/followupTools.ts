@@ -40,25 +40,8 @@ export const followupTools = {
       return { candidates };
     }
   }),
-  list_followup_candidates: defineTool({
-    description: "List open follow-up candidates.",
-    parameters: z.object({
-      status: z.enum(["open", "contacted", "closed"]).optional()
-    }),
-    execute: async (args, runtime) => {
-      const candidates = followupCandidates(runtime, args.status ?? "open");
-      return { candidates };
-    }
-  }),
   send_followup_outreach: defineTool({
     description: "Send a mock follow-up outreach message for a due reminder candidate.",
-    parameters: z.object({
-      candidateId: z.string()
-    }),
-    execute: async (args, runtime) => sendFollowupOutreach(args.candidateId, runtime)
-  }),
-  create_followup_task: defineTool({
-    description: "Legacy alias for send_followup_outreach; sends mock outreach without creating a task.",
     parameters: z.object({
       candidateId: z.string()
     }),

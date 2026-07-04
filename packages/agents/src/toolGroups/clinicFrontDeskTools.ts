@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mockDeliveryChannels } from "../agentVocabulary";
 import {
   clientFor,
   defineTool,
@@ -33,7 +34,7 @@ export const clinicFrontDeskTools = {
         ? {
             action: "wait_concern_dispatched",
             status: "sent",
-            delivery: "front_desk_console_mock",
+            delivery: mockDeliveryChannels.frontDeskConsole,
             alertId: id("wait-alert", `${appointment.id}-${pet.id}-${appointment.waitMinutes}`),
             priority: "high",
             clientName: client.fullName,
@@ -66,31 +67,6 @@ export const clinicFrontDeskTools = {
       return { arrived: true, action: "checked_in", appointment: { ...appointment, status: "arrived" }, client, pet, alert, task: null };
     }
   }),
-  mark_pet_ready: defineTool({
-    description: "Prepare a ready-for-pickup mock status update without creating a task.",
-    parameters: z.object({
-      petId: z.string(),
-      message: z.string().optional()
-    }),
-    execute: async (args, runtime) => {
-      const pet = petFor(runtime.data, args.petId);
-      const client = pet ? clientFor(runtime.data, pet.clientId) : null;
-      if (pet && client) {
-        recordEvent(runtime, {
-          eventType: "pickup_status_prepared",
-          title: "Pickup status prepared",
-          detail: args.message ?? `${pet.name} is ready for pickup.`,
-          metadata: {
-            action: "pickup_status_prepared",
-            delivery: "client_portal_mock",
-            clientId: client.id,
-            petId: pet.id
-          }
-        });
-      }
-      return { ready: Boolean(pet), pet, client, task: null };
-    }
-  }),
   send_status_update: defineTool({
     description: "Send a mock client portal status update; future adapter can replace this with the real portal/SMS integration.",
     parameters: z.object({
@@ -103,9 +79,9 @@ export const clinicFrontDeskTools = {
         eventType: "status_update_sent",
         title: "Client portal update sent",
         detail: args.message,
-        metadata: { clientId: args.clientId, delivery: "client_portal_mock", action: "status_update_sent" }
+        metadata: { clientId: args.clientId, delivery: mockDeliveryChannels.clientPortal, action: "status_update_sent" }
       });
-      return { sent: true, delivery: "client_portal_mock", client, message: args.message };
+      return { sent: true, delivery: mockDeliveryChannels.clientPortal, client, message: args.message };
     }
   }),
   capture_arrival_exception: defineTool({
@@ -120,7 +96,7 @@ export const clinicFrontDeskTools = {
       const exception = {
         action: "arrival_exception_captured",
         status: "captured",
-        delivery: "front_desk_console_mock",
+        delivery: mockDeliveryChannels.frontDeskConsole,
         confirmationId: id("arrival-exception", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.request}`),
         clientName: args.clientName ?? null,
         clientPhone: args.clientPhone ?? null,
@@ -151,7 +127,7 @@ export const clinicFrontDeskTools = {
       const message = {
         action: "clinic_message_sent",
         status: "sent",
-        delivery: "clinic_inbox_mock",
+        delivery: mockDeliveryChannels.clinicInbox,
         messageId: id("clinic-message", `${args.subject}-${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.message}`),
         priority: args.priority ?? "medium",
         clientName: args.clientName ?? null,
@@ -184,7 +160,7 @@ export const clinicFrontDeskTools = {
       const alert = {
         action: "clinical_triage_dispatched",
         status: "sent",
-        delivery: "clinical_triage_mock",
+        delivery: mockDeliveryChannels.clinicalTriage,
         alertId: id("clinical-alert", `${args.clientName ?? "client"}-${args.petName ?? "pet"}-${args.message}`),
         priority: args.priority,
         clientName: args.clientName ?? null,

@@ -1,10 +1,7 @@
 "use client";
 
 import type {
-  ArrivalDeskSnapshot,
   ArrivalIntake,
-  ArrivalQuestionnaire,
-  ClinicRoom,
   RoomState
 } from "@central-vet/db";
 import {
@@ -18,26 +15,14 @@ import {
   SprayCan,
   Stethoscope
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
 import { canAdmin } from "../lib/taskWorkflow";
-import {
-  checkoutArrivalRoomState,
-  readArrivalDeskSnapshot,
-  saveArrivalDeskSettings,
-  updateArrivalRoomState
-} from "./taskBoardClient";
 import type { TaskBoardSession } from "./taskBoardTypes";
+import { useArrivalDeskState } from "./useArrivalDeskState";
 
 type Props = {
   session: TaskBoardSession;
   actorQuery: string;
   onError: (message: string) => void;
-};
-
-type SettingsDraft = ArrivalQuestionnaire & {
-  roomAssignmentEnabled: boolean;
-  visitReasonsText: string;
-  sickSignsText: string;
 };
 
 const roomStates: { state: RoomState; label: string }[] = [
@@ -46,37 +31,6 @@ const roomStates: { state: RoomState; label: string }[] = [
   { state: "cleaning", label: "Cleaning" },
   { state: "closed", label: "Closed" }
 ];
-
-function compactList(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function draftFromDesk(desk: ArrivalDeskSnapshot): SettingsDraft {
-  const questionnaire = desk.settings.questionnaire;
-  return {
-    ...questionnaire,
-    roomAssignmentEnabled: desk.settings.roomAssignmentEnabled,
-    visitReasonsText: questionnaire.visitReasons.join(", "),
-    sickSignsText: questionnaire.sickSigns.join(", ")
-  };
-}
-
-function questionnaireFromDraft(draft: SettingsDraft): ArrivalQuestionnaire {
-  return {
-    visitReasons: compactList(draft.visitReasonsText),
-    sickSignsLabel: draft.sickSignsLabel,
-    sickSigns: compactList(draft.sickSignsText),
-    specialConcernsLabel: draft.specialConcernsLabel,
-    vaccineFeelingLabel: draft.vaccineFeelingLabel,
-    surgeryAteLabel: draft.surgeryAteLabel,
-    surgeryFeelingLabel: draft.surgeryFeelingLabel,
-    dentalConcernLabel: draft.dentalConcernLabel,
-    routineConcernLabel: draft.routineConcernLabel
-  };
-}
 
 function roomIcon(state: RoomState) {
   if (state === "open") return DoorOpen;
@@ -97,91 +51,18 @@ function answerSummary(arrival: ArrivalIntake) {
 }
 
 export function ArrivalDeskPanel({ session, actorQuery, onError }: Props) {
-  const [desk, setDesk] = useState<ArrivalDeskSnapshot | null>(null);
-  const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const arrivalsByRoom = useMemo(() => {
-    const map = new Map<string, ArrivalIntake>();
-    desk?.arrivals.forEach((arrival) => {
-      if (arrival.roomId) map.set(arrival.roomId, arrival);
-    });
-    return map;
-  }, [desk]);
-
-  async function load() {
-    if (!actorQuery || loading) return;
-    setLoading(true);
-    try {
-      const snapshot = await readArrivalDeskSnapshot(session, actorQuery);
-      setDesk(snapshot);
-      setSettingsDraft(draftFromDesk(snapshot));
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "Arrivals failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadIfMounted = () => {
-      if (!cancelled) void load();
-    };
-    const initialId = window.setTimeout(loadIfMounted, 0);
-    const id = window.setInterval(() => {
-      loadIfMounted();
-    }, 20000);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(initialId);
-      window.clearInterval(id);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actorQuery, session.passcode, session.role, session.name]);
-
-  async function updateRoom(room: ClinicRoom, state: RoomState) {
-    setSaving(true);
-    try {
-      await updateArrivalRoomState(session, room.id, state);
-      await load();
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "Room update failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function checkout(arrivalId: string) {
-    setSaving(true);
-    try {
-      await checkoutArrivalRoomState(session, arrivalId);
-      await load();
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "Checkout update failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveSettings(event: FormEvent) {
-    event.preventDefault();
-    if (!settingsDraft) return;
-    setSaving(true);
-    try {
-      await saveArrivalDeskSettings(
-        session,
-        settingsDraft.roomAssignmentEnabled,
-        questionnaireFromDraft(settingsDraft)
-      );
-      await load();
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "Settings save failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const {
+    desk,
+    settingsDraft,
+    loading,
+    saving,
+    arrivalsByRoom,
+    load,
+    updateRoomState,
+    checkout,
+    saveSettings,
+    updateSettingsDraft
+  } = useArrivalDeskState({ session, actorQuery, onError });
 
   return (
     <section className="arrivalDeskPanel">
@@ -217,7 +98,7 @@ export function ArrivalDeskPanel({ session, actorQuery, onError }: Props) {
                     type="button"
                     className={room.state === item.state ? "selected" : ""}
                     disabled={saving}
-                    onClick={() => void updateRoom(room, item.state)}
+                    onClick={() => void updateRoomState(room.id, item.state)}
                   >
                     {item.label}
                   </button>
@@ -261,7 +142,13 @@ export function ArrivalDeskPanel({ session, actorQuery, onError }: Props) {
         </section>
 
         {canAdmin(session.role) && settingsDraft ? (
-          <form className="arrivalSettingsPanel" onSubmit={saveSettings}>
+          <form
+            className="arrivalSettingsPanel"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveSettings();
+            }}
+          >
             <div className="arrivalMiniHeader">
               <Sparkles size={17} />
               <h3>Admin defaults</h3>
@@ -270,7 +157,7 @@ export function ArrivalDeskPanel({ session, actorQuery, onError }: Props) {
               <input
                 type="checkbox"
                 checked={settingsDraft.roomAssignmentEnabled}
-                onChange={(event) => setSettingsDraft({ ...settingsDraft, roomAssignmentEnabled: event.target.checked })}
+                onChange={(event) => updateSettingsDraft({ roomAssignmentEnabled: event.target.checked })}
               />
               Auto-assign open rooms
             </label>
@@ -278,27 +165,27 @@ export function ArrivalDeskPanel({ session, actorQuery, onError }: Props) {
               Visit reasons
               <input
                 value={settingsDraft.visitReasonsText}
-                onChange={(event) => setSettingsDraft({ ...settingsDraft, visitReasonsText: event.target.value })}
+                onChange={(event) => updateSettingsDraft({ visitReasonsText: event.target.value })}
               />
             </label>
             <label>
               Sick signs
               <input
                 value={settingsDraft.sickSignsText}
-                onChange={(event) => setSettingsDraft({ ...settingsDraft, sickSignsText: event.target.value })}
+                onChange={(event) => updateSettingsDraft({ sickSignsText: event.target.value })}
               />
             </label>
             <label>
               Sick question
-              <input value={settingsDraft.sickSignsLabel} onChange={(event) => setSettingsDraft({ ...settingsDraft, sickSignsLabel: event.target.value })} />
+              <input value={settingsDraft.sickSignsLabel} onChange={(event) => updateSettingsDraft({ sickSignsLabel: event.target.value })} />
             </label>
             <label>
               Vaccines question
-              <input value={settingsDraft.vaccineFeelingLabel} onChange={(event) => setSettingsDraft({ ...settingsDraft, vaccineFeelingLabel: event.target.value })} />
+              <input value={settingsDraft.vaccineFeelingLabel} onChange={(event) => updateSettingsDraft({ vaccineFeelingLabel: event.target.value })} />
             </label>
             <label>
               Surgery food question
-              <input value={settingsDraft.surgeryAteLabel} onChange={(event) => setSettingsDraft({ ...settingsDraft, surgeryAteLabel: event.target.value })} />
+              <input value={settingsDraft.surgeryAteLabel} onChange={(event) => updateSettingsDraft({ surgeryAteLabel: event.target.value })} />
             </label>
             <button className="primaryButton" type="submit" disabled={saving}>
               {saving ? <Loader2 className="spinIcon" size={17} /> : <Save size={17} />}

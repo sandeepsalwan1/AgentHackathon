@@ -3,74 +3,15 @@
 // Replace implementations with real API calls when the backend is ready.
 // SECURITY NOTE: mockHash is NOT cryptographic. Replace with bcrypt server-side.
 
-type AuthRole = "customer" | "veterinarian" | "staff" | "admin";
+import {
+  ACCOUNTS_KEY,
+  DEMO_ACCOUNTS,
+  type Account,
+  type TeamRole
+} from "./accountModel";
 
-// Roles an admin can create from the clinic team panel.
-export type TeamRole = "veterinarian" | "staff";
-
-export type Account = {
-  id: string;
-  role: AuthRole;
-  name: string;
-  email: string;
-  phone?: string;
-  petName?: string;
-  passcode?: string;
-  passwordHash: string;
-  mustResetPassword?: boolean;
-  otp?: string;
-  createdAt: string;
-};
-
-export type AccountSession = {
-  accountId: string;
-  role: AuthRole;
-  name: string;
-  email: string;
-  phone?: string;
-  petName?: string;
-  passcode?: string;
-  source: "account"; // discriminator — legacy passcode sessions lack this field
-};
-
-const ACCOUNTS_KEY = "central-vet-accounts";
-const SESSION_KEY = "central-vet-session";
-
-const DEMO_PASSCODES = {
-  admin: "246810",
-  veterinarian: "135790"
-} as const;
-
-const DEMO_ACCOUNTS = [
-  {
-    role: "customer" as const,
-    name: "Maya Parker",
-    email: "maya@example.com",
-    phone: "(415) 555-0134",
-    petName: "Biscuit",
-    password: "demo1234"
-  },
-  {
-    role: "staff" as const,
-    name: "Front Desk",
-    email: "staff@centralvet.demo",
-    password: "staff1234"
-  },
-  {
-    role: "veterinarian" as const,
-    name: "Dr. Shiv",
-    email: "vet@centralvet.demo",
-    password: "vet1234",
-    passcode: DEMO_PASSCODES.veterinarian
-  },
-  {
-    role: "admin" as const,
-    name: "Clinic Admin",
-    email: "admin@centralvet.demo",
-    password: "admin1234",
-    passcode: DEMO_PASSCODES.admin
-  }
-];
+export type { Account, AccountSession, TeamRole } from "./accountModel";
+export { getSession, logout, saveSession } from "./accountSessionStore";
 
 // MOCK: base64 + salt. Replace with real hashing server-side.
 function mockHash(value: string): string {
@@ -102,6 +43,15 @@ function uid(): string {
 
 function generateOtp(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+function cleanEmail(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+function findAccountIndexByEmail(accounts: Account[], email: string): number {
+  const normalized = cleanEmail(email);
+  return accounts.findIndex((account) => account.email === normalized);
 }
 
 function seedDemoAccounts(): void {
@@ -142,14 +92,14 @@ export async function signupCustomer(params: {
 }): Promise<Account> {
   seedDemoAccounts();
   const accounts = loadAccounts();
-  if (accounts.some((a) => a.email === params.email.toLowerCase())) {
+  if (findAccountIndexByEmail(accounts, params.email) !== -1) {
     throw new Error("An account with this email already exists.");
   }
   const account: Account = {
     id: uid(),
     role: "customer",
     name: params.name.trim(),
-    email: params.email.toLowerCase().trim(),
+    email: cleanEmail(params.email),
     phone: params.phone.trim(),
     petName: params.petName.trim(),
     passwordHash: mockHash(params.password),
@@ -162,7 +112,7 @@ export async function signupCustomer(params: {
 export async function login(email: string, password: string): Promise<Account> {
   seedDemoAccounts();
   const accounts = loadAccounts();
-  const account = accounts.find((a) => a.email === email.toLowerCase().trim());
+  const account = accounts[findAccountIndexByEmail(accounts, email)];
   if (!account) throw new Error("No account found with this email.");
   if (account.mustResetPassword) {
     throw new Error("Please redeem your one-time password to set a new password.");
@@ -179,7 +129,7 @@ export async function createTeamMember(params: {
   role: TeamRole;
 }): Promise<{ account: Account; otp: string }> {
   const accounts = loadAccounts();
-  if (accounts.some((a) => a.email === params.email.toLowerCase().trim())) {
+  if (findAccountIndexByEmail(accounts, params.email) !== -1) {
     throw new Error("An account with this email already exists.");
   }
   const otp = generateOtp();
@@ -187,7 +137,7 @@ export async function createTeamMember(params: {
     id: uid(),
     role: params.role,
     name: params.name.trim(),
-    email: params.email.toLowerCase().trim(),
+    email: cleanEmail(params.email),
     passwordHash: "",
     mustResetPassword: true,
     otp,
@@ -203,7 +153,7 @@ export async function redeemOtp(
   newPassword: string
 ): Promise<Account> {
   const accounts = loadAccounts();
-  const idx = accounts.findIndex((a) => a.email === email.toLowerCase().trim());
+  const idx = findAccountIndexByEmail(accounts, email);
   if (idx === -1) throw new Error("No account found with this email.");
   const account = accounts[idx];
   if (!account.mustResetPassword || account.otp !== otp.trim().toUpperCase()) {
@@ -225,7 +175,7 @@ export async function redeemOtp(
 export async function requestPasswordReset(email: string): Promise<{ email: string; otp: string }> {
   seedDemoAccounts();
   const accounts = loadAccounts();
-  const idx = accounts.findIndex((a) => a.email === email.toLowerCase().trim());
+  const idx = findAccountIndexByEmail(accounts, email);
   if (idx === -1) throw new Error("No account found with this email.");
   const otp = generateOtp();
   const updated: Account = {
@@ -245,36 +195,6 @@ export async function resetPasswordWithOtp(
   newPassword: string
 ): Promise<Account> {
   return redeemOtp(email, otp, newPassword);
-}
-
-export function getSession(): AccountSession | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
-    if (parsed?.source === "account") return parsed as AccountSession;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveSession(account: Account): AccountSession {
-  const session: AccountSession = {
-    accountId: account.id,
-    role: account.role,
-    name: account.name,
-    email: account.email,
-    phone: account.phone,
-    petName: account.petName,
-    passcode: account.passcode,
-    source: "account",
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
-}
-
-export function logout(): void {
-  localStorage.removeItem(SESSION_KEY);
 }
 
 export function listTeam(): Account[] {

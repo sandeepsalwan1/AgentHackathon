@@ -61,7 +61,7 @@ services:
         value: disabled
       - key: NOTIFICATION_CHANNEL
         value: email
-      - key: OVERDUE_CHECK_HOUR
+      - key: DAILY_PRIORITY_SUMMARY_HOUR
         value: "18"
       - key: RESEND_API_KEY
         sync: false
@@ -89,6 +89,7 @@ services:
         value: https://vetagent-internal.onrender.com
 
   - type: cron
+    # Keep the legacy Render service name so blueprint sync updates the existing cron in place.
     name: vetagent-overdue-summary
     runtime: node
     plan: free
@@ -97,7 +98,7 @@ services:
     rootDir: .
     buildCommand: npm ci
     startCommand: >-
-      node -e "const url=process.env.INTERNAL_BASE_URL + '/api/notifications/overdue'; fetch(url,{headers:{authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{const text=await r.text(); console.log(r.status,text); if(!r.ok) process.exit(1);}).catch((error)=>{console.error(error); process.exit(1);})"
+      node -e "const url=process.env.INTERNAL_BASE_URL + '/api/notifications/daily-priority-summary'; fetch(url,{headers:{authorization:'Bearer '+process.env.CRON_SECRET}}).then(async r=>{const text=await r.text(); console.log(r.status,text); if(!r.ok) process.exit(1);}).catch((error)=>{console.error(error); process.exit(1);})"
     envVars:
       - key: NODE_VERSION
         value: 22.16.0

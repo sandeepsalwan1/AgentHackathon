@@ -5,8 +5,15 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@central-vet/db": "*",
-    "resend": "^4.1.2"
+    "resend": "^6.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^6.0.3"
   }
 }

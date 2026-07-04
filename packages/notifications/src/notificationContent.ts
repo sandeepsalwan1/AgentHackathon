@@ -31,7 +31,7 @@ function formatPhone(value: string | null) {
   return clean;
 }
 
-export function overdueHtml(tasks: Task[], localDate: string, clinicName = defaultClinicName) {
+export function dailyPrioritySummaryHtml(tasks: Task[], localDate: string, clinicName = defaultClinicName) {
   const rows = tasks
     .map(
       (task) => `
@@ -46,21 +46,9 @@ export function overdueHtml(tasks: Task[], localDate: string, clinicName = defau
 
   return `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">${escapeHtml(clinicName)} overdue task summary</h1>
+      <h1 style="font-size:20px;margin:0 0 12px;">${escapeHtml(clinicName)} daily priority summary</h1>
       <p style="margin:0 0 16px;">${tasks.length} medium/high priority task${tasks.length === 1 ? "" : "s"} are still open at end of day ${escapeHtml(localDate)}.</p>
       <ul style="padding-left:20px;margin:0;">${rows}</ul>
-    </div>
-  `;
-}
-
-export function priorityTaskHtml(task: Task, clinicName = defaultClinicName) {
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.45;">
-      <h1 style="font-size:20px;margin:0 0 12px;">${escapeHtml(clinicName)} ${escapeHtml(task.priority)} priority task</h1>
-      <p style="margin:0 0 12px;">A ${escapeHtml(task.priority)} priority task was added and is ready for review/action.</p>
-      <p style="margin:0 0 8px;"><strong>${escapeHtml(task.petName || task.clientName || "Task")}</strong></p>
-      <p style="margin:0 0 8px;">${escapeHtml(task.request)}</p>
-      <p style="margin:0;color:#64748b;">Client: ${escapeHtml(task.clientName || "Not listed")} · Phone: ${escapeHtml(formatPhone(task.clientPhone))} · Due: ${escapeHtml(task.dueDate)} · Source: ${escapeHtml(sourceLabel(task.source))}</p>
     </div>
   `;
 }
@@ -98,7 +86,7 @@ export function agentExampleText(
   return truncateText(`${clinicName} agent email.${byline} ${message} Example send verified for ${localDate}.`);
 }
 
-export function overdueText(tasks: Task[], localDate: string, clinicName = defaultClinicName) {
+export function dailyPrioritySummaryText(tasks: Task[], localDate: string, clinicName = defaultClinicName) {
   const firstTasks = tasks
     .slice(0, 3)
     .map((task) => {
@@ -109,12 +97,6 @@ export function overdueText(tasks: Task[], localDate: string, clinicName = defau
     .join(" | ");
   const more = tasks.length > 3 ? ` +${tasks.length - 3} more.` : "";
   return truncateText(`${clinicName} end-of-day medium/high ${localDate}: ${tasks.length} open task${tasks.length === 1 ? "" : "s"}. ${firstTasks}${more}`);
-}
-
-export function priorityTaskText(task: Task, clinicName = defaultClinicName) {
-  const name = task.petName || task.clientName || "Task";
-  const phone = task.clientPhone ? ` Phone: ${formatPhone(task.clientPhone)}.` : "";
-  return truncateText(`${clinicName} ${task.priority} priority: ${name}. ${task.request}.${phone}`);
 }
 
 export function escalationHtml(task: Task, clinicName = defaultClinicName) {

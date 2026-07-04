@@ -1,146 +1,38 @@
 import { getSql } from "./connection";
 import { resolveClinicId } from "./clinics";
+import {
+  assignOpenRoom,
+  autoOpenReadyRooms,
+  ensureArrivalSetup
+} from "./arrivalRooms";
+import {
+  normalizeArrival,
+  normalizeMatch,
+  normalizeRoom,
+  normalizeSettings,
+  type ArrivalDeskSnapshot,
+  type ArrivalMatch,
+  type ArrivalQuestionnaire,
+  type ArrivalRow,
+  type MatchRow,
+  type RoomRow,
+  type SettingsRow
+} from "./arrivalIntakeRows";
 
-export type RoomState = "open" | "occupied" | "closed" | "cleaning";
-export type ArrivalStatus = "checked_in" | "exception";
+export {
+  checkoutArrivalRoom,
+  updateClinicRoom
+} from "./arrivalRooms";
 
-export type ArrivalQuestionnaire = {
-  visitReasons: string[];
-  sickSignsLabel: string;
-  sickSigns: string[];
-  specialConcernsLabel: string;
-  vaccineFeelingLabel: string;
-  surgeryAteLabel: string;
-  surgeryFeelingLabel: string;
-  dentalConcernLabel: string;
-  routineConcernLabel: string;
-};
-
-export type ArrivalSettings = {
-  roomAssignmentEnabled: boolean;
-  questionnaire: ArrivalQuestionnaire;
-};
-
-export type ClinicRoom = {
-  id: string;
-  clinicId: string;
-  name: string;
-  sortOrder: number;
-  state: RoomState;
-  currentArrivalId: string | null;
-  stateChangedAt: string;
-  autoOpenAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ArrivalIntake = {
-  id: string;
-  clinicId: string;
-  status: ArrivalStatus;
-  appointmentId: string | null;
-  clientId: string | null;
-  petId: string | null;
-  clientName: string | null;
-  clientPhone: string | null;
-  petName: string | null;
-  visitReason: string | null;
-  answers: Record<string, unknown>;
-  roomId: string | null;
-  roomName: string | null;
-  pimsWriteStatus: string;
-  pimsWriteSummary: string | null;
-  exceptionReason: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ArrivalMatch = {
-  appointmentId: string;
-  clientId: string;
-  petId: string;
-  clientName: string;
-  clientPhone: string;
-  petName: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  appointmentType: string;
-  doctor: string;
-  status: string;
-  waitMinutes: number;
-};
-
-export type ArrivalDeskSnapshot = {
-  settings: ArrivalSettings;
-  rooms: ClinicRoom[];
-  arrivals: ArrivalIntake[];
-};
-
-type SettingsRow = {
-  room_assignment_enabled: boolean;
-  questionnaire: ArrivalQuestionnaire | null;
-};
-
-type RoomRow = {
-  id: string;
-  clinic_id: string;
-  name: string;
-  sort_order: number;
-  state: RoomState;
-  current_arrival_id: string | null;
-  state_changed_at: string;
-  auto_open_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type ArrivalRow = {
-  id: string;
-  clinic_id: string;
-  status: ArrivalStatus;
-  appointment_id: string | null;
-  client_id: string | null;
-  pet_id: string | null;
-  client_name: string | null;
-  client_phone: string | null;
-  pet_name: string | null;
-  visit_reason: string | null;
-  answers: Record<string, unknown> | null;
-  room_id: string | null;
-  room_name: string | null;
-  pims_write_status: string;
-  pims_write_summary: string | null;
-  exception_reason: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type MatchRow = {
-  appointment_id: string;
-  client_id: string;
-  pet_id: string;
-  client_name: string;
-  client_phone: string;
-  pet_name: string;
-  appointment_date: string | Date;
-  appointment_time: string;
-  appointment_type: string;
-  doctor: string;
-  status: string;
-  wait_minutes: number;
-};
-
-const defaultQuestionnaire: ArrivalQuestionnaire = {
-  visitReasons: ["Sick", "Vaccines", "Surgery", "Dental", "Routine"],
-  sickSignsLabel: "What signs are you seeing?",
-  sickSigns: ["Vomiting", "Diarrhea", "Coughing", "Other signs"],
-  specialConcernsLabel: "Any special concerns?",
-  vaccineFeelingLabel: "How is your pet feeling today?",
-  surgeryAteLabel: "Did your pet eat today?",
-  surgeryFeelingLabel: "How is your pet feeling today?",
-  dentalConcernLabel: "Any dental concerns today?",
-  routineConcernLabel: "Scratching, itching, routine vaccines, or anything else?"
-};
+export type {
+  ArrivalDeskSnapshot,
+  ArrivalIntake,
+  ArrivalMatch,
+  ArrivalQuestionnaire,
+  ArrivalSettings,
+  ClinicRoom,
+  RoomState
+} from "./arrivalIntakeRows";
 
 function jsonInput(value: Record<string, unknown>) {
   return value as never;
@@ -158,125 +50,6 @@ function lastName(value: string | null | undefined) {
 function phoneDigits(value: string | null | undefined) {
   const digits = value?.replace(/\D/g, "") ?? "";
   return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-}
-
-function dateText(value: string | Date) {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return value.split("T")[0] || value;
-}
-
-function normalizeSettings(row: SettingsRow | null | undefined): ArrivalSettings {
-  return {
-    roomAssignmentEnabled: row?.room_assignment_enabled ?? true,
-    questionnaire: {
-      ...defaultQuestionnaire,
-      ...(row?.questionnaire ?? {})
-    }
-  };
-}
-
-function normalizeRoom(row: RoomRow): ClinicRoom {
-  return {
-    id: row.id,
-    clinicId: row.clinic_id,
-    name: row.name,
-    sortOrder: row.sort_order,
-    state: row.state,
-    currentArrivalId: row.current_arrival_id,
-    stateChangedAt: row.state_changed_at,
-    autoOpenAt: row.auto_open_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function normalizeArrival(row: ArrivalRow): ArrivalIntake {
-  return {
-    id: row.id,
-    clinicId: row.clinic_id,
-    status: row.status,
-    appointmentId: row.appointment_id,
-    clientId: row.client_id,
-    petId: row.pet_id,
-    clientName: row.client_name,
-    clientPhone: row.client_phone,
-    petName: row.pet_name,
-    visitReason: row.visit_reason,
-    answers: row.answers ?? {},
-    roomId: row.room_id,
-    roomName: row.room_name,
-    pimsWriteStatus: row.pims_write_status,
-    pimsWriteSummary: row.pims_write_summary,
-    exceptionReason: row.exception_reason,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-function normalizeMatch(row: MatchRow): ArrivalMatch {
-  return {
-    appointmentId: row.appointment_id,
-    clientId: row.client_id,
-    petId: row.pet_id,
-    clientName: row.client_name,
-    clientPhone: row.client_phone,
-    petName: row.pet_name,
-    appointmentDate: dateText(row.appointment_date),
-    appointmentTime: row.appointment_time,
-    appointmentType: row.appointment_type,
-    doctor: row.doctor,
-    status: row.status,
-    waitMinutes: row.wait_minutes
-  };
-}
-
-export function defaultArrivalQuestionnaire() {
-  return defaultQuestionnaire;
-}
-
-export async function ensureArrivalSetup(options?: { clinicId?: string | null }) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(options?.clinicId);
-  await sql`
-    insert into arrival_settings (clinic_id)
-    values (${clinicId})
-    on conflict (clinic_id) do nothing
-  `;
-  await sql`
-    insert into clinic_rooms (clinic_id, name, sort_order)
-    select ${clinicId}, room.name, room.sort_order
-    from (
-      values
-        ('Exam Room 1', 1),
-        ('Exam Room 2', 2),
-        ('Exam Room 3', 3),
-        ('Exam Room 4', 4),
-        ('Exam Room 5', 5),
-        ('Exam Room 6', 6)
-    ) as room(name, sort_order)
-    where not exists (
-      select 1 from clinic_rooms existing where existing.clinic_id = ${clinicId}
-    )
-    on conflict (clinic_id, name) do nothing
-  `;
-  return clinicId;
-}
-
-export async function autoOpenReadyRooms(options?: { clinicId?: string | null }) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(options?.clinicId);
-  await sql`
-    update clinic_rooms
-    set state = 'open',
-      current_arrival_id = null,
-      auto_open_at = null,
-      state_changed_at = now(),
-      updated_at = now()
-    where clinic_id = ${clinicId}
-      and state = 'cleaning'
-      and auto_open_at is not null
-      and auto_open_at <= now()
-  `;
 }
 
 export async function getArrivalSettings(options?: { clinicId?: string | null }) {
@@ -384,29 +157,6 @@ function intakeSummary(input: {
     `Answers: ${JSON.stringify(input.answers)}`
   ];
   return parts.join(" ");
-}
-
-async function assignOpenRoom(clinicId: string, arrivalId: string) {
-  const sql = getSql();
-  const rows = await sql<RoomRow[]>`
-    with candidate as (
-      select id
-      from clinic_rooms
-      where clinic_id = ${clinicId}
-        and state = 'open'
-      order by sort_order asc, name asc
-      limit 1
-    )
-    update clinic_rooms room
-    set state = 'occupied',
-      current_arrival_id = ${arrivalId},
-      auto_open_at = null,
-      state_changed_at = now(),
-      updated_at = now()
-    where room.id in (select id from candidate)
-    returning id, clinic_id, name, sort_order, state, current_arrival_id, state_changed_at, auto_open_at, created_at, updated_at
-  `;
-  return rows[0] ? normalizeRoom(rows[0]) : null;
 }
 
 export async function createArrivalException(input: {
@@ -524,47 +274,6 @@ export async function submitMatchedArrival(input: {
       and id = ${input.match.appointmentId}
   `;
   return arrival;
-}
-
-export async function updateClinicRoom(input: {
-  clinicId?: string | null;
-  roomId: string;
-  state: RoomState;
-}) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(input.clinicId);
-  const rows = await sql<RoomRow[]>`
-    update clinic_rooms
-    set state = ${input.state},
-      current_arrival_id = case when ${input.state} = 'occupied' then current_arrival_id else null end,
-      auto_open_at = case when ${input.state} = 'cleaning' then now() + interval '10 minutes' else null end,
-      state_changed_at = now(),
-      updated_at = now()
-    where clinic_id = ${clinicId}
-      and id = ${input.roomId}
-    returning id, clinic_id, name, sort_order, state, current_arrival_id, state_changed_at, auto_open_at, created_at, updated_at
-  `;
-  return rows[0] ? normalizeRoom(rows[0]) : null;
-}
-
-export async function checkoutArrivalRoom(input: {
-  clinicId?: string | null;
-  arrivalId: string;
-}) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(input.clinicId);
-  const rows = await sql<RoomRow[]>`
-    update clinic_rooms
-    set state = 'cleaning',
-      current_arrival_id = null,
-      auto_open_at = now() + interval '10 minutes',
-      state_changed_at = now(),
-      updated_at = now()
-    where clinic_id = ${clinicId}
-      and current_arrival_id = ${input.arrivalId}
-    returning id, clinic_id, name, sort_order, state, current_arrival_id, state_changed_at, auto_open_at, created_at, updated_at
-  `;
-  return rows[0] ? normalizeRoom(rows[0]) : null;
 }
 
 export async function updateArrivalSettings(input: {

@@ -11,6 +11,7 @@ import {
   signupCustomer,
   type AccountSession
 } from "../../lib/accountStore";
+import { AuthCodeInput } from "./AuthCodeInput";
 import { AuthPasswordInput } from "./AuthPasswordInput";
 
 type CustomerAuthProps = {
@@ -104,13 +105,7 @@ export function CustomerLogin({ onAuth, onSwitch }: CustomerAuthProps) {
         ) : null}
         <label className="authLabel">
           Code
-          <input
-            value={otp}
-            onChange={(event) => setOtp(event.target.value.toUpperCase())}
-            placeholder="A1B2C3D4"
-            style={{ fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}
-            required
-          />
+          <AuthCodeInput value={otp} onChange={setOtp} />
         </label>
         <label className="authLabel">
           New password

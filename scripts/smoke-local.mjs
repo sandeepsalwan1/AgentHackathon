@@ -3,71 +3,74 @@
 const baseUrl = process.env.LOCAL_BASE_URL || "http://localhost:3000";
 const now = Date.now();
 const smokeUserAgent = `vetagent-smoke/${now}`;
-const managerPasscode = process.env.VET_APP_ADMIN_PASSCODE || process.env.VET_ADMIN_PASSCODE || "";
+const demoAdminPasscode = process.env.DEMO_ACCOUNTS === "disabled" ? "" : "246810";
+const managerPasscode = process.env.VET_APP_ADMIN_PASSCODE || process.env.VET_ADMIN_PASSCODE || demoAdminPasscode;
 const managerQuery = "role=admin&name=Local%20Smoke";
 
-const checks = [
-  { label: "arrival page", method: "GET", path: "/arrival", maxMs: 1500 },
-  { label: "request page", method: "GET", path: "/request", maxMs: 1500 },
-  { label: "staff agent page", method: "GET", path: "/staff/agent", maxMs: 1500 },
-  { label: "approvals page", method: "GET", path: "/staff/approvals", maxMs: 1500 },
-  {
-    label: "mock clinic api",
-    method: "GET",
-    path: `/api/mock/clinic?${managerQuery}`,
-    maxMs: 2500,
-    skip: !managerPasscode,
-    skipReason: "VET_APP_ADMIN_PASSCODE or VET_ADMIN_PASSCODE missing",
-    headers: { "x-central-vet-passcode": managerPasscode }
-  },
-  {
-    label: "check-in workflow",
-    method: "POST",
-    path: "/api/agent/checkin",
-    maxMs: 6000,
-    body: {
-      clientName: "Maya Parker",
-      clientPhone: "(415) 555-0134",
-      petName: "Biscuit",
-      message: `I am outside for my appointment. Smoke ${now}.`
-    }
-  },
-  {
-    label: "records workflow",
-    method: "POST",
-    path: "/api/agent/records",
-    maxMs: 6000,
-    body: {
-      clientName: "Hannah Kim",
-      clientPhone: "(415) 555-0172",
-      petName: "Maple",
-      destination: "Bayview Animal Clinic",
-      message: `Please send Maple's vaccine records to Bayview Animal Clinic. Smoke ${now}.`
-    }
-  },
-  {
-    label: "daily ops workflow",
-    method: "POST",
-    path: "/api/agent/daily-ops",
-    maxMs: 7000,
-    skip: !managerPasscode,
-    skipReason: "VET_APP_ADMIN_PASSCODE or VET_ADMIN_PASSCODE missing",
-    body: {
-      actor: {
-        name: "Local Smoke",
-        role: "admin",
-        passcode: managerPasscode
+function createChecks(runId) {
+  return [
+    { label: "arrival page", method: "GET", path: "/arrival", maxMs: 1500 },
+    { label: "request page", method: "GET", path: "/request", maxMs: 1500 },
+    { label: "staff agent page", method: "GET", path: "/staff/agent", maxMs: 1500 },
+    { label: "approvals page", method: "GET", path: "/staff/approvals", maxMs: 1500 },
+    {
+      label: "mock clinic api",
+      method: "GET",
+      path: `/api/mock/clinic?${managerQuery}`,
+      maxMs: 2500,
+      skip: !managerPasscode,
+      skipReason: "manager passcode missing and demo passcodes disabled",
+      headers: { "x-central-vet-passcode": managerPasscode }
+    },
+    {
+      label: "check-in workflow",
+      method: "POST",
+      path: "/api/agent/checkin",
+      maxMs: 6000,
+      body: {
+        clientName: "Maya Parker",
+        clientPhone: "(415) 555-0134",
+        petName: "Biscuit",
+        message: `I am outside for my appointment. Smoke ${runId}.`
+      }
+    },
+    {
+      label: "records workflow",
+      method: "POST",
+      path: "/api/agent/records",
+      maxMs: 6000,
+      body: {
+        clientName: "Hannah Kim",
+        clientPhone: "(415) 555-0172",
+        petName: "Maple",
+        destination: "Bayview Animal Clinic",
+        message: `Please send Maple's vaccine records to Bayview Animal Clinic. Smoke ${runId}.`
+      }
+    },
+    {
+      label: "daily ops workflow",
+      method: "POST",
+      path: "/api/agent/daily-ops",
+      maxMs: 7000,
+      skip: !managerPasscode,
+      skipReason: "manager passcode missing and demo passcodes disabled",
+      body: {
+        actor: {
+          name: "Local Smoke",
+          role: "admin",
+          passcode: managerPasscode
+        }
       }
     }
-  }
-];
+  ];
+}
 
 function payloadSize(value) {
   if (!value) return 0;
   return Buffer.byteLength(value, "utf8");
 }
 
-async function runCheck(check) {
+async function runCheck(check, { enforceBudget }) {
   if (check.skip) {
     return {
       ...check,
@@ -104,7 +107,7 @@ async function runCheck(check) {
   }
 
   const ms = Math.round(performance.now() - started);
-  const ok = response.ok && ms <= check.maxMs;
+  const ok = response.ok && (!enforceBudget || ms <= check.maxMs);
   return {
     ...check,
     status: response.status,
@@ -115,9 +118,24 @@ async function runCheck(check) {
   };
 }
 
+const warmupResults = [];
+for (const check of createChecks(`${now}-warmup`)) {
+  warmupResults.push(await runCheck(check, { enforceBudget: false }));
+}
+
+const warmupFailures = warmupResults.filter((result) => !result.skipped && !result.ok);
+if (warmupFailures.length > 0) {
+  for (const result of warmupFailures) {
+    const detail = result.error ? ` ${result.error}` : "";
+    console.error(`FAIL warm-up ${result.label}: ${result.status} ${result.ms}ms ${result.bytes}b${detail}`);
+  }
+  console.error(`Local smoke warm-up failed for ${baseUrl}`);
+  process.exit(1);
+}
+
 const results = [];
-for (const check of checks) {
-  results.push(await runCheck(check));
+for (const check of createChecks(now)) {
+  results.push(await runCheck(check, { enforceBudget: true }));
 }
 
 let failed = false;

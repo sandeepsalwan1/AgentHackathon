@@ -1,14 +1,9 @@
 import { getSql } from "./connection";
-
-export type Clinic = {
-  id: string;
-  slug: string;
-  name: string;
-  timeZone: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-};
+import {
+  clinicColumns,
+  normalizeClinic,
+  type ClinicRow
+} from "./clinicRows";
 
 export type ClinicContext = {
   clinicId: string;
@@ -18,32 +13,10 @@ export type ClinicContext = {
   hostname: string | null;
 };
 
-type ClinicRow = {
-  id: string;
-  slug: string;
-  name: string;
-  time_zone: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-};
-
 const defaultClinicSlug = "central-vet";
 const eepishSuffixes = [".vet.eepish.com", ".eepish.com"];
 
-function normalizeClinic(row: ClinicRow): Clinic {
-  return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    timeZone: row.time_zone,
-    status: row.status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-
-export function cleanHostname(host: string | null | undefined) {
+function cleanHostname(host: string | null | undefined) {
   const value = host?.split(",")[0]?.trim().toLowerCase() ?? "";
   return value.replace(/:\d+$/, "");
 }
@@ -65,7 +38,7 @@ async function defaultClinic() {
   const slug = process.env.DEFAULT_CLINIC_SLUG || defaultClinicSlug;
   const sql = getSql();
   const rows = await sql<ClinicRow[]>`
-    select id, slug, name, time_zone, status, created_at, updated_at
+    select ${sql.unsafe(clinicColumns)}
     from clinics
     where slug = ${slug}
     limit 1
@@ -80,12 +53,12 @@ async function defaultClinic() {
       ${process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"}
     )
     on conflict (slug) do update set updated_at = now()
-    returning id, slug, name, time_zone, status, created_at, updated_at
+    returning ${sql.unsafe(clinicColumns)}
   `;
   return normalizeClinic(fallback[0]);
 }
 
-export async function getDefaultClinicContext(): Promise<ClinicContext> {
+async function getDefaultClinicContext(): Promise<ClinicContext> {
   const clinic = await defaultClinic();
   return {
     clinicId: clinic.id,
@@ -104,7 +77,7 @@ export async function resolveClinicId(clinicId?: string | null) {
 export async function getClinicById(id: string) {
   const sql = getSql();
   const rows = await sql<ClinicRow[]>`
-    select id, slug, name, time_zone, status, created_at, updated_at
+    select ${sql.unsafe(clinicColumns)}
     from clinics
     where id = ${id}
     limit 1
@@ -138,7 +111,7 @@ export async function resolveClinicForHostname(host: string | null | undefined):
     const slug = slugFromKnownHost(hostname);
     if (slug) {
       const slugRows = await sql<ClinicRow[]>`
-        select id, slug, name, time_zone, status, created_at, updated_at
+        select ${sql.unsafe(clinicColumns)}
         from clinics
         where slug = ${slug}
           and status = 'active'

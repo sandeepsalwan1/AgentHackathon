@@ -50,13 +50,5 @@ export const billingTools = {
       issueDetails: z.string()
     }),
     execute: async (args, runtime) => createInvoiceReview(args.invoiceId, args.issueDetails, runtime)
-  }),
-  flag_invoice_issue: defineTool({
-    description: "Legacy alias for review_invoice_flags; returns a report only, no task.",
-    parameters: z.object({
-      invoiceId: z.string(),
-      issueDetails: z.string()
-    }),
-    execute: async (args, runtime) => createInvoiceReview(args.invoiceId, args.issueDetails, runtime)
   })
 };

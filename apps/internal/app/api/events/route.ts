@@ -1,13 +1,11 @@
 import { listTaskEvents } from "@central-vet/db";
 import { NextResponse } from "next/server";
+import { dbError, logWarn, noStoreHeaders } from "../_apiResponse";
 import {
   authenticateActorFromQuery,
-  canManage,
-  dbError,
-  logWarn,
-  noStoreHeaders,
   resolveClinicFromRequest
 } from "../_shared";
+import { canManage } from "../../lib/taskWorkflow";
 
 export async function GET(request: Request) {
   try {

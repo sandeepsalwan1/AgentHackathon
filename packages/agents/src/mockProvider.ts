@@ -11,9 +11,10 @@ import {
   type ToolCallTrace,
   type WorkflowEventDraft
 } from "./contracts";
+export { resolveAgentMode as resolveMode } from "./runtimeConfig";
 import { createToolRuntime, getInputText } from "./tools";
 
-export type AgentRuntime = ReturnType<typeof createToolRuntime>;
+type AgentRuntime = ReturnType<typeof createToolRuntime>;
 
 const intentPatterns: Array<[AgentIntent, RegExp]> = [
   ["checkin", /(arriv|outside|check.?in|waiting|here for)/i],
@@ -40,22 +41,7 @@ export function classifyIntent(input: AgentInput, fallback: AgentIntent = "unkno
   return match?.[0] ?? fallback;
 }
 
-export function resolveMode(options: RunAgentOptions = {}): AgentMode {
-  if (options.mode) return options.mode;
-  if (process.env.AGENT_RUNTIME === "google-adk" && hasGoogleAdkCredentials()) return "google-adk";
-  return "mock";
-}
-
-function hasGoogleAdkCredentials() {
-  return Boolean(
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENAI_USE_VERTEXAI === "TRUE" ||
-    process.env.GOOGLE_GENAI_USE_VERTEXAI === "true"
-  );
-}
-
-export function makeRunId(intent: AgentIntent, options: RunAgentOptions = {}) {
+function makeRunId(intent: AgentIntent, options: RunAgentOptions = {}) {
   if (options.runId) return options.runId;
   return `agent-${intent}-${(options.now ?? new Date("2026-05-31T12:00:00.000Z")).getTime()}`;
 }

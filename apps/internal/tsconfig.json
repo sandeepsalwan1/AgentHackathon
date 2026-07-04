@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "plugins": [{ "name": "next" }],
-    "baseUrl": "."
+    "plugins": [{ "name": "next" }]
   },
   "include": [
     "next-env.d.ts",

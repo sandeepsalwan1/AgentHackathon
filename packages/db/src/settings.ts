@@ -43,7 +43,13 @@ const defaultProfiles: RecipientProfile[] = [
 ];
 
 const profileKeyPrefix = "recipient_profile:";
-const priorityAlertsKey = "priority_alerts_enabled";
+// Preserve the stored key while the code interface names the actual feature.
+const endOfDayAlertsKey = "priority_alerts_enabled";
+
+type SettingRow = {
+  key: string;
+  value: string;
+};
 
 function scopedKey(clinicId: string, key: string) {
   return `clinic:${clinicId}:${key}`;
@@ -103,20 +109,33 @@ function profileKey(profileId: string) {
   return `${profileKeyPrefix}${profileId}`;
 }
 
-export async function isPriorityAlertsEnabled(options?: { clinicId?: string | null }) {
+function profileSettingsById(rows: SettingRow[], keyPrefix: string) {
+  const byId = new Map<string, unknown>();
+  for (const row of rows) {
+    const profileId = row.key.replace(keyPrefix, "");
+    try {
+      byId.set(profileId, JSON.parse(row.value));
+    } catch {
+      byId.set(profileId, null);
+    }
+  }
+  return byId;
+}
+
+export async function isEndOfDayAlertsEnabled(options?: { clinicId?: string | null }) {
   const sql = getSql();
   const clinicId = await resolveClinicId(options?.clinicId);
   const rows = await sql<{ value: string }[]>`
     select value
     from app_settings
-    where key = ${scopedKey(clinicId, priorityAlertsKey)}
+    where key = ${scopedKey(clinicId, endOfDayAlertsKey)}
     limit 1
   `;
   if (rows[0]) return rows[0].value === "true";
   const fallback = await sql<{ value: string }[]>`
     select value
     from app_settings
-    where key = ${priorityAlertsKey}
+    where key = ${endOfDayAlertsKey}
     limit 1
   `;
   return fallback[0]?.value === "true";
@@ -129,28 +148,21 @@ export async function listRecipientProfiles(options?: {
   const sql = getSql();
   const clinicId = await resolveClinicId(options?.clinicId);
   const scopedPrefix = scopedProfileKeyPrefix(clinicId);
-  let rows = await sql<{ key: string; value: string }[]>`
-    select key, value
-    from app_settings
-    where key like ${`${scopedPrefix}%`}
-  `;
-  let keyPrefix = scopedPrefix;
-  if (rows.length === 0) {
-    rows = await sql<{ key: string; value: string }[]>`
+  const [legacyRows, scopedRows] = await Promise.all([
+    sql<SettingRow[]>`
       select key, value
       from app_settings
       where key like ${`${profileKeyPrefix}%`}
-    `;
-    keyPrefix = profileKeyPrefix;
-  }
-  const byId = new Map<string, unknown>();
-  for (const row of rows) {
-    const profileId = row.key.replace(keyPrefix, "");
-    try {
-      byId.set(profileId, JSON.parse(row.value));
-    } catch {
-      byId.set(profileId, null);
-    }
+    `,
+    sql<SettingRow[]>`
+      select key, value
+      from app_settings
+      where key like ${`${scopedPrefix}%`}
+    `
+  ]);
+  const byId = profileSettingsById(legacyRows, profileKeyPrefix);
+  for (const [profileId, value] of profileSettingsById(scopedRows, scopedPrefix)) {
+    byId.set(profileId, value);
   }
   const profiles = defaultProfiles.map((profile) =>
     normalizeProfile(byId.get(profile.profileId), profile)
@@ -232,7 +244,7 @@ export async function deactivateRecipientProfile(
   }, actor, { clinicId });
 }
 
-export async function setPriorityAlertsEnabled(
+export async function setEndOfDayAlertsEnabled(
   enabled: boolean,
   actor: Actor,
   options?: { clinicId?: string | null }
@@ -241,7 +253,7 @@ export async function setPriorityAlertsEnabled(
   const clinicId = await resolveClinicId(options?.clinicId);
   const rows = await sql<{ value: string }[]>`
     insert into app_settings (key, value, updated_by_name, updated_at)
-    values (${scopedKey(clinicId, priorityAlertsKey)}, ${enabled ? "true" : "false"}, ${actor.name}, now())
+    values (${scopedKey(clinicId, endOfDayAlertsKey)}, ${enabled ? "true" : "false"}, ${actor.name}, now())
     on conflict (key) do update
       set value = excluded.value,
           updated_by_name = excluded.updated_by_name,

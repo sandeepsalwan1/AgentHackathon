@@ -259,20 +259,6 @@ export async function renameActorReferences(args: {
   };
 }
 
-export async function listOverdueTasks(localDate: string, options?: { clinicId?: string | null }) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(options?.clinicId);
-  const rows = await sql<TaskRow[]>`
-    select ${sql.unsafe(taskColumns)} from tasks
-    where archived_at is null
-      and clinic_id = ${clinicId}
-      and status in ('pending_review', 'due', 'pending')
-      and due_date < ${localDate}
-    order by due_date asc, due_time asc, created_at asc
-  `;
-  return rows.map(normalizeTask);
-}
-
 export async function listIncompletePriorityTasks(
   localDate: string,
   options?: { clinicId?: string | null }

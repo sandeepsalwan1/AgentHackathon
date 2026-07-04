@@ -47,23 +47,14 @@ function all(...checks: Array<(result: AgentWorkflowResult) => string | null>) {
 const externalDeniedToolNames = [
   "triage_message",
   "triage_call",
-  "check_medical_guardrail",
-  "check_billing_guardrail",
-  "check_pricing_guardrail",
   "list_tasks",
   "list_approvals",
   "list_reports",
   "create_task",
-  "create_approval",
-  "decide_approval",
-  "create_agent_report",
   "create_daily_ops_report",
   "update_task",
-  "request_records_transfer",
-  "create_followup_task",
   "get_invoice_summary",
   "review_invoice_flags",
-  "flag_invoice_issue",
   "list_service_catalog",
   "run_competitor_scan",
   "compare_service_prices",
@@ -72,13 +63,7 @@ const externalDeniedToolNames = [
   "lookup_lab_orders",
   "get_lab_result",
   "summarize_lab_result",
-  "prepare_lab_client_update",
-  "create_lab_followup_task",
-  "dispatch_clinical_triage",
-  "record_\u0077orkflow_event",
-  "create_agent_run",
-  "complete_agent_run",
-  "fail_agent_run"
+  "prepare_lab_client_update"
 ] as const satisfies readonly ToolName[];
 
 const externalRequiredToolNames = [
@@ -91,6 +76,7 @@ const externalRequiredToolNames = [
   "get_wait_status",
   "mark_arrived",
   "send_status_update",
+  "dispatch_clinical_triage",
   "capture_arrival_exception",
   "capture_booking_request",
   "send_clinic_inbox_message",
@@ -98,9 +84,7 @@ const externalRequiredToolNames = [
   "audit_records_transfer",
   "complete_records_transfer",
   "find_followup_candidates",
-  "send_followup_outreach",
-  "check_records_guardrail",
-  "record_tool_call"
+  "send_followup_outreach"
 ] as const satisfies readonly ToolName[];
 
 const internalRequiredToolNames = [
@@ -113,6 +97,7 @@ const internalRequiredToolNames = [
   "run_competitor_scan",
   "compare_service_prices",
   "create_price_review_report",
+  "dispatch_clinical_triage",
   "list_lab_catalog",
   "lookup_lab_orders",
   "get_lab_result",
@@ -136,7 +121,7 @@ function expectAdkToolBoundaries() {
   return failures;
 }
 
-export const scenarios: Scenario[] = [
+const scenarios: Scenario[] = [
   {
     name: "arrival happy path",
     run: () => runExternalAgent({

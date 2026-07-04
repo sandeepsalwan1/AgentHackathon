@@ -2,7 +2,6 @@ import { billingTools } from "./toolGroups/billingTools";
 import { clinicTools } from "./toolGroups/clinicTools";
 import { followupTools } from "./toolGroups/followupTools";
 import { labTools } from "./toolGroups/labTools";
-import { observabilityTools } from "./toolGroups/observabilityTools";
 import { pricingTools } from "./toolGroups/pricingTools";
 import { recordsTools } from "./toolGroups/recordsTools";
 import { safetyTools } from "./toolGroups/safetyTools";
@@ -17,7 +16,6 @@ import {
 
 export {
   createToolRuntime,
-  getClientPetFromInput,
   getInputText,
   summarizeInvoice
 } from "./toolCore";
@@ -31,8 +29,7 @@ export const tools = defineTools({
   ...billingTools,
   ...followupTools,
   ...pricingTools,
-  ...labTools,
-  ...observabilityTools
+  ...labTools
 });
 
 type ToolRegistry = typeof tools;

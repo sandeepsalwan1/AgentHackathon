@@ -38,7 +38,3 @@ export function getSql() {
   }
   return cachedSql;
 }
-
-export function hasDatabaseUrl() {
-  return Boolean(databaseUrl());
-}

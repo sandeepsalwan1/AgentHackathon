@@ -1,14 +1,13 @@
 import { decideApproval } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { dbError, noStoreHeaders } from "../../_apiResponse";
 import {
   actorSchema,
   authenticateActor,
-  canManage,
-  dbError,
-  noStoreHeaders,
   resolveClinicFromRequest
 } from "../../_shared";
+import { canManage } from "../../../lib/taskWorkflow";
 
 export const dynamic = "force-dynamic";
 

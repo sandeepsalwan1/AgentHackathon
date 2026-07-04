@@ -1,15 +1,14 @@
 import { createApproval, listApprovals } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { dbError, noStoreHeaders } from "../_apiResponse";
 import {
   actorSchema,
   authenticateActor,
-  authenticateActorFromQuery,
-  canManage,
-  dbError,
-  noStoreHeaders,
+  requireManagerFromQuery,
   resolveClinicFromRequest
 } from "../_shared";
+import { canManage } from "../../lib/taskWorkflow";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +23,10 @@ const approvalSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const clinic = await resolveClinicFromRequest(request);
-    const auth = await authenticateActorFromQuery(url, request, clinic);
+    const auth = await requireManagerFromQuery(request);
     if ("response" in auth) return auth.response;
-    if (!canManage(auth.actor.role)) {
-      return NextResponse.json({ error: "Manager access required." }, { status: 403 });
-    }
-    const status = url.searchParams.get("status") || "pending";
-    const approvals = await listApprovals({ clinicId: clinic.clinicId, status });
+    const status = auth.url.searchParams.get("status") || "pending";
+    const approvals = await listApprovals({ clinicId: auth.clinic.clinicId, status });
     return NextResponse.json({ ok: true, approvals }, { headers: noStoreHeaders });
   } catch (error) {
     return dbError(error, { route: "approvals.list" });

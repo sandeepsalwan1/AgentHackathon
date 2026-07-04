@@ -1,6 +1,7 @@
 import { sendAgentExampleEmail, type NotificationMode } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
-import { dbError, logInfo, logWarn, resolveClinicFromRequest } from "../../_shared";
+import { dbError, logInfo, logWarn } from "../../_apiResponse";
+import { resolveClinicFromRequest } from "../../_shared";
 
 export const dynamic = "force-dynamic";
 

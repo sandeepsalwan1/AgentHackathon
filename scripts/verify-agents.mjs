@@ -2,13 +2,14 @@
 
 import { spawn } from "node:child_process";
 import { mkdir, appendFile, readdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 const args = new Set(process.argv.slice(2));
 const allowFallback = args.has("--allow-fallback");
 const jsonl = args.has("--jsonl");
 const baseUrl = process.env.LOCAL_BASE_URL || process.env.SCENARIO_BASE_URL || "http://localhost:3000";
-const proofPath = "docs/proof/mainCompleteAllAgents-proof.md";
+const proofPath = process.env.VERIFY_AGENTS_PROOF_PATH || join(tmpdir(), "central-vet-agent-proof.md");
 
 function envState(name) {
   return process.env[name] ? "present" : "missing";
@@ -91,11 +92,16 @@ async function grep(args) {
 
 async function duplicateAudits() {
   const audits = [];
-  const noWorkflow = await grep(["-R", "_workflow", "apps/internal/app/api/agent", "packages/agents"]);
+  const legacyWorkflow = await grep(["-R", "_workflow", "apps/internal/app/api/agent", "packages/agents"]);
+  const legacyWorkflowLines = legacyWorkflow.stdout
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter((line) => !line.includes("_workflowRoutes"));
   audits.push({
-    label: "no _workflow references",
-    ok: noWorkflow.status === 1,
-    detail: noWorkflow.status === 1 ? "none" : (noWorkflow.stdout || noWorkflow.stderr).trim()
+    label: "no legacy _workflow references",
+    ok: legacyWorkflowLines.length === 0,
+    detail: legacyWorkflowLines.length ? legacyWorkflowLines.join(" | ") : "none"
   });
   const noRouteRuns = await grep(["-R", "-E", "export async function runCheckin|export async function runBooking|export async function runRecords|export async function runPricing|export async function runDailyOps", "apps/internal/app/api/agent"]);
   audits.push({

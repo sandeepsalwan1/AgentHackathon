@@ -9,6 +9,7 @@ import type {
   MockTask,
   RunAgentOptions
 } from "./contracts";
+import { mockLabDataSource, mockLabVendor } from "./agentVocabulary";
 import { decideCapabilityRoute, withCapabilityDecision } from "./capabilityRouting";
 import { checkBillingGuardrail, checkMedicalGuardrail } from "./guardrails";
 import {
@@ -99,7 +100,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
       : { result: null };
     const summary = order
       ? await executeTool("summarize_lab_result", { labOrderId: order.id }, runtime) as { summary: Record<string, unknown> }
-      : { summary: { labVendor: "antech_mock", source: "mock lab data", status: "not_found", medicalAdviceGiven: false } };
+      : { summary: { labVendor: mockLabVendor, source: mockLabDataSource, status: "not_found", medicalAdviceGiven: false } };
     const clientUpdate = order
       ? await executeTool("prepare_lab_client_update", {
           labOrderId: order.id,
@@ -113,8 +114,8 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
       mode,
       message: "Mock lab data checked. I prepared the safe client-update state without giving medical advice.",
       result: {
-        labVendor: "antech_mock",
-        source: "mock lab data",
+        labVendor: mockLabVendor,
+        source: mockLabDataSource,
         order,
         summary: summary.summary,
         clientUpdate: clientUpdate?.update ?? null,
@@ -127,7 +128,7 @@ export async function runInternalAgent(input: AgentInput | unknown, options: Run
 
   const tasksResult = await executeTool("list_tasks", {}, runtime) as { tasks: MockTask[] };
   const approvalsResult = await executeTool("list_approvals", { status: "pending" }, runtime) as { approvals: MockApproval[] };
-  const followupsResult = await executeTool("list_followup_candidates", { status: "open" }, runtime) as { candidates: MockFollowup[] };
+  const followupsResult = await executeTool("find_followup_candidates", { status: "open" }, runtime) as { candidates: MockFollowup[] };
   const reportsResult = await executeTool("list_reports", {}, runtime) as { reports: MockReport[] };
   const invoiceReviews = runtime.data.invoices.filter((invoice) => invoice.flags.length > 0).length;
   const openTasks = tasksResult.tasks.filter((task) => task.status !== "completed" && task.status !== "archived").length || runtime.data.messages.length;

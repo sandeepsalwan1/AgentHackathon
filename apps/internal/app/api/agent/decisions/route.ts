@@ -1,11 +1,8 @@
 import { listAgentDecisions, type AgentDecisionStatus } from "@central-vet/db";
 import { NextResponse } from "next/server";
+import { dbError, noStoreHeaders } from "../../_apiResponse";
 import {
-  authenticateActorFromQuery,
-  canManage,
-  dbError,
-  noStoreHeaders,
-  resolveClinicFromRequest
+  requireManagerFromQuery
 } from "../../_shared";
 
 export const dynamic = "force-dynamic";
@@ -32,15 +29,11 @@ function limitParam(value: string | null) {
 
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const clinic = await resolveClinicFromRequest(request);
-    const auth = await authenticateActorFromQuery(url, request, clinic);
+    const auth = await requireManagerFromQuery(request);
     if ("response" in auth) return auth.response;
-    if (!canManage(auth.actor.role)) {
-      return NextResponse.json({ error: "Manager access required." }, { status: 403 });
-    }
+    const url = auth.url;
     const decisions = await listAgentDecisions({
-      clinicId: clinic.clinicId,
+      clinicId: auth.clinic.clinicId,
       runId: url.searchParams.get("runId"),
       decisionKind: url.searchParams.get("kind"),
       status: statusParam(url.searchParams.get("status")),

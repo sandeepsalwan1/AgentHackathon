@@ -3,6 +3,7 @@
 import type { RecipientProfile } from "@central-vet/db";
 import { Settings, UserPlus, UserX } from "lucide-react";
 import { useState } from "react";
+import { smsPhoneReady } from "../lib/phoneText";
 
 const blankVeterinarianProfile: RecipientProfile = {
   profileId: "",
@@ -20,13 +21,13 @@ const blankVeterinarianProfile: RecipientProfile = {
 type NotificationSettingsMenuProps = {
   open: boolean;
   saving: boolean;
-  priorityAlertsEnabled: boolean;
+  endOfDayAlertsEnabled: boolean;
   recipientProfiles: RecipientProfile[];
   canEditAllProfiles: boolean;
   currentProfileId: string | null;
   addingProfile: boolean;
   onToggleOpen: () => void;
-  onTogglePriorityAlerts: () => void;
+  onToggleEndOfDayAlerts: () => void;
   onSaveProfile: (profile: RecipientProfile) => void;
   onDeactivateProfile: (profile: RecipientProfile) => void;
   onAddProfile: () => void;
@@ -35,13 +36,13 @@ type NotificationSettingsMenuProps = {
 export function NotificationSettingsMenu({
   open,
   saving,
-  priorityAlertsEnabled,
+  endOfDayAlertsEnabled,
   recipientProfiles,
   canEditAllProfiles,
   currentProfileId,
   addingProfile,
   onToggleOpen,
-  onTogglePriorityAlerts,
+  onToggleEndOfDayAlerts,
   onSaveProfile,
   onDeactivateProfile,
   onAddProfile
@@ -64,9 +65,9 @@ export function NotificationSettingsMenu({
             <label className="toggleLine strongToggle">
               <input
                 type="checkbox"
-                checked={priorityAlertsEnabled}
+                checked={endOfDayAlertsEnabled}
                 disabled={saving}
-                onChange={() => void onTogglePriorityAlerts()}
+                onChange={() => void onToggleEndOfDayAlerts()}
               />
               End-of-day alert
             </label>
@@ -147,8 +148,7 @@ function ProfileSettings({
   };
   const channelCount = Number(draft.emailOptIn) + Number(draft.smsOptIn);
   const alertCount = Number(draft.escalationOptIn) + Number(draft.dailyPriorityOptIn);
-  const phoneDigits = draft.phone.replace(/\D/g, "");
-  const smsReady = phoneDigits.length === 10 || (phoneDigits.length === 11 && phoneDigits.startsWith("1"));
+  const smsReady = smsPhoneReady(draft.phone);
 
   return (
     <section className={`profileSettings ${!draft.active ? "inactiveProfile" : ""}`}>

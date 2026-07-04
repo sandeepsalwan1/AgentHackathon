@@ -1,15 +1,12 @@
-export { getSql, hasDatabaseUrl, MissingDatabaseUrlError } from "./connection";
+export { getSql, MissingDatabaseUrlError } from "./connection";
 export {
-  cleanHostname,
   getClinicById,
-  getDefaultClinicContext,
   resolveClinicForHostname,
   resolveClinicId
 } from "./clinics";
-export type { Clinic, ClinicContext } from "./clinics";
+export type { ClinicContext } from "./clinics";
 export {
   checkAuthAttemptLimit,
-  hashAuthIdentity,
   recordAuthAttempt
 } from "./auth";
 export {
@@ -17,7 +14,6 @@ export {
   editTask,
   getTask,
   listIncompletePriorityTasks,
-  listOverdueTasks,
   listTasks,
   renameActorReferences
 } from "./tasks";
@@ -46,13 +42,11 @@ export {
 } from "./agents";
 export {
   createAgentDecision,
-  listAgentDecisions,
-  updateAgentDecisionStatus
+  listAgentDecisions
 } from "./agentDecisions";
 export type {
   AgentDecision,
-  AgentDecisionStatus,
-  AgentDecisionTtl
+  AgentDecisionStatus
 } from "./agentDecisions";
 export {
   correctAgentMemory,
@@ -63,41 +57,26 @@ export {
 } from "./agentMemory";
 export type { AgentMemory } from "./agentMemory";
 export {
-  getAgentRun,
   getAgentRunWithTimeline,
   listAgentReports,
-  listAgentToolCalls,
   listApprovals,
-  listWorkflowEvents
 } from "./agentTimeline";
 export type {
   AgentReport,
-  AgentRun,
-  AgentRunTimeline,
-  AgentToolCall,
   Approval,
   WorkflowEvent
 } from "./agents";
 export {
   bookMockAppointment,
-  listAvailableSlots,
   listOpenFollowups,
-  listReviewInvoices,
   markAppointmentArrived,
   markFollowupContacted,
   resetMockClinicState
 } from "./mockClinic";
 export { listMockClinic } from "./mockClinicSnapshot";
 export {
-  createPricingObservation,
-  listPricingObservations,
-  listServiceCatalog
-} from "./mockClinicPricing";
-export { findArrivalAppointment } from "./mockClinicLookup";
-export {
   checkoutArrivalRoom,
   createArrivalException,
-  defaultArrivalQuestionnaire,
   getArrivalSettings,
   listArrivalDesk,
   matchArrivalIdentity,
@@ -116,27 +95,18 @@ export type {
 } from "./arrivalIntake";
 export type {
   MockAppointment,
-  MockCallTranscript,
-  MockClient,
-  MockFollowup,
-  MockInvoice,
   MockLabCatalogItem,
   MockLabOrder,
   MockLabResult,
-  MockMessage,
-  MockPet,
-  MockService,
-  MockSlot,
-  PricingObservation
 } from "./mockClinic";
 export {
-  isPriorityAlertsEnabled,
+  isEndOfDayAlertsEnabled,
   deactivateRecipientProfile,
   getRecipientProfile,
   getRecipientProfileByPasscode,
   listRecipientProfiles,
   setRecipientProfile,
-  setPriorityAlertsEnabled
+  setEndOfDayAlertsEnabled
 } from "./settings";
 export type { RecipientProfile } from "./settings";
 export type {

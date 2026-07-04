@@ -12,7 +12,7 @@ export type Audience = "customer" | "staff";
 type Props = {
   audience: Audience;
   onAuth: (session: AccountSession) => void;
-  onLegacyStaff: () => void;
+  onOpenPasscodeBoard: () => void;
 };
 
 type CustomerView = "login" | "signup";
@@ -38,7 +38,7 @@ const COPY = {
   }
 } as const;
 
-export function AuthScreen({ audience, onAuth, onLegacyStaff }: Props) {
+export function AuthScreen({ audience, onAuth, onOpenPasscodeBoard }: Props) {
   const [customerView, setCustomerView] = useState<CustomerView>("login");
   const clinic = useClinicBrand();
   const copy = COPY[audience];
@@ -87,7 +87,7 @@ export function AuthScreen({ audience, onAuth, onLegacyStaff }: Props) {
               <CustomerSignup onAuth={onAuth} onSwitch={() => setCustomerView("login")} />
             )
           ) : (
-            <StaffPortal onAuth={onAuth} onLegacyStaff={onLegacyStaff} />
+            <StaffPortal onAuth={onAuth} onOpenPasscodeBoard={onOpenPasscodeBoard} />
           )}
         </div>
         <a className="authCrossLink" href={copy.crossHref}>

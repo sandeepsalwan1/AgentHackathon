@@ -3,27 +3,10 @@ import { resolveClinicId } from "./clinics";
 import {
   normalizeAppointment,
   normalizeFollowup,
-  normalizeInvoice,
-  normalizeSlot,
   type AppointmentRow,
-  type FollowupRow,
-  type InvoiceRow,
-  type SlotRow
+  type FollowupRow
 } from "./mockClinicRows";
-export type {
-  MockAppointment,
-  MockCallTranscript,
-  MockClient,
-  MockFollowup,
-  MockInvoice,
-  MockMessage,
-  MockPet,
-  MockSlot
-} from "./mockClinicRows";
-export type {
-  MockService,
-  PricingObservation
-} from "./mockClinicPricingRows";
+export type { MockAppointment } from "./mockClinicRows";
 export type {
   MockLabCatalogItem,
   MockLabOrder,
@@ -36,11 +19,21 @@ export async function resetMockClinicState(options?: { clinicId?: string | null 
   const appointmentRows = await sql<{ id: string }[]>`
     update mock_appointments
     set status = 'scheduled',
+      appointment_date = case
+        when id in ('appt-biscuit-today', 'appt-luna-today', 'appt-otis-today') then current_date
+        when id = 'appt-maple-tomorrow' then current_date + interval '1 day'
+        else appointment_date
+      end,
       room_status = 'waiting',
       arrived_at = null,
       updated_at = now()
     where clinic_id = ${clinicId}
-      and (status = 'arrived' or arrived_at is not null)
+      and (
+        status = 'arrived'
+        or arrived_at is not null
+        or (id in ('appt-biscuit-today', 'appt-luna-today', 'appt-otis-today') and appointment_date <> current_date)
+        or (id = 'appt-maple-tomorrow' and appointment_date <> current_date + interval '1 day')
+      )
     returning id
   `;
   const bookedRows = await sql<{ id: string }[]>`
@@ -148,34 +141,6 @@ export async function bookMockAppointment(input: {
   return rows[0] ? normalizeAppointment(rows[0]) : null;
 }
 
-export async function listAvailableSlots(
-  appointmentType?: string | null,
-  options?: { clinicId?: string | null }
-) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(options?.clinicId);
-  const type = appointmentType?.trim();
-  const rows = type
-    ? await sql<SlotRow[]>`
-        select id, slot_date, slot_time, doctor, appointment_type, available
-        from mock_slots
-        where available = true
-          and clinic_id = ${clinicId}
-          and appointment_type ilike ${`%${type}%`}
-        order by slot_date asc, slot_time asc
-        limit 8
-      `
-    : await sql<SlotRow[]>`
-        select id, slot_date, slot_time, doctor, appointment_type, available
-        from mock_slots
-        where available = true
-          and clinic_id = ${clinicId}
-        order by slot_date asc, slot_time asc
-        limit 8
-      `;
-  return rows.map(normalizeSlot);
-}
-
 export async function listOpenFollowups(options?: { clinicId?: string | null }) {
   const sql = getSql();
   const clinicId = await resolveClinicId(options?.clinicId);
@@ -200,17 +165,4 @@ export async function markFollowupContacted(id: string, options?: { clinicId?: s
     returning id, client_id, pet_id, followup_type, due_date, recommended_action, status
   `;
   return rows[0] ? normalizeFollowup(rows[0]) : null;
-}
-
-export async function listReviewInvoices(options?: { clinicId?: string | null }) {
-  const sql = getSql();
-  const clinicId = await resolveClinicId(options?.clinicId);
-  const rows = await sql<InvoiceRow[]>`
-    select id, client_id, pet_id, invoice_number, invoice_date, total_cents, status, line_items, flags
-    from mock_invoices
-    where clinic_id = ${clinicId}
-      and (status = 'review' or jsonb_array_length(flags) > 0)
-    order by invoice_date desc
-  `;
-  return rows.map(normalizeInvoice);
 }

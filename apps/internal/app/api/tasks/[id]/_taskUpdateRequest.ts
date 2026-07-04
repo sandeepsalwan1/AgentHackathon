@@ -41,7 +41,7 @@ export const taskUpdateBodySchema = z.object({
   invalidReason: z.string().trim().max(500).optional().nullable()
 });
 
-export type TaskUpdateBody = z.infer<typeof taskUpdateBodySchema>;
+type TaskUpdateBody = z.infer<typeof taskUpdateBodySchema>;
 
 type TaskUpdateError = {
   error: string;

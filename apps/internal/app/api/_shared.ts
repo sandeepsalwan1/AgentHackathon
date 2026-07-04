@@ -1,26 +1,18 @@
 import {
   checkAuthAttemptLimit,
   getRecipientProfileByPasscode,
-  MissingDatabaseUrlError,
   recordAuthAttempt,
   resolveClinicForHostname,
   type Actor,
   type AppRole,
-  type ClinicContext,
-  type Task
+  type ClinicContext
 } from "@central-vet/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-export { canAdmin, canManage } from "../lib/taskWorkflow";
+import { canManage } from "../lib/taskWorkflow";
+import { logWarn } from "./_apiResponse";
 
 const roleSchema = z.enum(["staff", "va", "task_adder", "veterinarian", "admin"]);
-export const noStoreHeaders = {
-  "Cache-Control": "no-store, max-age=0, must-revalidate"
-};
-
-type LogValue = string | number | boolean | null | undefined;
-type LogFields = Record<string, LogValue>;
-
 export const actorSchema = z.object({
   name: z.string().trim().max(80).optional().default(""),
   role: roleSchema,
@@ -99,8 +91,8 @@ async function normalizeActor(
   return null;
 }
 
-function passcodeFromRequest(url: URL, request?: Request) {
-  return request?.headers.get(passcodeHeader) || url.searchParams.get("passcode") || undefined;
+function passcodeFromRequest(request: Request) {
+  return request?.headers.get(passcodeHeader) || undefined;
 }
 
 function clientIdentity(request: Request, role: AppRole) {
@@ -174,7 +166,7 @@ export async function authenticateActorFromQuery(
 ) {
   const role = roleSchema.safeParse(url.searchParams.get("role") ?? "staff");
   const name = url.searchParams.get("name") || "";
-  const passcode = passcodeFromRequest(url, request);
+  const passcode = passcodeFromRequest(request);
   if (!role.success) {
     return {
       response: NextResponse.json({ error: "Invalid role or passcode." }, { status: 403 })
@@ -183,69 +175,51 @@ export async function authenticateActorFromQuery(
   return authenticateActor({ name, role: role.data, passcode }, request, clinic);
 }
 
-function staffSafeActorName(role: AppRole | null, name: string | null) {
-  if (role === "va" || role === "task_adder") return "VA";
-  if (role === "admin") return "Admin";
-  return name;
-}
-
-export function sanitizeTaskForActor(task: Task, role: AppRole) {
-  if (role !== "staff") return task;
-  const adminOrVaSource =
-    task.source === "admin" ||
-    task.source === "va" ||
-    task.source === "task_adder";
-  const assignedTo =
-    task.status === "pending"
-      ? staffSafeActorName(task.assignedByRole, task.assignedTo)
-      : adminOrVaSource
-        ? null
-        : task.assignedTo;
-
-  return {
-    ...task,
-    assignedTo,
-    updatedByName: null,
-    createdByName: staffSafeActorName(task.createdByRole, task.createdByName),
-    completedByName: staffSafeActorName(task.completedByRole, task.completedByName),
-    archivedByName: staffSafeActorName(task.archivedByRole, task.archivedByName),
-    escalatedByName: staffSafeActorName(task.escalatedByRole, task.escalatedByName)
-  };
-}
-
-function logPayload(event: string, fields: LogFields = {}) {
-  return {
-    event,
-    at: new Date().toISOString(),
-    ...fields
-  };
-}
-
-export function logInfo(event: string, fields?: LogFields) {
-  console.info(logPayload(event, fields));
-}
-
-export function logWarn(event: string, fields?: LogFields) {
-  console.warn(logPayload(event, fields));
-}
-
-export function logError(event: string, error: unknown, fields?: LogFields) {
-  const message = error instanceof Error ? error.message : "Unknown error";
-  console.error(logPayload(event, { ...fields, error: message }));
-}
-
-export function dbError(error: unknown, fields?: LogFields) {
-  if (error instanceof MissingDatabaseUrlError) {
-    logWarn("database_missing_url", fields);
-    return NextResponse.json(
-      {
-        error: "Database not configured.",
-        detail: "Set Supabase DATABASE_URL, then run npm run db:migrate."
-      },
-      { status: 503 }
-    );
+export async function requireManagerFromQuery(request: Request) {
+  const url = new URL(request.url);
+  const clinic = await resolveClinicFromRequest(request);
+  const auth = await authenticateActorFromQuery(url, request, clinic);
+  if ("response" in auth) return { url, clinic, response: auth.response };
+  if (!canManage(auth.actor.role)) {
+    return {
+      url,
+      clinic,
+      response: NextResponse.json({ error: "Manager access required." }, { status: 403 })
+    };
   }
+  return { url, clinic, actor: auth.actor };
+}
 
-  logError("server_error", error, fields);
-  return NextResponse.json({ error: "Server error." }, { status: 500 });
+async function readBody(request: Request) {
+  return await request.json().catch(() => ({}));
+}
+
+async function requireActorFromBody(request: Request) {
+  const body = await readBody(request);
+  const clinic = await resolveClinicFromRequest(request);
+  const actorResult = actorSchema.safeParse(body.actor);
+  if (!actorResult.success) {
+    return {
+      body,
+      response: NextResponse.json({ error: "Internal agent routes require actor credentials." }, { status: 403 })
+    };
+  }
+  const auth = await authenticateActor(actorResult.data, request, clinic);
+  if ("response" in auth) {
+    return { body, response: auth.response };
+  }
+  return { body, actor: auth.actor, clinic };
+}
+
+export async function requireManagerFromBody(request: Request) {
+  const auth = await requireActorFromBody(request);
+  if ("response" in auth) return auth;
+  if (!canManage(auth.actor.role)) {
+    logWarn("manager_route_rejected", { actorRole: auth.actor.role });
+    return {
+      body: auth.body,
+      response: NextResponse.json({ error: "Manager access required." }, { status: 403 })
+    };
+  }
+  return auth;
 }

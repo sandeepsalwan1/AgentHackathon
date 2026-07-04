@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSession, logout, type AccountSession } from "../lib/accountStore";
+import { validateAccountTeamSession } from "../lib/authClient";
 import { AdminDashboard } from "./admin/AdminDashboard";
 import { AuthScreen, type Audience } from "./auth/AuthScreen";
 import { ClinicProvider, useClinicBrand } from "./ClinicContext";
@@ -23,7 +24,7 @@ type View =
   | { kind: "redirecting" }
   | { kind: "board" } // staff / VA / veterinarian on the shared task board
   | { kind: "customer"; session: AccountSession }
-  | { kind: "admin"; session: AccountSession };
+  | { kind: "admin"; session: AccountSession & { role: "admin" } };
 
 const HOME_PATH = "/";
 const STAFF_PATH = "/staff";
@@ -32,8 +33,12 @@ function audienceForRole(role: AccountSession["role"]): Audience {
   return role === "customer" ? "customer" : "staff";
 }
 
-// A staff/vet/admin account drives the task board through the legacy passcode
-// session it shares with the API. Mirror the account into that session so the
+function isAdminSession(session: AccountSession): session is AccountSession & { role: "admin" } {
+  return session.role === "admin";
+}
+
+// A staff/vet/admin account drives the task board through the passcode session
+// it shares with the API. Mirror the account into that session so the
 // team never has to sign in twice.
 function bridgeToBoardSession(session: AccountSession) {
   if (session.role === "customer") return;
@@ -48,9 +53,21 @@ function bridgeToBoardSession(session: AccountSession) {
 
 function viewForSession(session: AccountSession): View {
   if (session.role === "customer") return { kind: "customer", session };
-  if (session.role === "admin") return { kind: "admin", session };
+  if (isAdminSession(session)) return { kind: "admin", session };
   bridgeToBoardSession(session);
   return { kind: "board" };
+}
+
+async function resolveViewForSession(session: AccountSession): Promise<View> {
+  if (session.role !== "customer") {
+    const validation = await validateAccountTeamSession(session);
+    if (validation === "invalid") {
+      logout();
+      clearStoredTaskBoardSession();
+      return { kind: "board" };
+    }
+  }
+  return viewForSession(session);
 }
 
 function AppRootContent({ audience }: { audience: Audience }) {
@@ -58,20 +75,27 @@ function AppRootContent({ audience }: { audience: Audience }) {
   const clinic = useClinicBrand();
 
   useEffect(() => {
+    let cancelled = false;
     const id = window.setTimeout(() => {
-      const session = getSession();
-      if (!session) {
-        setView({ kind: "auth" });
-        return;
-      }
-      if (audienceForRole(session.role) !== audience) {
-        setView({ kind: "redirecting" });
-        window.location.replace(audience === "customer" ? STAFF_PATH : HOME_PATH);
-        return;
-      }
-      setView(viewForSession(session));
+      void (async () => {
+        const session = getSession();
+        if (!session) {
+          if (!cancelled) setView({ kind: "auth" });
+          return;
+        }
+        if (audienceForRole(session.role) !== audience) {
+          if (!cancelled) setView({ kind: "redirecting" });
+          window.location.replace(audience === "customer" ? STAFF_PATH : HOME_PATH);
+          return;
+        }
+        const nextView = await resolveViewForSession(session);
+        if (!cancelled) setView(nextView);
+      })();
     }, 0);
-    return () => window.clearTimeout(id);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
   }, [audience]);
 
   function handleAuth(session: AccountSession) {
@@ -80,7 +104,8 @@ function AppRootContent({ audience }: { audience: Audience }) {
       window.location.replace(audienceForRole(session.role) === "customer" ? HOME_PATH : STAFF_PATH);
       return;
     }
-    setView(viewForSession(session));
+    setView({ kind: "loading" });
+    void resolveViewForSession(session).then(setView);
   }
 
   function handleOpenBoard() {
@@ -110,7 +135,7 @@ function AppRootContent({ audience }: { audience: Audience }) {
   }
 
   if (view.kind === "auth") {
-    return <AuthScreen audience={audience} onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
+    return <AuthScreen audience={audience} onAuth={handleAuth} onOpenPasscodeBoard={handleOpenBoard} />;
   }
 
   if (view.kind === "board") {
@@ -132,7 +157,7 @@ function AppRootContent({ audience }: { audience: Audience }) {
   }
 
   handleLogout();
-  return <AuthScreen audience={audience} onAuth={handleAuth} onLegacyStaff={handleOpenBoard} />;
+  return <AuthScreen audience={audience} onAuth={handleAuth} onOpenPasscodeBoard={handleOpenBoard} />;
 }
 
 export function AppRoot({ audience = "customer" }: { audience?: Audience }) {

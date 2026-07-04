@@ -2,7 +2,6 @@
 
 import type { Task, TaskEvent } from "@central-vet/db";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { canManage } from "../lib/taskWorkflow";
 import {
   activeTaskSyncIntervalMs,
   activeTaskSyncWindowMs,
@@ -18,9 +17,10 @@ import {
   writeStoredTaskBoardSession
 } from "./taskBoardBrowserState";
 import {
-  isAuthError,
+  taskBoardActorQuery,
   readTaskBoardSnapshot
 } from "./taskBoardClient";
+import { isAuthError } from "../lib/apiClient";
 import type { TaskBoardSession as Session } from "./taskBoardTypes";
 
 type LoadOptions = {
@@ -45,12 +45,7 @@ export function useTaskBoardDataSync() {
 
   const actorQuery = useMemo(() => {
     if (!session) return "";
-    const params = new URLSearchParams({
-      name: session.name,
-      role: session.role,
-      includeArchived: canManage(session.role) ? "true" : "false"
-    });
-    return params.toString();
+    return taskBoardActorQuery(session);
   }, [session]);
 
   const recordActivity = useCallback(() => {

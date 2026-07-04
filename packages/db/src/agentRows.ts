@@ -1,7 +1,7 @@
 import type { AppRole } from "./types";
-import type { AgentDecision } from "./agentDecisions";
+import type { AgentDecision } from "./agentDecisionRows";
 
-export type AgentRun = {
+type AgentRun = {
   id: string;
   clinicId: string;
   agent: string;
@@ -68,7 +68,7 @@ export type AgentReport = {
   createdAt: string;
 };
 
-export type AgentToolCall = {
+type AgentToolCall = {
   id: string;
   clinicId: string;
   runId: string | null;

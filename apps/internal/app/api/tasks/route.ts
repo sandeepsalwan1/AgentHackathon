@@ -1,40 +1,21 @@
 import {
-  archiveCompletedTasksBefore,
   createTask,
-  listTasks
 } from "@central-vet/db";
 import { NextResponse } from "next/server";
+import { dbError, logInfo, logWarn, noStoreHeaders } from "../_apiResponse";
 import {
   authenticateActor,
   authenticateActorFromQuery,
   actorSchema,
-  dbError,
-  logInfo,
-  logWarn,
-  noStoreHeaders,
-  resolveClinicFromRequest,
-  sanitizeTaskForActor
+  resolveClinicFromRequest
 } from "../_shared";
 import {
   internalTaskCreateGuard,
   taskCreateInputForActor,
   taskCreateSchema
 } from "./_taskCreateRequest";
-
-const systemActor = { name: "System", role: "admin" as const };
-
-function localDateString(
-  timeZone = process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles"
-) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
+import { taskListPayload } from "./_taskListRequest";
+import { sanitizeTaskForActor } from "./_taskVisibility";
 
 export async function GET(request: Request) {
   try {
@@ -48,21 +29,8 @@ export async function GET(request: Request) {
     const actor = auth.actor;
 
     const includeArchived = url.searchParams.get("includeArchived") === "true";
-    await archiveCompletedTasksBefore(
-      localDateString(),
-      systemActor,
-      clinic.timeZone || process.env.APP_TIME_ZONE || process.env.TZ || "America/Los_Angeles",
-      { clinicId: clinic.clinicId }
-    );
-    const tasks = await listTasks({
-      clinicId: clinic.clinicId,
-      role: actor.role,
-      includeArchived
-    });
     return NextResponse.json(
-      {
-        tasks: tasks.map((task) => sanitizeTaskForActor(task, actor.role))
-      },
+      await taskListPayload({ actor, clinic, includeArchived }),
       { headers: noStoreHeaders }
     );
   } catch (error) {

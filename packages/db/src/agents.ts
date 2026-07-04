@@ -21,9 +21,6 @@ import {
 } from "./agentRows";
 export type {
   AgentReport,
-  AgentRun,
-  AgentRunTimeline,
-  AgentToolCall,
   Approval,
   WorkflowEvent
 } from "./agentRows";

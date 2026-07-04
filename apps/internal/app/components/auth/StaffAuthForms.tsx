@@ -10,14 +10,15 @@ import {
   saveSession,
   type AccountSession
 } from "../../lib/accountStore";
+import { AuthCodeInput } from "./AuthCodeInput";
 import { AuthPasswordInput } from "./AuthPasswordInput";
 
 type StaffPortalProps = {
   onAuth: (session: AccountSession) => void;
-  onLegacyStaff: () => void;
+  onOpenPasscodeBoard: () => void;
 };
 
-export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
+export function StaffPortal({ onAuth, onOpenPasscodeBoard }: StaffPortalProps) {
   const [view, setView] = useState<"login" | "redeem">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -77,14 +78,7 @@ export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
         </label>
         <label className="authLabel">
           One-time password
-          <input
-            type="text"
-            value={otp}
-            onChange={(event) => setOtp(event.target.value.toUpperCase())}
-            placeholder="e.g. A1B2C3D4"
-            style={{ fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}
-            required
-          />
+          <AuthCodeInput value={otp} onChange={setOtp} placeholder="e.g. A1B2C3D4" />
         </label>
         <label className="authLabel">
           New password
@@ -146,7 +140,7 @@ export function StaffPortal({ onAuth, onLegacyStaff }: StaffPortalProps) {
         </button>
       </p>
       <div className="authDivider" />
-      <button type="button" className="authGhostBtn" onClick={onLegacyStaff}>
+      <button type="button" className="authGhostBtn" onClick={onOpenPasscodeBoard}>
         Use a clinic passcode instead
       </button>
     </form>

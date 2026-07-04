@@ -1,7 +1,7 @@
 import type { LabCatalogRow, LabOrderRow, LabResultRow } from "./mockClinicLabRows";
 import type { PricingObservationRow, ServiceRow } from "./mockClinicPricingRows";
 
-export type MockClient = {
+type MockClient = {
   id: string;
   fullName: string;
   phone: string;
@@ -9,7 +9,7 @@ export type MockClient = {
   notes: string | null;
 };
 
-export type MockPet = {
+type MockPet = {
   id: string;
   clientId: string;
   name: string;
@@ -35,7 +35,7 @@ export type MockAppointment = {
   notes: string | null;
 };
 
-export type MockSlot = {
+type MockSlot = {
   id: string;
   slotDate: string;
   slotTime: string;
@@ -44,7 +44,7 @@ export type MockSlot = {
   available: boolean;
 };
 
-export type MockFollowup = {
+type MockFollowup = {
   id: string;
   clientId: string;
   petId: string;
@@ -54,7 +54,7 @@ export type MockFollowup = {
   status: string;
 };
 
-export type MockInvoice = {
+type MockInvoice = {
   id: string;
   clientId: string;
   petId: string;
@@ -66,7 +66,7 @@ export type MockInvoice = {
   flags: Record<string, unknown>[];
 };
 
-export type MockMessage = {
+type MockMessage = {
   id: string;
   clientId: string | null;
   channel: string;
@@ -78,7 +78,7 @@ export type MockMessage = {
   createdAt: string;
 };
 
-export type MockCallTranscript = {
+type MockCallTranscript = {
   id: string;
   callerName: string;
   callerPhone: string;
@@ -87,7 +87,7 @@ export type MockCallTranscript = {
   createdAt: string;
 };
 
-export type ClientRow = {
+type ClientRow = {
   id: string;
   full_name: string;
   phone: string;
@@ -95,7 +95,7 @@ export type ClientRow = {
   notes: string | null;
 };
 
-export type PetRow = {
+type PetRow = {
   id: string;
   client_id: string;
   name: string;
@@ -121,7 +121,7 @@ export type AppointmentRow = {
   notes: string | null;
 };
 
-export type SlotRow = {
+type SlotRow = {
   id: string;
   slot_date: string | Date;
   slot_time: string;
@@ -140,7 +140,7 @@ export type FollowupRow = {
   status: string;
 };
 
-export type InvoiceRow = {
+type InvoiceRow = {
   id: string;
   client_id: string;
   pet_id: string;
@@ -152,7 +152,7 @@ export type InvoiceRow = {
   flags: Record<string, unknown>[];
 };
 
-export type MessageRow = {
+type MessageRow = {
   id: string;
   client_id: string | null;
   channel: string;
@@ -164,7 +164,7 @@ export type MessageRow = {
   created_at: string;
 };
 
-export type CallRow = {
+type CallRow = {
   id: string;
   caller_name: string;
   caller_phone: string;

@@ -1,10 +1,10 @@
-import { handleClientRequestIntake } from "@central-vet/request-intake";
+import { handleClientRequest } from "@central-vet/client-request";
 import { NextResponse } from "next/server";
 import { resolveClinicFromRequest } from "../_shared";
 
 export async function POST(request: Request) {
   const clinic = await resolveClinicFromRequest(request);
-  const result = await handleClientRequestIntake(request, {
+  const result = await handleClientRequest(request, {
     clinicId: clinic.clinicId,
     hospitalName: clinic.name,
     maxTrackedClients: 2000

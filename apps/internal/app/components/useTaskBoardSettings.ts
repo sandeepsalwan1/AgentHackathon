@@ -2,16 +2,16 @@
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import type { RecipientProfile } from "@central-vet/db";
+import { isAuthError } from "../lib/apiClient";
 import { canUseNotificationSettings } from "../lib/taskWorkflow";
+import { doctorName } from "../lib/veterinarianProfile";
 import { writeStoredTaskBoardSession } from "./taskBoardBrowserState";
 import {
   deactivateTaskBoardRecipientProfile,
-  isAuthError,
   readTaskBoardSettings,
   saveTaskBoardRecipientProfile,
-  setTaskBoardPriorityAlerts
-} from "./taskBoardClient";
-import { doctorName } from "./taskBoardDisplay";
+  setTaskBoardEndOfDayAlerts
+} from "./taskBoardSettingsClient";
 import type { TaskBoardSession as Session, TaskBoardToast } from "./taskBoardTypes";
 
 type TaskBoardSyncType = "tasks_changed" | "settings_changed";
@@ -37,26 +37,26 @@ export function useTaskBoardSettings({
 }: UseTaskBoardSettingsOptions) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  const [priorityAlertsEnabled, setPriorityAlertsEnabled] = useState(true);
+  const [endOfDayAlertsEnabled, setEndOfDayAlertsEnabled] = useState(true);
   const [recipientProfiles, setRecipientProfiles] = useState<RecipientProfile[]>([]);
   const [canEditAllProfiles, setCanEditAllProfiles] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [addingProfile, setAddingProfile] = useState(false);
 
   const applySettings = useCallback((data: {
-    priorityAlertsEnabled: boolean;
+    endOfDayAlertsEnabled: boolean;
     recipientProfiles: RecipientProfile[];
     canEditAllProfiles: boolean;
     currentProfileId: string | null;
   }) => {
-    setPriorityAlertsEnabled(data.priorityAlertsEnabled);
+    setEndOfDayAlertsEnabled(data.endOfDayAlertsEnabled);
     setRecipientProfiles(data.recipientProfiles);
     setCanEditAllProfiles(data.canEditAllProfiles);
     setCurrentProfileId(data.currentProfileId);
   }, []);
 
   const resetSettings = useCallback(() => {
-    setPriorityAlertsEnabled(false);
+    setEndOfDayAlertsEnabled(false);
     setRecipientProfiles([]);
     setCanEditAllProfiles(false);
     setCurrentProfileId(null);
@@ -76,23 +76,23 @@ export function useTaskBoardSettings({
     }
   }, [actorQuery, applySettings, clearSession, resetSettings, session, setError]);
 
-  const togglePriorityAlerts = useCallback(async () => {
+  const toggleEndOfDayAlerts = useCallback(async () => {
     if (!session || session.role !== "admin") return;
-    const next = !priorityAlertsEnabled;
-    setPriorityAlertsEnabled(next);
+    const next = !endOfDayAlertsEnabled;
+    setEndOfDayAlertsEnabled(next);
     setSettingsSaving(true);
     try {
-      const data = await setTaskBoardPriorityAlerts(session, next);
+      const data = await setTaskBoardEndOfDayAlerts(session, next);
       applySettings(data);
-      setToast({ text: next ? "Priority alerts on." : "Priority alerts off." });
+      setToast({ text: next ? "End-of-day alert on." : "End-of-day alert off." });
       publishSync("settings_changed");
     } catch (settingsError) {
-      setPriorityAlertsEnabled(!next);
+      setEndOfDayAlertsEnabled(!next);
       setError(settingsError instanceof Error ? settingsError.message : "Settings failed.");
     } finally {
       setSettingsSaving(false);
     }
-  }, [applySettings, priorityAlertsEnabled, publishSync, session, setError, setToast]);
+  }, [applySettings, endOfDayAlertsEnabled, publishSync, session, setError, setToast]);
 
   const saveRecipientProfile = useCallback(async (profile: RecipientProfile) => {
     if (!session || !canUseNotificationSettings(session.role)) return;
@@ -139,14 +139,14 @@ export function useTaskBoardSettings({
   return {
     settingsOpen,
     settingsSaving,
-    priorityAlertsEnabled,
+    endOfDayAlertsEnabled,
     recipientProfiles,
     canEditAllProfiles,
     currentProfileId,
     addingProfile,
     loadSettings,
     toggleSettingsOpen: () => setSettingsOpen((open) => !open),
-    togglePriorityAlerts,
+    toggleEndOfDayAlerts,
     saveRecipientProfile,
     deactivateRecipientProfile,
     startAddingProfile: () => setAddingProfile(true),
