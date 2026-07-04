@@ -16,6 +16,35 @@ export type {
 export async function resetMockClinicState(options?: { clinicId?: string | null }) {
   const sql = getSql();
   const clinicId = await resolveClinicId(options?.clinicId);
+  const roomRows = await sql<{ id: string }[]>`
+    update clinic_rooms
+    set state = 'open',
+      current_arrival_id = null,
+      auto_open_at = null,
+      state_changed_at = now(),
+      updated_at = now()
+    where clinic_id = ${clinicId}
+      and (
+        state <> 'open'
+        or current_arrival_id is not null
+        or auto_open_at is not null
+      )
+    returning id
+  `;
+  const arrivalRows = await sql<{ id: string }[]>`
+    delete from arrival_intakes
+    where clinic_id = ${clinicId}
+      and (
+        status = 'exception'
+        or appointment_id in (
+          'appt-biscuit-today',
+          'appt-luna-today',
+          'appt-otis-today',
+          'appt-maple-tomorrow'
+        )
+      )
+    returning id
+  `;
   const appointmentRows = await sql<{ id: string }[]>`
     update mock_appointments
     set status = 'scheduled',
@@ -57,6 +86,8 @@ export async function resetMockClinicState(options?: { clinicId?: string | null 
     returning id
   `;
   return {
+    resetRooms: roomRows.length,
+    resetArrivals: arrivalRows.length,
     resetAppointments: appointmentRows.length,
     resetBookedAppointments: bookedRows.length,
     resetSlots: slotRows.length,

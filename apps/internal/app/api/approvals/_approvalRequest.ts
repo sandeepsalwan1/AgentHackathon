@@ -92,9 +92,10 @@ export async function decideApprovalFromBody(
     clinic,
     { error: "Invalid approval decision.", status: 400 }
   );
-  if (!decisionResult.success || "ok" in manager) {
+  if (!decisionResult.success) {
     return { ok: false, error: "Invalid approval decision.", status: 400 };
   }
+  if ("ok" in manager) return manager;
   if ("response" in manager) return manager;
 
   const approval = await decideApproval(approvalId, {

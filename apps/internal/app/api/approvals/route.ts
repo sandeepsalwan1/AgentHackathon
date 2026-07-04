@@ -1,33 +1,22 @@
-import { createApproval, listApprovals } from "@central-vet/db";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { dbError, noStoreHeaders } from "../_apiResponse";
 import {
-  actorSchema,
-  authenticateActor,
   requireManagerFromQuery,
   resolveClinicFromRequest
 } from "../_shared";
-import { canManage } from "../../lib/taskWorkflow";
+import { approvalListPayload, createApprovalFromBody } from "./_approvalRequest";
 
 export const dynamic = "force-dynamic";
-
-const approvalSchema = z.object({
-  runId: z.string().uuid().optional().nullable(),
-  taskId: z.string().uuid().optional().nullable(),
-  approvalType: z.string().trim().min(2).max(80),
-  title: z.string().trim().min(2).max(160),
-  summary: z.string().trim().min(2).max(2000),
-  requestedAction: z.record(z.string(), z.unknown()).optional()
-});
 
 export async function GET(request: Request) {
   try {
     const auth = await requireManagerFromQuery(request);
     if ("response" in auth) return auth.response;
     const status = auth.url.searchParams.get("status") || "pending";
-    const approvals = await listApprovals({ clinicId: auth.clinic.clinicId, status });
-    return NextResponse.json({ ok: true, approvals }, { headers: noStoreHeaders });
+    return NextResponse.json(
+      await approvalListPayload(auth.clinic.clinicId, status),
+      { headers: noStoreHeaders }
+    );
   } catch (error) {
     return dbError(error, { route: "approvals.list" });
   }
@@ -36,25 +25,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const actorResult = actorSchema.safeParse(body.actor);
-    if (!actorResult.success) {
-      return NextResponse.json({ error: "Actor credentials are required." }, { status: 403 });
-    }
     const clinic = await resolveClinicFromRequest(request);
-    const auth = await authenticateActor(actorResult.data, request, clinic);
-    if ("response" in auth) return auth.response;
-    if (!canManage(auth.actor.role)) {
-      return NextResponse.json({ error: "Manager access required." }, { status: 403 });
-    }
-    const parsed = approvalSchema.safeParse(body.approval);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid approval request." }, { status: 400 });
-    }
-    const approval = await createApproval({
-      ...parsed.data,
-      clinicId: clinic.clinicId
-    });
-    return NextResponse.json({ ok: true, approval }, { headers: noStoreHeaders, status: 201 });
+    const result = await createApprovalFromBody(request, body, clinic);
+    if ("response" in result) return result.response;
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ ok: true, approval: result.approval }, { headers: noStoreHeaders, status: result.status });
   } catch (error) {
     return dbError(error, { route: "approvals.create" });
   }

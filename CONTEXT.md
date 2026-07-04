@@ -93,6 +93,7 @@ _Avoid_: Manual-only room release
 - Arrival desk browser adapter: browser request payloads and response normalization for Arrival Desk snapshot, room, checkout, and settings mutations.
 - Arrival desk state: browser polling, room-to-arrival projection, settings drafts, room updates, checkout, and Arrival questionnaire saves.
 - Mock clinic snapshot query: aggregate persisted mock clinic clients, pets, appointments, slots, followups, invoices, messages, pricing, and lab data for agent runtime input.
+- Mock clinic request: manager-authenticated fixture snapshot and reset route behavior for demos/scenarios.
 - Mock clinic row projection: database row-to-contract mapping for mock clinic clients, pets, appointments, pricing, and lab data.
 - Mock clinic pricing row projection: database row-to-contract mapping for service catalog rows and competitor pricing observations.
 - Pricing agent data: service catalog and competitor observations loaded from the mock clinic snapshot, with scan results kept in runtime data and pricing reports persisted as agent reports.
@@ -114,18 +115,20 @@ _Avoid_: Manual-only room release
 - Task board form state: browser create/edit modal state, blank/edit projection, save request, refresh, sync, errors, and toast.
 - Task board mutation actions: browser side-effect rules for status, archive, escalation, undo, refresh, toast, and completion confetti.
 - Task board overlays: browser invalid-task modal and undoable toast rendering for task-board mutations.
+- Task audit event request: task audit event read auth, permission logging, and tenant-scoped event query.
 - Task board profile-name state: browser optimistic session rename, server save, actor-reference reconciliation, settings sync, toast, and rollback.
 - Admin task snapshot: browser polling, active-task filtering, dashboard stats, and new-task counts for the admin Tasks tab.
 - Admin Tasks tab: browser rendering for admin task stats, active queue rows, manual refresh, and internal-agent quick actions.
 - Team account panel: admin browser flow for creating clinic team accounts, showing one-time passwords, and listing activation status.
+- Approval request: manager approval listing, create payload validation, decision validation, manager auth, and approval persistence.
 - Approval queue browser adapter: browser request payloads and response normalization for manager approval listing and approve/reject mutations.
 - Approval queue state: stored task-board session load, approval list state, saving state, errors, and refresh after decisions.
 - Browser phone text: shared browser phone digit extraction, input formatting, SMS readiness, and display formatting.
-- Settings request: notification setting projection, veterinarian profile mutation, profile-name normalization, and actor-reference rename side effects.
+- Settings request: settings access validation, notification setting projection, veterinarian profile mutation, profile-name normalization, and actor-reference rename side effects.
 - Task board settings state: notification settings loading, end-of-day alert toggles, veterinarian profile saves/deactivation, and settings sync signalling.
 - Task board settings UI: veterinarian notification profile controls and end-of-day alert panel for the task board.
 - Admin assistant chat state: browser messages, quick-action loading, internal-agent sends, and post-agent task refresh.
-- Profile-name request: actor display-name update, doctor-name normalization, veterinarian profile sync, and task/audit actor-reference rename side effects.
+- Profile-name request: profile-name payload/auth validation, actor display-name update, doctor-name normalization, veterinarian profile sync, and task/audit actor-reference rename side effects.
 - Task list request: read-side completed-task archive cutoff, role-scoped task query, and staff-safe task projection.
 - Task visibility projection: role-specific task response shaping that hides staff-unsafe actor details.
 - Task transition persistence: status moves, completion/invalid/archive/undo/escalation writes, and transition audit metadata.
@@ -149,6 +152,7 @@ _Avoid_: Manual-only room release
 - Chat report card: inline agent report summary and expandable report-detail rendering for chat messages.
 - Public agent result panel: browser summary rendering for public workflow outputs, task ids, approval ids, run ids, and agent result facts.
 - Notification content: HTML/text rendering for escalation, daily priority summary, smoke, and agent-example notifications.
+- Notification request: cron authorization, notification mode normalization, environment recipient-list parsing, and smoke-notification auth/send behavior for notification routes.
 - Notification delivery planning: mode, channel, recipient, timezone, and opt-in target selection for notification sends.
 - Notification send pipeline: idempotency keys, notification attempt lifecycle, Resend transport, and per-recipient send results.
 - Account auth browser adapter: browser request payloads and validation-state projection for passcode-backed `/api/auth` checks.

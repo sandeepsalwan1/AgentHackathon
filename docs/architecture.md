@@ -74,6 +74,7 @@ Notification flow:
 - Mock clinic contract seam: `packages/agents/src/mockClinicContracts.ts` owns the mock clinic data shape shared by tools, adapters, scenarios, and app clinic-data projection.
 - Agent adapter seam: `packages/agents/src/adapters.ts` owns runtime operation interfaces; `mockClinicAdapters.ts` owns deterministic mock mutations behind that interface.
 - Mock clinic lookup seam: `packages/agents/src/mockClinicLookup.ts` keeps shared id/name/phone matching behind agent runtime and mock adapter code.
+- Mock clinic request seam: `apps/internal/app/api/mock/clinic/_mockClinicRequest.ts` hides manager auth, fixture snapshot, and reset behavior from the route.
 - Route auth seam: `_shared.ts` owns actor auth, manager query auth, and manager body auth.
 - Route response seam: `_apiResponse.ts` owns no-store headers, structured route logging, and database/server error responses.
 - Agent workflow route seam: `apps/internal/app/api/agent/_workflowRoutes.ts` owns route slug mapping, auth mode, and route-intent normalization.
@@ -83,16 +84,18 @@ Notification flow:
 - Arrival intake flow seam: `components/useArrivalIntakeFlow.ts` owns customer autofill, matched arrival state, step transitions, errors, and loading state.
 - Arrival desk browser adapter seam: `components/arrivalDeskClient.ts` owns browser request payloads for Arrival Desk reads and staff mutations.
 - Arrival desk state seam: `components/useArrivalDeskState.ts` owns polling, settings draft projection, room updates, checkout, and Arrival questionnaire saves for the task board.
+- Task audit event request seam: `apps/internal/app/api/events/_eventRequest.ts` hides event-read auth, permission logging, and tenant-scoped query from the route.
 - Task list request seam: `apps/internal/app/api/tasks/_taskListRequest.ts` hides read-side archive cutoff and role-specific task projection from the route.
 - Task visibility seam: `apps/internal/app/api/tasks/_taskVisibility.ts` hides staff-safe task response projection from task routes.
-- Profile-name request seam: `apps/internal/app/api/profile-name/_profileNameRequest.ts` hides actor display-name updates and reference renames from the route.
+- Profile-name request seam: `apps/internal/app/api/profile-name/_profileNameRequest.ts` hides payload/auth validation, actor display-name updates, and reference renames from the route.
 - Agent memory request seam: `apps/internal/app/api/agent/memory/_memoryRequest.ts` hides memory query/mutation validation and actor metadata from the route.
 - Staff agent audit seam: `components/useStaffAgentAudit.ts` owns decision/memory loading and memory writes for the internal-agent console.
 - Public agent flow config seam: `components/publicAgentFlowConfig.ts` owns workflow-specific public form copy/options so route pages only choose workflow keys.
 - Public agent browser adapter seam: `agentClient.ts` owns public workflow route mapping and form payloads plus customer/staff chat payloads.
 - Persistence seam: `@central-vet/db` hides SQL and row projection.
 - Notification seam: `@central-vet/notifications` hides delivery rules and transport.
-- Settings request seam: `apps/internal/app/api/settings/_settingsRequest.ts` hides profile mutation and notification-settings projection from the route.
+- Notification request seam: `apps/internal/app/api/notifications/_notificationRequest.ts` hides cron authorization, route env parsing, and smoke-notification auth/send behavior from notification routes.
+- Settings request seam: `apps/internal/app/api/settings/_settingsRequest.ts` hides settings access validation, profile mutation, and notification-settings projection from the route.
 - Browser API seam: `apiClient.ts` owns JSON/error normalization for browser fetches.
 - Browser actor seam: `browserActor.ts` owns actor body, manager read query, and passcode read-header projection for browser route adapters.
 - Account auth browser adapter seam: `authClient.ts` owns `/api/auth` request payloads and validation-state projection.
@@ -101,6 +104,7 @@ Notification flow:
 - Task board browser seam: `taskBoardClient.ts`, `taskBoardSettingsClient.ts`, `taskBoardState.ts`, `taskBoardDisplay.ts`, `taskBoardBrowserState.ts`, `useTaskBoardForm.ts`, `useTaskBoardTaskActions.ts`, and `useTaskBoardProfileName.ts` keep UI state and mutation rules out of cards.
 - Admin dashboard task seam: `components/admin/useAdminTaskSnapshot.ts` owns polling, active-task filtering, new-task counts, and stats for the admin Tasks tab.
 - Admin assistant chat seam: `components/admin/useAdminAssistantChat.ts` owns assistant messages, quick-action loading, internal-agent sends, and task refresh after agent runs.
+- Approval request seam: `apps/internal/app/api/approvals/_approvalRequest.ts` hides approval list/create/decision validation, manager auth, and persistence from approval routes.
 - Approval Queue browser adapter seam: `components/approvalQueueClient.ts` owns approval-list and approve/reject request payloads.
 - Approval Queue state seam: `components/useApprovalQueueState.ts` owns stored-session loading, approval list state, saving state, errors, and refresh after decisions.
 

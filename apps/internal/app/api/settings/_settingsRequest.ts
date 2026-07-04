@@ -10,10 +10,17 @@ import {
   type ClinicContext,
   type RecipientProfile
 } from "@central-vet/db";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { canAdmin } from "../../lib/taskWorkflow";
+import { canAdmin, canUseNotificationSettings } from "../../lib/taskWorkflow";
 import { doctorName, profileIdFromName } from "../../lib/veterinarianProfile";
-import { actorSchema } from "../_shared";
+import { logWarn } from "../_apiResponse";
+import {
+  actorSchema,
+  authenticateActor,
+  authenticateActorFromQuery,
+  resolveClinicFromRequest
+} from "../_shared";
 
 const profileSchema = z.object({
   profileId: z.string().trim().max(80).optional(),
@@ -28,7 +35,7 @@ const profileSchema = z.object({
   dailyPriorityOptIn: z.boolean()
 });
 
-export const settingsPatchSchema = z.object({
+const settingsPatchSchema = z.object({
   actor: actorSchema,
   endOfDayAlertsEnabled: z.boolean().optional(),
   profileName: z.string().trim().min(1).max(80).optional(),
@@ -37,6 +44,14 @@ export const settingsPatchSchema = z.object({
 });
 
 type SettingsPatch = z.infer<typeof settingsPatchSchema>;
+type SettingsAccessResult =
+  | { actor: Actor; clinic: ClinicContext }
+  | { response: NextResponse };
+type SettingsPatchResult =
+  | { actor: Actor; clinic: ClinicContext; patch: SettingsPatch }
+  | { response: NextResponse };
+
+const settingsAccessError = "Settings require Admin or Veterinarian.";
 
 async function profilesForActor(actor: Actor, clinicId: string) {
   const profiles = await listRecipientProfiles({ clinicId, includeInactive: false });
@@ -55,6 +70,46 @@ export async function settingsPayloadForActor(actor: Actor, clinic: ClinicContex
     canEditAllProfiles: actor.role === "admin",
     currentProfileId: actor.profileId ?? null
   };
+}
+
+export async function settingsReadContext(request: Request): Promise<SettingsAccessResult> {
+  const clinic = await resolveClinicFromRequest(request);
+  const auth = await authenticateActorFromQuery(new URL(request.url), request, clinic);
+  if ("response" in auth) {
+    logWarn("settings_read_rejected", { reason: "unauthorized" });
+    return { response: auth.response };
+  }
+  if (!canUseNotificationSettings(auth.actor.role)) {
+    logWarn("settings_read_rejected", { reason: "unauthorized" });
+    return {
+      response: NextResponse.json({ error: settingsAccessError }, { status: 403 })
+    };
+  }
+  return { actor: auth.actor, clinic };
+}
+
+export async function settingsPatchContext(request: Request): Promise<SettingsPatchResult> {
+  const parsed = settingsPatchSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    logWarn("settings_update_rejected", { reason: "unauthorized_or_invalid" });
+    return {
+      response: NextResponse.json({ error: settingsAccessError }, { status: 403 })
+    };
+  }
+
+  const clinic = await resolveClinicFromRequest(request);
+  const auth = await authenticateActor(parsed.data.actor, request, clinic);
+  if ("response" in auth) {
+    logWarn("settings_update_rejected", { reason: "unauthorized_or_invalid" });
+    return { response: auth.response };
+  }
+  if (!canUseNotificationSettings(auth.actor.role)) {
+    logWarn("settings_update_rejected", { reason: "unauthorized_or_invalid" });
+    return {
+      response: NextResponse.json({ error: settingsAccessError }, { status: 403 })
+    };
+  }
+  return { actor: auth.actor, clinic, patch: parsed.data };
 }
 
 type SettingsUpdateResult =

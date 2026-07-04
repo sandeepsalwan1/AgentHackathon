@@ -1,36 +1,15 @@
-import { sendAgentExampleEmail, type NotificationMode } from "@central-vet/notifications";
+import { sendAgentExampleEmail } from "@central-vet/notifications";
 import { NextResponse } from "next/server";
-import { dbError, logInfo, logWarn } from "../../_apiResponse";
+import { dbError, logInfo } from "../../_apiResponse";
 import { resolveClinicFromRequest } from "../../_shared";
+import { envList, notificationMode, requireCronAuthorization } from "../_notificationRequest";
 
 export const dynamic = "force-dynamic";
 
-function cronAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
-function notificationMode(value: string | null | undefined): NotificationMode {
-  if (value === "test" || value === "production") return value;
-  return "disabled";
-}
-
-function envList(value: string | undefined) {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 async function handler(request: Request) {
   try {
-    if (!cronAuthorized(request)) {
-      logWarn("monthly_agent_email_rejected", {
-        reason: process.env.CRON_SECRET ? "invalid_secret" : "missing_cron_secret"
-      });
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-    }
+    const unauthorized = requireCronAuthorization(request, "monthly_agent_email_rejected");
+    if (unauthorized) return unauthorized;
 
     const url = new URL(request.url);
     const clinic = await resolveClinicFromRequest(request);

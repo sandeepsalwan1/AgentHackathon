@@ -5,14 +5,20 @@ import {
   setRecipientProfile,
   type Actor
 } from "@central-vet/db";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { doctorName } from "../../lib/veterinarianProfile";
-import { actorSchema } from "../_shared";
+import { logWarn } from "../_apiResponse";
+import { actorSchema, authenticateActor, resolveClinicFromRequest } from "../_shared";
 
-export const profileNameBodySchema = z.object({
+const profileNameBodySchema = z.object({
   actor: actorSchema,
   name: z.string().trim().min(1).max(80)
 });
+
+type ProfileNameUpdateContext =
+  | { actor: Actor; clinicId: string; name: string }
+  | { response: NextResponse };
 
 async function profilePayload(profileId: string | null | undefined, clinicId: string) {
   if (!profileId) return {};
@@ -64,5 +70,28 @@ export async function applyProfileNameUpdate(args: {
       tasksUpdated: rename.tasksUpdated,
       eventsUpdated: rename.eventsUpdated
     }
+  };
+}
+
+export async function profileNameUpdateContext(request: Request): Promise<ProfileNameUpdateContext> {
+  const parsed = profileNameBodySchema.safeParse(await request.json());
+  if (!parsed.success) {
+    logWarn("profile_name_rejected", { reason: "invalid_payload" });
+    return {
+      response: NextResponse.json({ error: "Enter a valid name." }, { status: 400 })
+    };
+  }
+
+  const clinic = await resolveClinicFromRequest(request);
+  const auth = await authenticateActor(parsed.data.actor, request, clinic);
+  if ("response" in auth) {
+    logWarn("profile_name_rejected", { reason: "unauthorized", actorRole: parsed.data.actor.role });
+    return { response: auth.response };
+  }
+
+  return {
+    actor: auth.actor,
+    clinicId: clinic.clinicId,
+    name: parsed.data.name
   };
 }
